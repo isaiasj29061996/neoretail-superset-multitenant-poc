@@ -1,0 +1,193 @@
+name: neoretail-v9-multitenant
+
+x-superset-environment: &superset-environment
+  SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+  SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change-me-local-only}
+  GUEST_TOKEN_JWT_SECRET: ${GUEST_TOKEN_JWT_SECRET:-change-me-local-guest-only}
+  SUPERSET_METADATA_URI: postgresql+psycopg2://superset:${SUPERSET_DB_PASSWORD:-superset}@superset-db:5432/superset
+  SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+  SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+  SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@localhost}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  ANALYTICS_DB_HOST: analytics-db
+  ANALYTICS_DB_PORT: 5432
+  ANALYTICS_DB_NAME: ${ANALYTICS_DB_NAME:-analytics}
+  ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-analytics}
+  ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analytics}
+  ANALYTICS_SQLALCHEMY_URI: ${ANALYTICS_SQLALCHEMY_URI:-}
+
+services:
+  superset-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD:-superset}
+    volumes: ["superset_metadata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  analytics-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${ANALYTICS_DB_NAME:-analytics}
+      POSTGRES_USER: ${ANALYTICS_DB_USER:-analytics}
+      POSTGRES_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analytics}
+    ports: ["${ANALYTICS_DB_PORT:-5433}:5432"]
+    volumes:
+      - analytics_data:/var/lib/postgresql/data
+      - ./analytics-db/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ANALYTICS_DB_USER:-analytics} -d ${ANALYTICS_DB_NAME:-analytics}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  superset-init:
+    build: ./superset
+    environment: *superset-environment
+    volumes:
+      - ./superset:/app/pythonpath:ro
+      - ./generated:/generated
+      - ./certs:/certs:ro
+    depends_on:
+      superset-db: { condition: service_healthy }
+      analytics-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command: ["/bin/sh", "/app/pythonpath/init.sh"]
+    healthcheck: { disable: true }
+    restart: "no"
+
+  superset:
+    build: ./superset
+    environment: *superset-environment
+    ports: ["8088:8088"]
+    volumes:
+      - ./superset:/app/pythonpath:ro
+      - ./generated:/generated
+      - ./certs:/certs:ro
+    depends_on:
+      superset-init: { condition: service_completed_successfully }
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        gunicorn --bind 0.0.0.0:8088 --workers ${SUPERSET_WORKERS:-2}
+        --worker-class gthread --threads ${SUPERSET_THREADS:-20}
+        --timeout ${SUPERSET_TIMEOUT:-180} 'superset.app:create_app()'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8088/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  local-engine:
+    build: ./local-engine
+    environment:
+      PYTHONPATH: /workspace/local-engine
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-neoretail}
+      AZURE_BLOB_PREFIX: ${AZURE_BLOB_PREFIX:-}
+      SOURCE_CATALOG_PATH: /workspace/config/source_catalog.yaml
+      APPROVED_FACTS_PATH: /workspace/config/approved_facts.yaml
+      METRIC_CONTRACTS_PATH: /workspace/config/metric_contracts.yaml
+      POWER_QUERY_CONTRACTS_PATH: /workspace/config/power_query_contracts.yaml
+      CUSTOMERS_CONFIG_PATH: /workspace/config/customers.yaml
+      NEORETAIL_CUSTOMER: ${NEORETAIL_CUSTOMER:-259}
+      LOCAL_DATA_ROOT: /data
+      LOCAL_LAKE_FORMAT: ${LOCAL_LAKE_FORMAT:-parquet}
+      LOCAL_DISCOVERY_MAX_FILES: ${LOCAL_DISCOVERY_MAX_FILES:-5000}
+      SPARK_MASTER: ${SPARK_MASTER:-local[*]}
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-4g}
+      ANALYTICS_DB_HOST: analytics-db
+      ANALYTICS_DB_PORT: 5432
+      ANALYTICS_DB_NAME: ${ANALYTICS_DB_NAME:-analytics}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-analytics}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analytics}
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-neoretail-v9-local}
+      OUTPUT_DIR: /workspace/generated
+    ports: ["8888:8888"]
+    volumes:
+      - ./local-engine:/workspace/local-engine
+      - ./generated:/workspace/generated
+      - ./config:/workspace/config:ro
+      - ./certs:/certs:ro
+      - local_lake:/data
+    depends_on:
+      analytics-db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8888/api || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  embedded-app:
+    build: ./embedded-app
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      SESSION_SECRET: ${EMBED_SESSION_SECRET:-change-me-local-session}
+      SUPERSET_INTERNAL_URL: http://superset:8088
+      PUBLIC_SUPERSET_URL: ${PUBLIC_SUPERSET_URL:-http://localhost:8088}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_EMBEDDED_DASHBOARD_ID: ${SUPERSET_EMBEDDED_DASHBOARD_ID:-}
+      ANALYTICS_MODE: local_postgres
+      TENANTS_CONFIG: /app/config/tenants.yaml
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+    ports: ["3000:3000"]
+    volumes: ["./config:/app/config:ro"]
+    depends_on:
+      superset: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  blob-profiler:
+    profiles: ["blob"]
+    build: ./blob-profiler
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-neoretail}
+      AZURE_BLOB_PREFIX: ${AZURE_BLOB_PREFIX:-}
+      BLOB_PROFILE_MAX_FILES: ${BLOB_PROFILE_MAX_FILES:-250}
+      BLOB_PROFILE_SAMPLE_ROWS: ${BLOB_PROFILE_SAMPLE_ROWS:-1000}
+      BLOB_PROFILE_INCLUDE_SAMPLES: ${BLOB_PROFILE_INCLUDE_SAMPLES:-false}
+      COMPANY_CA_BUNDLE: /certs/company-root-ca.crt
+      OUTPUT_DIR: /generated
+    volumes:
+      - ./generated:/generated
+      - ./config:/config:ro
+      - ./certs:/certs:ro
+    restart: "no"
+
+volumes:
+  superset_metadata:
+  analytics_data:
+  redis_data:
+  local_lake:

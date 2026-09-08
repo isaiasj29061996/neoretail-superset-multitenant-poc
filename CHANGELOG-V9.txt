@@ -1,0 +1,12 @@
+NeoRetail V9 - Multi-tenant Superset
+
+Checkpoint 01 - identidade de clientes
+- V8.1 preservada como baseline funcional.
+- Nova base V9 criada sem alterar os charts finais.
+- ID_CUSTOMER adotado como chave corporativa e de RLS.
+- Clientes iniciais confirmados: 3CORACOES=259, BASTON=609, SAFIRA=16868.
+- Quality Gate respeita clientes sem o modulo Mercado.
+- Plugin React NeoRetail KPI Card adicionado ao frontend do Superset 6.
+- Mart Visao Industria enriquecido com tarefas por item/local.
+- Prefixos de fatos registrados por industria.
+- Horarios mantidos desabilitados ate validacao com a operacao.

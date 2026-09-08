@@ -1,0 +1,23 @@
+version: "9.0"
+policy: Dashboards são construídos manualmente sobre datasets Gold aprovados.
+modules:
+  visao_industria:
+    label: Visão geral da indústria
+    priority: 1
+    status: engineering_ready_visual_pending
+    required_metrics: [tvd, ivd, osa, giro, oportunidades]
+  osa_ruptura:
+    label: OSA e ruptura
+    priority: 2
+    status: discovery
+    required_metrics: [osa]
+  vendas_perdas:
+    label: Vendas, perdas e oportunidades
+    priority: 3
+    status: discovery
+    required_metrics: [oportunidades]
+  itens_sem_venda:
+    label: Itens sem venda
+    priority: 4
+    status: discovery
+    required_metrics: [itens_sem_venda]

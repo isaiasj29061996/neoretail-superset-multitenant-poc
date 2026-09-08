@@ -1,0 +1,40 @@
+NeoRetail V8.1 - Local PostgreSQL
+
+- Divide a Silver em 03A dimensoes, 03B fatos, 03C oportunidades e 03D validacao.
+- Une varejistas por familia com schema drift, tenant_id e linhagem auditavel.
+- Consolida ETL_CALC_V2 sem inventar formulas ausentes do codigo M.
+- Adiciona power_query_contracts.yaml e audits de readiness/quality da Silver.
+
+- Remove Databricks Runtime, SQL Warehouse, SDK e connector do runtime.
+- Adiciona PySpark local com Jupyter e notebooks 00-08 via Jupytext.
+- Mantem Azure Blob como unica fonte de verdade.
+- Cria lake local Bronze/Silver/Gold em Parquet; Delta e opcional.
+- Adiciona PostgreSQL Analytics separado do PostgreSQL Metadata.
+- Publica somente Gold no banco consumido pelo Superset.
+- Cadastra e testa automaticamente a conexao Analytics no Superset.
+- Mantem Guest Token, RLS por tenant_id, Redis e portal Embedded.
+- Adiciona pipeline, smoke test, health checks e logs por etapa.
+- Mantem fatos e metricas bloqueados ate aprovacao humana.
+- Fixa o local-engine em Debian Bookworm para manter OpenJDK 17 disponivel
+  e impedir quebra do build quando a tag flutuante python:3.11-slim mudar.
+- Corrige o bootstrap Analytics para a API de context manager do Superset 6:
+  abre a Engine antes de iniciar a transacao SQLAlchemy.
+- Mantem o objeto Database anexado a sessao durante a validacao, usa o setter
+  seguro da URI e confirma o metadata somente depois do SELECT 1.
+- Adiciona ingestao Bronze de todos os fatos candidatos sob
+  PARTICULAR_3/3CORACOES, classificados em nove familias e varejos.
+- Preserva ETL_CALC V1/V2 e schemas diferentes em tabelas separadas.
+- Adiciona inventario auditavel e comando PowerShell por familia, sem salvar SAS.
+- Trata Parquet candidato vazio como `empty_source`, preservando a evidencia e
+  continuando a ingestao dos outros arquivos da familia.
+- Divide a etapa Bronze em notebook 02A para dimensoes aprovadas e 02B para
+  fatos candidatos, ambos chamando o mesmo engine Python usado pelo PowerShell.
+- Faz a etapa 01 inventariar explicitamente o prefixo da 3CORACOES mesmo quando
+  a varredura geral atinge o limite de arquivos.
+- Reproduz na Silver as consultas M extraidas do SemanticModel TMDL para oito
+  dimensoes/auxiliares, sete fatos particulares e CALCULO_OPORTUNIDADES.
+- Adiciona DIMENSAO_VAREJO_CONTRATADO a Bronze 02A, dependencia real de DIM_LOCAL.
+- Adiciona 02C para os Parquets de FATO_MERCADO fora do prefixo PARTICULAR_3.
+- Mantem as oito colunas calculadas DAX de oportunidades na camada semantica.
+- Aceita `DIAS_SEM_VENDAS` dos Parquets diarios como alias de
+  `DIAS_SEM_VENDA`, preservando o nome final definido pelo Power Query.

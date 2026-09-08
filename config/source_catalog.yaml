@@ -1,0 +1,81 @@
+version: "9.0"
+source_of_truth: azure_blob
+runtime: local_pyspark_postgres_multitenant
+policy:
+  no_pbix_dependency: true
+  approval_required: true
+  candidates_are_not_approved_tables: true
+  required_evidence:
+    - parquet_path
+    - schema_fingerprint
+    - business_grain
+    - primary_or_natural_keys
+    - tenant_column
+    - date_column_when_applicable
+    - sample_and_count_validation
+    - human_reviewer
+storage:
+  account: azreu2platdw
+  container: neoretail
+  local_cache_root: /data/raw-cache
+  local_lake_root: /data/lake
+  serving_database: postgresql_analytics
+sources:
+  dim_itens:
+    path: DIMENSAO/CATALOGO_PRODUTO_GVI.snappy.parquet
+    classification: dimension
+    status: approved_path
+    bronze_table: dim_itens_raw
+  dim_local:
+    path: DIMENSAO/DIMENSAO_LOCAL.snappy.parquet
+    classification: dimension
+    status: approved_path
+    bronze_table: dim_local_raw
+  dim_customer:
+    path: DIMENSAO/DIMENSAO_CUSTOMER.snappy.parquet
+    classification: dimension
+    status: approved_path
+    bronze_table: dim_customer_raw
+  dim_conversao:
+    path: DIMENSAO/DIMENSAO_CONVERSOES.snappy.parquet
+    classification: dimension
+    status: approved_path
+    bronze_table: dim_conversao_raw
+  dim_catalogo_produtos:
+    path: DIMENSAO/DIMENSAO_CATALOGO_PRODUTOS.snappy.parquet
+    classification: dimension
+    status: approved_path
+    bronze_table: dim_catalogo_produtos_raw
+  dim_varejo_contratado:
+    path: DIMENSAO/DIMENSAO_VAREJO_CONTRATADO.snappy.parquet
+    classification: auxiliary_dimension
+    status: approved_path
+    bronze_table: dim_varejo_contratado_raw
+discovery:
+  facts_prefix_source: customers.yaml
+  status: discovery
+  note: Nomes ETL_CALC não definem a tabela lógica nem a métrica.
+  candidate_policy:
+    bronze_only: true
+    one_table_per_file: true
+    preserve_versions: true
+    gold_requires_approval: true
+  families:
+    etl_calc_v2:
+      regex: '^ETL_CALC_V2_(?P<retailer>[A-Z0-9]+)\.snappy\.parquet$'
+    etl_calc_v1:
+      regex: '^ETL_CALC_(?P<retailer>[A-Z0-9]+)\.snappy\.parquet$'
+    fato_diaria:
+      regex: '^PARTICULAR_FATO_DIARIA_(?P<retailer>[A-Z0-9]+)_(?P<customer>[A-Z0-9]+)\.snappy\.parquet$'
+    fato_historico:
+      regex: '^PARTICULAR_FATO_HISTORICO_(?P<retailer>[A-Z0-9]+)_(?P<customer>[A-Z0-9]+)\.snappy\.parquet$'
+    fato_ivd_tvd:
+      regex: '^PARTICULAR_FATO_IVD_TVD_(?P<retailer>[A-Z0-9]+)\.snappy\.parquet$'
+    fato_nivel_atividade:
+      regex: '^PARTICULAR_FATO_NIVEL_ATIVIDADE_(?P<retailer>[A-Z0-9]+)_(?P<customer>[A-Z0-9]+)\.snappy\.parquet$'
+    fato_preco:
+      regex: '^PARTICULAR_FATO_PRECO_(?P<retailer>[A-Z0-9]+)\.snappy\.parquet$'
+    mensal_causa_osa:
+      regex: '^PARTICULAR_MENSAL_CAUSA_OSA_(?P<retailer>[A-Z0-9]+)_(?P<customer>[A-Z0-9]+)\.snappy\.parquet$'
+    semanal:
+      regex: '^PARTICULAR_SEMANAL_(?P<retailer>[A-Z0-9]+)\.snappy\.parquet$'

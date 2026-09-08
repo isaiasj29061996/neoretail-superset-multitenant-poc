@@ -1,0 +1,114 @@
+version: "9.0"
+purpose: Reproduzir na Silver as consultas M extraidas do modelo semantico NeoRetail Pocket RF.
+evidence:
+  artifact: NeoRetail Pocket RF.SemanticModel
+  format: TMDL
+  parameter_query: _nomeCliente
+policy:
+  source_layer: bronze
+  target_layer: silver
+  normalize_column_names: true
+  trim_strings: true
+  preserve_lineage: true
+  no_unproven_business_formula: true
+  customer_key: id_customer
+  customer_registry: customers.yaml
+
+dimensions:
+  dim_customer: {source_table: dim_customer_raw, target_table: dim_customer, power_query: DIM_CUSTOMER}
+  aux_contratado_local: {source_table: dim_varejo_contratado_raw, target_table: aux_contratado_local, power_query: AUX_CONTRATADO_LOCAL}
+  dim_itens: {source_table: dim_itens_raw, target_table: dim_itens, power_query: DIM_ITENS, depends_on: [dim_customer]}
+  dim_conversao: {source_table: dim_conversao_raw, target_table: dim_conversao, power_query: DIM_CONVERSAO, depends_on: [dim_customer]}
+  dim_catalogo_produtos: {source_table: dim_catalogo_produtos_raw, target_table: dim_catalogo_produtos, power_query: DIM_CATALOGO_PRODUTOS, allow_empty: true}
+  aux_contratado_segmento: {source_table: dim_catalogo_produtos_raw, target_table: aux_contratado_segmento, power_query: AUX_CONTRATADO_SEGMENTO, depends_on: [dim_catalogo_produtos], allow_empty: true}
+  dim_local: {source_table: dim_local_raw, target_table: dim_local, power_query: DIM_LOCAL, depends_on: [aux_contratado_local]}
+  dim_catalogo_local: {source_table: dim_local_raw, target_table: dim_catalogo_local, power_query: DIM_CATALOGO_LOCAL}
+
+fact_families:
+  fato_diaria:
+    target_table: fato_diaria
+    power_query: FATOS_PARTICULAR_DIARIA
+    aliases: {dias_sem_venda: [dias_sem_vendas]}
+    columns: [id_time, id_item, id_location, volume_unidades, faturamento, estoque_unidades, estoque_transito, rup, est_virtual, dias_sem_venda, nivel_atividade, qtd_itens_ativos, qtd_perda_osa, qtd_problemas_osa, qtd_item_ativo_osa, status_item_geral, demanda_media, estoque_cd, preco_medio_ref]
+    rename: {id_time: data}
+    types: {data: date, id_item: text, id_location: text, volume_unidades: double, faturamento: double, estoque_unidades: double, estoque_transito: double, rup: long, est_virtual: long, dias_sem_venda: double, nivel_atividade: text, qtd_itens_ativos: long, qtd_perda_osa: double, qtd_problemas_osa: long, qtd_item_ativo_osa: long, status_item_geral: long, demanda_media: double, estoque_cd: double, preco_medio_ref: double}
+
+  semanal:
+    target_table: fato_semanal
+    power_query: FATOS_PARTICULAR_SEMANAL
+    columns: [id_time, cd_week, id_location, id_item, rup, est_virtual, qtd_problemas_osa, qtd_item_ativo_osa, status_item_geral, giro, qtd_perda_osa, qtd_itens_validos, estoque_unidades, estoque_medio, volume_unidade, faturamento, avg_sales_price, avg_price_cost, perda_ruptura, perda_isv]
+    types: {id_time: date, cd_week: text, id_location: text, id_item: text, rup: double, est_virtual: double, qtd_problemas_osa: long, qtd_item_ativo_osa: long, status_item_geral: long, giro: long, qtd_perda_osa: double, qtd_itens_validos: long, estoque_unidades: double, estoque_medio: double, volume_unidade: double, faturamento: double, avg_sales_price: double, avg_price_cost: double, perda_ruptura: double, perda_isv: double}
+
+  fato_historico:
+    target_table: fato_historico
+    power_query: FATOS_PARTICULAR_HISTORICO
+    columns: [mes_ano, id_item, ean, id_location, cnpj, volume_unidades, faturamento, estoque_unidades, expectativa_vendas, rup, est_virtual, qtd_perda_osa, positivacao, giro, demanda_media, qtd_problemas_osa, qtd_itens_validos, status_item_geral, qtd_item_ativo_osa, avg_sales_price, avg_price_cost, estoque_medio, estoque_transito, tp_activity_level]
+    fill_nulls: {tp_activity_level: I}
+    types: {mes_ano: date, id_item: text, ean: text, id_location: text, cnpj: text, volume_unidades: double, faturamento: double, estoque_unidades: double, expectativa_vendas: double, rup: double, est_virtual: double, qtd_perda_osa: double, positivacao: long, giro: double, demanda_media: double, qtd_problemas_osa: double, qtd_itens_validos: double, status_item_geral: double, qtd_item_ativo_osa: double, avg_sales_price: double, avg_price_cost: double, estoque_medio: double, estoque_transito: double, tp_activity_level: text}
+
+  fato_ivd_tvd:
+    target_table: fato_ivd_tvd
+    power_query: FATOS_PARTICULAR_TVD_IVD
+    columns: [id_time, id_item, id_location, tp_activity_level, tvd_simplificado, ivd_simplificado]
+    types: {id_time: timestamp, id_item: text, id_location: text, tp_activity_level: text, tvd_simplificado: double, ivd_simplificado: double}
+
+  mensal_causa_osa:
+    target_table: fato_mensal_causa_osa
+    power_query: FATOS_MENSAL_CAUSA_OSA
+    columns: [vl_month, vl_year, id_item, id_location, qtd_perda_osa, qtd_problemas_osa, qtd_itens_ativos, volume_unidades, faturamento, preco_medio, causa_osa, motivo_osa]
+    derived_date: {target: data, year: vl_year, month: vl_month, day: 1}
+    drop_after_derive: [vl_month, vl_year]
+    types: {data: date, id_item: text, id_location: text, qtd_perda_osa: double, qtd_problemas_osa: long, qtd_itens_ativos: long, volume_unidades: double, faturamento: double, preco_medio: double, causa_osa: text, motivo_osa: text}
+
+  fato_nivel_atividade:
+    target_table: fato_nivel_atividade
+    power_query: FATOS_PARTICULAR_NIVEL_ATIVIDADE
+    columns: [id_item, id_location, tp_activity_level, nm_activity_level]
+    fill_nulls: {tp_activity_level: I}
+    types: {id_item: text, id_location: text, tp_activity_level: text, nm_activity_level: text}
+
+  fato_preco:
+    target_table: fato_preco
+    power_query: FATOS_PRECO
+    columns: [mes, ano, id_item, id_location, customer, preco_venda, preco_custo]
+    rename: {preco_venda: media_preco_venda, preco_custo: media_preco_custo}
+    types: {mes: long, ano: long, id_item: long, id_location: long, customer: text, media_preco_venda: double, media_preco_custo: double}
+
+  etl_calc_v1:
+    target_table: etl_calc_v1
+    power_query: null
+    technical_only: true
+    passthrough: true
+    note: ETL_CALC legado existe no Blob, mas nao alimenta CALCULO_OPORTUNIDADES atual.
+
+  etl_calc_v2:
+    target_table: etl_calc_v2
+    power_query: CALCULO_OPORTUNIDADES
+    columns: [id_location, id_item, estoque_unidades, expectativa_vendas, venda_hoje_qtd, venda_hoje_valor, venda_qtd_d7, venda_qtd_d30, venda_qtd_d90, venda_valor_d7, venda_valor_d30, venda_valor_d90, preco_medio_referencia, rup, est_virtual, demanda_media, dias_sem_vendas, perda_osa, estoque_medio_90, estoque_min, estoque_max, max_tp_activity_level, tvd, ivd, causa_osa_m0, motivo_osa_m0, acao_osa_m0, giro_estoque, perda_osa_rup_m0, perda_osa_isv_m0, qtd_item_ativo_osa_m0, qtd_problemas_osa_m0, status_item_geral, regra_critico, alerta_tvd, alerta_ivd, alerta_osa, estoque_cd, estoque_transito]
+    fill_nulls: {max_tp_activity_level: I, demanda_media: 0, estoque_unidades: 0, rup: 0, est_virtual: 0, giro_estoque: 0, perda_osa: 0, ivd: 0, tvd: 0, qtd_item_ativo_osa_m0: 0}
+    types: {id_location: text, id_item: text, estoque_unidades: double, expectativa_vendas: double, venda_hoje_qtd: double, venda_hoje_valor: double, venda_qtd_d7: double, venda_qtd_d30: double, venda_qtd_d90: double, venda_valor_d7: double, venda_valor_d30: double, venda_valor_d90: double, preco_medio_referencia: double, rup: long, est_virtual: long, demanda_media: double, dias_sem_vendas: long, perda_osa: double, estoque_medio_90: double, estoque_min: double, estoque_max: double, max_tp_activity_level: text, tvd: decimal_19_4, ivd: decimal_19_4, causa_osa_m0: text, motivo_osa_m0: text, acao_osa_m0: text, giro_estoque: double, qtd_item_ativo_osa_m0: long, qtd_problemas_osa_m0: long, status_item_geral: long, regra_critico: text, alerta_tvd: text, alerta_ivd: text, alerta_osa: text, estoque_cd: double, estoque_transito: double}
+
+post_fact_dimensions:
+  dim_nivel_atividade: {source_table: fato_nivel_atividade, target_table: dim_nivel_atividade, power_query: DIM_NIVEL_ATIVIDADE}
+
+market:
+  power_query: FATO_MERCADO
+  target_table: fato_mercado
+  blob_prefix: MERCADO
+  path_contains: /MERCADO_FATO_HISTORICO/
+  exclude_path_contains: gpa
+  segment_source: aux_contratado_segmento
+  allowed_segments: [AGUA_DE_COCO, AGUA_MINERAL, BEBIDA_ALCOOLICA_MISTA, CERVEJA, ISOTONICO, REFRIGERANTE]
+  status: ready_for_bronze_ingestion
+  columns: [segmento, id_retailer, mes_ano, id_product_segment, uf, contagem_itens, volume_unidades, faturamento, estoque_unidades, rup, est_virtual, qtd_perda_osa, positivacao, demanda_media, status_item_osa, qtd_problemas_osa, qtd_cnpj, id_customer, status_item_geral, estoque_medio, giro, nivel_atividade, avg_sales_price, avg_price_cost, estoque_valor]
+  fill_nulls: {nivel_atividade: I}
+  types: {segmento: text, id_retailer: text, mes_ano: date, id_product_segment: long, uf: text, contagem_itens: long, volume_unidades: double, faturamento: double, estoque_unidades: double, rup: double, est_virtual: double, qtd_perda_osa: double, positivacao: long, demanda_media: double, status_item_osa: long, qtd_problemas_osa: double, qtd_cnpj: long, id_customer: long, status_item_geral: long, estoque_medio: double, giro: long, nivel_atividade: text, avg_sales_price: double, avg_price_cost: double, estoque_valor: double}
+
+opportunities:
+  evidence: Consulta M CALCULO_OPORTUNIDADES expande somente ETL_CALC_V2.
+  source_table: etl_calc_v2
+  target_table: calculo_oportunidades
+  required_key_columns: [id_location, id_item]
+  required_source_columns: [estoque_unidades, expectativa_vendas, venda_hoje_qtd, venda_hoje_valor]
+  semantic_calculated_columns: [nivel_de_atividade_tvd, nivel_de_atividade_ivd, nivel_de_atividade_osa, flag_ruptura, flag_item_sem_venda, flag_problema_osa, flag_metrica_padrao_osa, status_ruptura]
+  formula_parity: power_query_m_exact_dax_deferred_to_semantic_layer

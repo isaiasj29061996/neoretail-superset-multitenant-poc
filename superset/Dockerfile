@@ -1,0 +1,38 @@
+FROM node:20-bookworm-slim AS neoretail-frontend
+
+ARG SUPERSET_VERSION=6.0.0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN curl -fsSL "https://github.com/apache/superset/archive/refs/tags/${SUPERSET_VERSION}.tar.gz" \
+  | tar -xz --strip-components=1
+
+COPY frontend-plugin/plugin-chart-neoretail-kpi \
+  /src/superset-frontend/plugins/plugin-chart-neoretail-kpi
+COPY frontend-plugin/register-plugin.mjs /tmp/register-plugin.mjs
+
+WORKDIR /src/superset-frontend
+RUN node /tmp/register-plugin.mjs
+RUN npm ci --no-audit --no-fund
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends zstd \
+ && rm -rf /var/lib/apt/lists/*
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+FROM apache/superset:6.0.0
+
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && update-ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && (/app/.venv/bin/python -m ensurepip --upgrade >/dev/null 2>&1 || true)
+
+RUN /app/.venv/bin/python -m pip install --no-cache-dir \
+      psycopg2-binary redis
+
+COPY superset_config.py bootstrap_analytics.py init.sh /app/pythonpath/
+COPY --from=neoretail-frontend /src/superset/static/assets /app/superset/static/assets
+USER superset

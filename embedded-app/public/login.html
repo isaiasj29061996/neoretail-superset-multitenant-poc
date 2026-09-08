@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeoRetail 2.0 — Entrar</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-brand">
+        <div class="brand-mark">N</div>
+        <p class="eyebrow">NeoRetail Analytics</p>
+        <h1>Decisões de varejo com contexto, velocidade e clareza.</h1>
+        <p class="brand-copy">POC V9 multitenant: uma Gold compartilhada, um dashboard e isolamento seguro por ID_CUSTOMER.</p>
+        <div class="architecture-strip">
+          <span>Blob</span><i>→</i><span>PySpark</span><i>→</i><span>PostgreSQL</span><i>→</i><span>Superset</span>
+        </div>
+      </section>
+      <section class="login-card">
+        <div>
+          <p class="eyebrow blue">Ambiente local</p>
+          <h2>Bem-vindo</h2>
+          <p>Entre com um usuário configurado para a POC.</p>
+        </div>
+        <form id="login-form">
+          <label>Usuário<input name="username" value="demo.multitenant" autocomplete="username" required /></label>
+          <label>Senha<input name="password" type="password" autocomplete="current-password" required /></label>
+          <p id="login-error" class="form-error" role="alert"></p>
+          <button type="submit">Entrar no NeoRetail</button>
+        </form>
+        <p class="login-note">Login mock exclusivo da POC. A autorização real continuará pertencendo ao backend NeoRetail.</p>
+      </section>
+    </main>
+    <script src="/app.bundle.js"></script>
+  </body>
+</html>

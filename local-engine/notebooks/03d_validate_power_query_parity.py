@@ -1,0 +1,24 @@
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.17.0
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
+# # NeoRetail V8.1 Local - 03D Validacao Silver
+# Compara contagens Bronze/Silver, colunas obrigatorias e paridade estrutural.
+# Os resultados ficam em `audit.silver_quality_gate`.
+
+# %%
+from neoretail_local.pipeline import run_step
+
+result = run_step("03D")
+result

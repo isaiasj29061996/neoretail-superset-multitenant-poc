@@ -1,0 +1,19 @@
+stages: [validate, refresh]
+
+validate-v9:
+  stage: validate
+  image: python:3.11-slim-bookworm
+  before_script:
+    - pip install --no-cache-dir pyyaml
+  script:
+    - python scripts/validate_project.py
+
+refresh-multitenant:
+  stage: refresh
+  tags: [windows-docker]
+  script:
+    - pwsh -NoProfile -File .\run-multitenant-refresh.ps1
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual

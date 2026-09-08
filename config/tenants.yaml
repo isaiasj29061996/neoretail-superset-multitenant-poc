@@ -1,0 +1,20 @@
+version: "9.0"
+default_customer_id: 259
+
+# POC local. Em produção, usuários e permissões virão do backend NeoRetail.
+customers:
+  "259":
+    name: 3 Corações
+    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
+  "609":
+    name: Baston
+    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
+  "16868":
+    name: Safira
+    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
+
+users:
+  - username: demo.multitenant
+    password_env: DEMO_USER_PASSWORD
+    display_name: Analista POC
+    allowed_customer_ids: [259, 609, 16868]

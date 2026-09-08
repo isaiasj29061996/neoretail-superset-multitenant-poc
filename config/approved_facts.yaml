@@ -1,0 +1,64 @@
+version: "9.0"
+
+policy:
+  source: silver_validated
+  approval_required: true
+  id_customer_required_for_gold: true
+  note: Somente fatos Silver validados podem ser publicadas na Gold.
+
+facts:
+  - logical_name: fato_diaria
+    silver_table: fato_diaria
+    grain: data_id_item_id_location
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: fato_semanal
+    silver_table: fato_semanal
+    grain: id_time_cd_week_id_item_id_location
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: fato_historico
+    silver_table: fato_historico
+    grain: mes_ano_id_item_id_location
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: fato_ivd_tvd
+    silver_table: fato_ivd_tvd
+    grain: id_time_id_item_id_location_tp_activity_level
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: fato_mensal_causa_osa
+    silver_table: fato_mensal_causa_osa
+    grain: data_id_item_id_location_causa_osa_motivo_osa
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: fato_nivel_atividade
+    silver_table: fato_nivel_atividade
+    grain: id_item_id_location
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: fato_preco
+    silver_table: fato_preco
+    grain: ano_mes_id_item_id_location_customer
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved
+
+  - logical_name: calculo_oportunidades
+    silver_table: calculo_oportunidades
+    grain: id_item_id_location
+    tenant_column: id_customer
+    reviewer: Isaias Justo
+    status: approved

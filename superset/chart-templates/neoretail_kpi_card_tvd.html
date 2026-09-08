@@ -1,0 +1,33 @@
+{{#each data}}
+<div class="nr-kpi-card">
+  <header class="nr-card-header">
+    <strong>TVD - Pré-ruptura</strong>
+    <span class="nr-info" title="Tendência de pré-ruptura">i</span>
+  </header>
+
+  <div class="nr-metrics">
+    <div class="nr-metric">
+      <span class="nr-label">MTD</span>
+      <span class="nr-value"><span class="nr-trend {{mtd_status}}">{{mtd_arrow}}</span> {{tvd_mtd_label}}</span>
+    </div>
+    <div class="nr-metric">
+      <span class="nr-label">Mês anterior</span>
+      <span class="nr-value"><span class="nr-trend {{anterior_status}}">{{anterior_arrow}}</span> {{tvd_mes_anterior_label}}</span>
+    </div>
+    <div class="nr-metric">
+      <span class="nr-label">Média U3M</span>
+      <span class="nr-value">{{tvd_media_u3m_label}}</span>
+    </div>
+  </div>
+
+  <svg class="nr-area" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Comparação entre MTD, mês anterior e média U3M">
+    <polygon points="0,100 75,{{tvd_mtd_y}} 150,{{tvd_mes_anterior_y}} 225,{{tvd_media_u3m_y}} 300,100" fill="#7c4ad9" fill-opacity="0.42"></polygon>
+    <polyline points="0,100 75,{{tvd_mtd_y}} 150,{{tvd_mes_anterior_y}} 225,{{tvd_media_u3m_y}} 300,100" fill="none" stroke="#7c4ad9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+  </svg>
+
+  <span class="nr-section-label">Tarefas do dia</span>
+  <div class="nr-task">{{formatNumber itens_criticos "pt-BR"}} itens críticos</div>
+  <div class="nr-task">{{formatNumber itens_risco "pt-BR"}} itens com risco</div>
+  <a class="nr-action" href="#">Ir para análise ›</a>
+</div>
+{{/each}}

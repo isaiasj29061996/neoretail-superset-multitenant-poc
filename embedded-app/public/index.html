@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeoRetail 2.0 — Visão Geral</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="app-page">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="sidebar-brand" href="/portal"><span class="brand-mark small">N</span><span>NeoRetail <b>2.0</b></span></a>
+        <nav>
+          <p>ANÁLISES</p>
+          <a class="active" href="#"><span>◫</span> Visão geral</a>
+          <a href="#"><span>⌁</span> Panorama</a>
+          <a href="#"><span>✓</span> Tarefas do dia</a>
+          <a href="#"><span>⌗</span> Malha</a>
+          <a data-module="mercado" href="#"><span>◇</span> Mercado</a>
+          <p>GESTÃO</p>
+          <a href="#"><span>⚙</span> Configurações</a>
+        </nav>
+        <div class="sidebar-footer">
+          <span id="analytics-state" class="status-dot">PostgreSQL Analytics</span>
+          <small>NeoRetail V9 • Multitenant • localhost</small>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="breadcrumb">ANÁLISES / VISÃO GERAL</p>
+            <h1>Visão Geral — Indústria</h1>
+          </div>
+          <div class="topbar-actions">
+            <label class="customer-context"><small>Indústria ativa</small><select id="customer-select" aria-label="Indústria ativa"></select></label>
+            <div class="tenant-pill"><small>Cliente</small><strong id="tenant-name">—</strong><span id="tenant-badge">—</span></div>
+            <div class="user-menu"><span class="avatar">NR</span><div><small>Analista</small><strong id="user-name">—</strong></div></div>
+            <button id="logout" class="icon-button" title="Sair">↪</button>
+          </div>
+        </header>
+
+        <section class="context-bar">
+          <div><small>PERÍODO</small><strong>Últimos 30 dias</strong></div>
+          <div><small>CANAL</small><strong>Todos os canais</strong></div>
+          <div><small>REGIÃO</small><strong>Brasil</strong></div>
+          <button>Mais filtros <span>＋</span></button>
+        </section>
+
+        <section class="kpi-preview" aria-label="Estrutura de indicadores">
+          <article><span class="kpi-icon cyan">T</span><div><small>TVD</small><strong>—</strong><em>Contrato em descoberta</em></div></article>
+          <article><span class="kpi-icon violet">I</span><div><small>IVD</small><strong>—</strong><em>Contrato em descoberta</em></div></article>
+          <article><span class="kpi-icon green">O</span><div><small>OSA</small><strong>—</strong><em>Contrato em descoberta</em></div></article>
+          <article><span class="kpi-icon amber">G</span><div><small>GIRO</small><strong>—</strong><em>Contrato em descoberta</em></div></article>
+        </section>
+
+        <section class="dashboard-card">
+          <div id="dashboard-loading" class="dashboard-state">
+            <span class="spinner"></span>
+            <h2>Preparando dashboard seguro</h2>
+            <p>Validando sessão, ID_CUSTOMER e Guest Token.</p>
+          </div>
+          <div id="setup-state" class="dashboard-state setup" hidden>
+            <span class="setup-icon">⌁</span>
+            <h2>Casca embedded pronta</h2>
+            <p id="setup-message"></p>
+            <div class="setup-flow"><span>Blob</span><i>→</i><span>Gold</span><i>→</i><span>Superset</span><i>→</i><span>Portal</span></div>
+          </div>
+          <div id="superset-container"></div>
+        </section>
+      </main>
+    </div>
+    <script src="/app.bundle.js"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+version: "9.0"
+policy:
+  source: blob_first
+  no_dax_import: true
+  no_unapproved_formula: true
+  canonical_layer: postgresql_analytics.gold
+  superset_role: presentation_and_aggregation
+  security_key: id_customer
+required_for_approval:
+  - business_definition
+  - numerator_and_denominator_or_expression
+  - source_tables
+  - grain
+  - filters_and_exclusions
+  - null_and_zero_policy
+  - expected_examples
+  - business_owner
+  - technical_reviewer
+metrics:
+  tvd: { label: TVD, status: discovery, business_definition: null, gold_expression: null, source_tables: [] }
+  ivd: { label: IVD, status: discovery, business_definition: null, gold_expression: null, source_tables: [] }
+  osa: { label: OSA, status: discovery, business_definition: null, gold_expression: null, source_tables: [] }
+  giro: { label: Giro, status: discovery, business_definition: null, gold_expression: null, source_tables: [] }
+  oportunidades: { label: Oportunidades, status: discovery, business_definition: null, gold_expression: null, source_tables: [] }
+  itens_sem_venda: { label: Itens sem venda, status: discovery, business_definition: null, gold_expression: null, source_tables: [] }
