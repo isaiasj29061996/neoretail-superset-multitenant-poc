@@ -18,6 +18,12 @@ ALLOWED_DOMAINS = os.getenv(
     "EMBED_ALLOWED_DOMAINS", "http://localhost:3000"
 ).split(",")
 
+EMBEDDED_FIT_CSS = (
+    " .dashboard-content { width: 100% !important; max-width: 100% !important; "
+    "overflow-x: hidden !important; } .grid-container { width: 100% !important; "
+    "max-width: 100% !important; } body { overflow-x: hidden !important; }"
+)
+
 
 def main():
     catalog = yaml.safe_load(open(CATALOG_PATH, encoding="utf-8"))
@@ -63,13 +69,17 @@ def main():
                 )
 
             metadata = json.loads(dashboard.json_metadata or "{}")
-            for native_filter in metadata.get("native_filter_configuration", []):
-                targets = native_filter.get("targets", [])
-                if any(target.get("column", {}).get("name") == "id_customer" for target in targets):
-                    native_filter["defaultDataMask"] = {
-                        "extraFormData": {}, "filterState": {}, "ownState": {},
-                    }
+            metadata["native_filter_configuration"] = [
+                native_filter
+                for native_filter in metadata.get("native_filter_configuration", [])
+                if not any(
+                    target.get("column", {}).get("name") == "id_customer"
+                    for target in native_filter.get("targets", [])
+                )
+            ]
             dashboard.json_metadata = json.dumps(metadata, ensure_ascii=False)
+            if EMBEDDED_FIT_CSS not in (dashboard.css or ""):
+                dashboard.css = (dashboard.css or "") + EMBEDDED_FIT_CSS
 
             embedded_uuid = uuid.UUID(str(definition["embedded_id"]))
             embedded = db.session.query(EmbeddedDashboard).filter(

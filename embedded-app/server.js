@@ -50,6 +50,7 @@ function authorizedDashboards(identity) {
       menuLabel: item.menu_label,
       section: item.section,
       embeddedId: String(item.embedded_id),
+      embeddedHeight: Number(item.embedded_height || 1200),
     }));
 }
 

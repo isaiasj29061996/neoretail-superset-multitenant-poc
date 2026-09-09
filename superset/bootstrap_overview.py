@@ -87,17 +87,25 @@ M = {
 
 def upsert_dataset(session, model, database, name, *, table_name=None, sql=None):
     dataset = session.query(model).filter(model.table_name == name).one_or_none()
+    needs_metadata = dataset is None
     if dataset is None:
         dataset = model(table_name=name, schema="gold", database=database)
         session.add(dataset)
+    else:
+        needs_metadata = (
+            dataset.sql != sql
+            or (table_name is not None and dataset.table_name != table_name)
+            or not dataset.columns
+        )
     dataset.database = database
     dataset.schema = "gold"
     dataset.sql = sql
     if table_name:
         dataset.table_name = table_name
     session.flush()
-    dataset.fetch_metadata()
-    session.flush()
+    if needs_metadata:
+        dataset.fetch_metadata()
+        session.flush()
     return dataset
 
 
@@ -147,7 +155,6 @@ def position_json(charts):
 
 def native_filters(dataset_id):
     definitions = [
-        ("id_customer", "Indústria", []),
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
@@ -165,8 +172,6 @@ def native_filters(dataset_id):
     return [{
         "id": ids[column], "controlValues": {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": True, "searchAllOptions": True, "inverseSelection": False},
         "name": label, "filterType": "filter_select", "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        # The portal applies id_customer through Guest Token RLS. Persisting a
-        # customer here would conflict when another industry is selected.
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
         "type": "NATIVE_FILTER", "description": "",
@@ -202,7 +207,7 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = position_json(charts)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; } .dashboard-component-chart-holder > .header { display: none !important; }"
+        dashboard.css = ".dashboard-content { width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; background: #e7f0f5 !important; } .grid-container { width: 100% !important; max-width: 100% !important; } .dashboard-component-chart-holder { border-radius: 8px; } .dashboard-component-chart-holder > .header { display: none !important; }"
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"})
         dashboard.slices = charts
         db.session.commit()

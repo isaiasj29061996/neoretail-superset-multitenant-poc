@@ -88,7 +88,6 @@ def detail_table_params(dataset, metrics, expression):
 
 def task_filters(dataset_id):
     definitions = [
-        ("id_customer", "Indústria", []),
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
@@ -112,7 +111,6 @@ def task_filters(dataset_id):
         },
         "name": label, "filterType": "filter_select",
         "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        # The portal applies id_customer through Guest Token RLS.
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents],
         "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
@@ -163,14 +161,14 @@ def main():
 
         tvd_card = custom_params(
             history, "TVD - Pré-ruptura", [TVD_HISTORY], grain="P1D",
-            formats="decimal", variant="headlinearea",
+            formats="currency", variant="headlinearea",
         )
         tvd_card["accent_color"] = "#7C43DF"
         add("tvd_card", history, "TVD - Pré-ruptura", tvd_card)
 
         ivd_card = custom_params(
             history, "IVD - Excesso de estoque", [IVD_HISTORY], grain="P1D",
-            formats="decimal", variant="headlinearea",
+            formats="currency", variant="headlinearea",
         )
         ivd_card["accent_color"] = "#C91878"
         add("ivd_card", history, "IVD - Excesso de estoque", ivd_card)
@@ -240,8 +238,10 @@ def main():
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
         dashboard.css = (
-            ".dashboard-content { background: #e7f0f5 !important; } "
+            ".dashboard-content { width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; background: #e7f0f5 !important; } "
+            ".grid-container { width: 100% !important; max-width: 100% !important; } "
             ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
+            ".dashboard-component-chart-holder > .header { display: none !important; } "
             ".dashboard-component-tabs { background: #fff; border-radius: 8px; }"
         )
         dashboard.json_metadata = json.dumps({
