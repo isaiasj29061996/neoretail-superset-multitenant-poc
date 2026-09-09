@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meu Portal — NeoRetail</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="portal-page" data-page="portal">
+    <header class="portal-header">
+      <a class="portal-brand" href="/portal">
+        <span class="portal-symbol"><i></i><i></i></span><strong>NeoRetail</strong>
+      </a>
+      <nav><a class="active" href="/portal"><span>⌂</span> Meu Portal</a><a href="#solutions"><span>▦</span> Minhas soluções</a></nav>
+      <div class="portal-user">
+        <button class="header-icon" title="Ajuda">?</button>
+        <span class="portal-avatar" id="portal-initials">NR</span>
+        <div><small>Bem-vindo</small><strong id="portal-user-name">—</strong></div>
+        <button id="portal-logout" class="text-button">Sair</button>
+      </div>
+    </header>
+
+    <section class="portal-hero">
+      <div><span class="eyebrow">PORTAL DE SOLUÇÕES</span><h1>Olá, <span id="portal-first-name">Analista</span>.</h1><p>Acesse suas soluções e escolha a indústria que deseja analisar.</p></div>
+      <div class="hero-orbit" aria-hidden="true"><i></i><i></i><i></i><span>NR</span></div>
+    </section>
+
+    <main id="solutions" class="solutions-shell">
+      <div class="section-heading"><div><h2>Minhas soluções</h2><p>Soluções disponíveis para o seu perfil.</p></div><span class="solution-count">1 solução</span></div>
+      <article class="solution-card">
+        <div class="solution-logo"><span class="nr-symbol"><i></i><i></i></span></div>
+        <div class="solution-copy"><small>ANALYTICS &amp; EXECUÇÃO</small><h3>NeoRetail 2.0</h3><p>Visibilidade de vendas, estoque, disponibilidade e oportunidades em uma experiência integrada.</p><div class="solution-tags"><span>4 dashboards</span><span>3 indústrias</span><span>RLS seguro</span></div></div>
+        <button id="solution-access" class="access-button">Acessar <span>→</span></button>
+      </article>
+    </main>
+
+    <div id="industry-modal" class="modal-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="industry-title">
+        <button class="modal-close" data-close-modal aria-label="Fechar">×</button>
+        <span class="modal-kicker">NeoRetail 2.0</span>
+        <h2 id="industry-title">Escolha a indústria</h2>
+        <p>Você possui acesso a três organizações. O contexto escolhido será aplicado com segurança em todas as análises.</p>
+        <label>Organização<select id="industry-select"></select></label>
+        <div id="industry-options" class="industry-options"></div>
+        <div class="modal-actions"><button class="secondary-button" data-close-modal>Cancelar</button><button id="confirm-industry" class="primary-button">Entrar no NeoRetail <span>→</span></button></div>
+      </section>
+    </div>
+    <script src="/app.bundle.js"></script>
+  </body>
+</html>

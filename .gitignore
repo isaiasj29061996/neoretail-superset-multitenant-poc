@@ -1,4 +1,5 @@
 .env
+recovered-*-env.txt
 *.log
 *.pyc
 __pycache__/

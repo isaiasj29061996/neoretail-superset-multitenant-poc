@@ -32,11 +32,30 @@ def main() -> None:
         from superset.models.core import Database
 
         name = "NeoRetail Gold - PostgreSQL Local"
-        database = (
-            db.session.query(Database)
-            .filter(Database.database_name == name)
-            .one_or_none()
-        )
+        try:
+            database = (
+                db.session.query(Database)
+                .filter(Database.database_name == name)
+                .one_or_none()
+            )
+        except ValueError as error:
+            if "Invalid decryption key" not in str(error):
+                raise
+            # A POC may be restarted after SUPERSET_SECRET_KEY changes. Clear
+            # only the encrypted connection fields for the local Analytics DB;
+            # set_sqlalchemy_uri below immediately writes them with the active
+            # key. No Analytics schema or business data is modified here.
+            db.session.rollback()
+            db.session.execute(text(
+                "UPDATE dbs SET password = NULL, encrypted_extra = NULL, "
+                "server_cert = NULL WHERE database_name = :name"
+            ), {"name": name})
+            db.session.flush()
+            database = (
+                db.session.query(Database)
+                .filter(Database.database_name == name)
+                .one_or_none()
+            )
         if database is None:
             database = Database(database_name=name)
             db.session.add(database)

@@ -1,12 +1,13 @@
 {
   "name": "neoretail-v9-multitenant-embedded",
-  "version": "9.0.0",
+  "version": "9.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "esbuild src/app.js --bundle --format=iife --target=es2022 --outfile=public/app.bundle.js",
     "start": "node server.js",
-    "check": "node --check server.js && node --check src/app.js"
+    "check": "node --check server.js && node --check src/app.js && node --check smoke.mjs",
+    "smoke": "node smoke.mjs"
   },
   "dependencies": {
     "@superset-ui/embedded-sdk": "0.4.0",

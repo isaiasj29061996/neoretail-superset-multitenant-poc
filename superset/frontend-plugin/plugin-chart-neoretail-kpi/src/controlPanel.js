@@ -13,9 +13,19 @@ export default {
       label: t('Consulta'),
       expanded: true,
       controlSetRows: [
-        ['x_axis'],
+        [
+          {
+            name: 'x_axis',
+            config: {
+              ...sharedControls.x_axis,
+              validators: [validateNonEmpty],
+              description: t('Selecione data como coluna temporal no dataset gold.vw_mart_visao_industria.'),
+            },
+          },
+        ],
         ['time_grain_sqla'],
         ['time_range'],
+        ['metrics'],
         [
           {
             name: 'metric',
@@ -35,6 +45,7 @@ export default {
           },
         ],
         ['adhoc_filters'],
+        ['groupby'],
         ['row_limit'],
       ],
     },
@@ -44,6 +55,41 @@ export default {
       controlSetRows: [
         [
           {
+            name: 'card_variant',
+            config: {
+              type: 'SelectControl',
+              label: t('Tipo de card'),
+              default: 'area',
+              choices: [
+                ['area', t('Área com tarefas')],
+                ['bars', t('Barras comparativas')],
+                ['multi', t('Indicadores múltiplos')],
+                ['osa', t('OSA com tarefas')],
+                ['panorama', t('Evolutivo panorama')],
+                ['rankbars', t('Ranking em barras')],
+                ['stacked', t('Colunas empilhadas')],
+                ['verticalbars', t('Barras verticais')],
+                ['headlinearea', t('Indicador com área')],
+                ['stackedrank', t('Ranking empilhado')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'chart_styles',
+            config: { type: 'TextControl', label: t('Estilos das séries'), description: t('bar ou line; separe por |.'), default: 'bar|bar|line', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'summary_count',
+            config: { type: 'TextControl', label: t('Quantidade de resumos'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
             name: 'card_title',
             config: {
               type: 'TextControl',
@@ -51,6 +97,30 @@ export default {
               default: 'TVD - Pré-ruptura',
               renderTrigger: true,
             },
+          },
+        ],
+        [
+          {
+            name: 'metric_labels',
+            config: { type: 'TextControl', label: t('Rótulos das métricas'), description: t('Separe por |.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'metric_formats',
+            config: { type: 'TextControl', label: t('Formatos'), description: t('currency, number ou percent; separe por |.'), default: 'currency', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'metric_directions',
+            config: { type: 'TextControl', label: t('Direção favorável'), description: t('higher ou lower; separe por |.'), default: 'lower', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'task_labels',
+            config: { type: 'TextControl', label: t('Rótulos das tarefas'), description: t('Separe por |.'), default: 'itens críticos|itens com risco', renderTrigger: true },
           },
         ],
         [

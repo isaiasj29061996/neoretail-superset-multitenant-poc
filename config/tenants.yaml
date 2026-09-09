@@ -1,5 +1,46 @@
 version: "9.0"
 default_customer_id: 259
+default_dashboard: overview
+
+# Catálogo único consumido pelo portal e pelo bootstrap embedded do Superset.
+# O UUID é estável para que a POC possa ser recriada sem editar o .env.
+dashboards:
+  overview:
+    title: Visão geral — Indústria
+    menu_label: Indústria
+    section: overview
+    slug: neoretail-v9-visao-geral-industria
+    embedded_id: 80291d5e-f3aa-5392-854e-d44c22ae3e0b
+    required_module: visao_industria
+  panorama:
+    title: Panorama — Indústria
+    menu_label: Geral
+    section: panorama
+    slug: neoretail-v9-panorama-industria
+    embedded_id: 3da04b29-3519-5d04-a813-bcffbb1062e8
+    required_module: visao_industria
+  osa:
+    title: Panorama — OSA
+    menu_label: OSA
+    section: panorama
+    slug: neoretail-v9-osa-industria
+    embedded_id: 4d51036e-bb25-56b9-925d-96b367e521bb
+    required_module: visao_industria
+  tasks:
+    title: Tarefas do dia — Pré-ruptura / Excesso
+    menu_label: Pré-ruptura / Excesso
+    section: tasks
+    slug: neoretail-v9-tarefas-otimizacao-estoque
+    embedded_id: 41b8a47c-9e46-5f87-be63-4efd6757c0bd
+    required_module: tarefas
+
+navigation:
+  - key: overview
+    label: Visão geral
+  - key: panorama
+    label: Panorama
+  - key: tasks
+    label: Tarefas do dia
 
 # POC local. Em produção, usuários e permissões virão do backend NeoRetail.
 customers:

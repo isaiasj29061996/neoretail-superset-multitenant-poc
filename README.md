@@ -236,6 +236,8 @@ charts e layouts no banco de metadados do Superset.
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
 ```
 
 | Dashboard | Slug | Conteúdo principal |
@@ -243,6 +245,7 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 | NeoRetail V9 — Visão geral da indústria | `neoretail-v9-visao-geral-industria` | TVD, IVD, giro, vendas, estoque, ROI, markup e OSA |
 | NeoRetail V9 — Panorama Indústria | `neoretail-v9-panorama-industria` | evolutivos, comparativos, rankings e análise detalhada |
 | NeoRetail V9 — OSA Indústria | `neoretail-v9-osa-industria` | visão mensal, perdas por motivo/causa e rankings OSA |
+| NeoRetail V9 — Tarefas de Otimização — Estoque | `neoretail-v9-tarefas-otimizacao-estoque` | tendências TVD/IVD, rankings e incidências de estoque |
 
 Exemplo de URL:
 
@@ -305,17 +308,27 @@ Atualize o navegador com `Ctrl+Shift+R` para descartar o bundle anterior.
 
 ## Portal embedded
 
-O portal em <http://localhost:3000> autentica o usuário demonstrativo, lista os
-clientes permitidos e emite um Guest Token para o dashboard configurado em
-`SUPERSET_EMBEDDED_DASHBOARD_ID`.
+O portal em <http://localhost:3000> oferece uma experiência própria do
+NeoRetail. Depois do login, a página **Minhas soluções** abre a seleção entre as
+três indústrias autorizadas. O produto organiza os quatro dashboards em menus
+de Visão geral, Panorama e Tarefas do dia, sem expor a navegação administrativa
+do Superset.
+
+A REST API do portal mantém a sessão, publica o catálogo autorizado e emite um
+Guest Token específico para a combinação de dashboard e indústria. O token
+aplica `id_customer` como RLS antes de qualquer consulta analítica.
 
 Antes de testar o embedded:
 
-1. defina `DEMO_USER_PASSWORD` no `.env`;
-2. informe o UUID do dashboard em `SUPERSET_EMBEDDED_DASHBOARD_ID`;
-3. confirme que `PUBLIC_SUPERSET_URL` é acessível pelo navegador;
-4. recrie o serviço com `docker compose up -d --force-recreate embedded-app`;
+1. use `demo.multitenant` / `neoretail-demo` ou defina `DEMO_USER_PASSWORD` no `.env`;
+2. confirme que `PUBLIC_SUPERSET_URL` é acessível pelo navegador;
+3. execute `superset/bootstrap_embedded.py` após os quatro bootstraps de dashboard;
+4. recrie o serviço com `docker compose up -d --build embedded-app`;
 5. teste pelo menos dois clientes e uma tentativa com cliente não autorizado.
+
+O catálogo em `config/tenants.yaml` é a fonte única dos menus, módulos, slugs e
+UUIDs embedded. Adicionar uma tela exige cadastrá-la ali e reaplicar o bootstrap
+embedded.
 
 ## Validação
 
@@ -344,6 +357,7 @@ Validação das consultas dos dashboards:
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_overview.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_panorama.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_osa_industry.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_stock_optimization.py
 ```
 
 Teste de regressão do plugin, quando Node.js estiver instalado no host:

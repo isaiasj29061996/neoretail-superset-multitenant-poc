@@ -170,4 +170,17 @@ def test_v9_customer_registry_and_embedded_rls():
     server = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in server
     assert "allowedCustomerIds.includes(idCustomer)" in server
+    assert 'app.get("/api/catalog"' in server
+    assert "authorizedDashboard(identity, dashboardKey)" in server
     assert "tenant_id =" not in server
+
+    tenant_config = yaml.safe_load(
+        (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
+    )
+    assert set(tenant_config["dashboards"]) == {
+        "overview", "panorama", "osa", "tasks"
+    }
+    assert len({
+        definition["embedded_id"]
+        for definition in tenant_config["dashboards"].values()
+    }) == 4

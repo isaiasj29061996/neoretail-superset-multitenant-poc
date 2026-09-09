@@ -6,30 +6,28 @@
     <title>NeoRetail 2.0 — Entrar</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="login-page">
+  <body class="login-page" data-page="login">
     <main class="login-shell">
       <section class="login-brand">
-        <div class="brand-mark">N</div>
-        <p class="eyebrow">NeoRetail Analytics</p>
-        <h1>Decisões de varejo com contexto, velocidade e clareza.</h1>
-        <p class="brand-copy">POC V9 multitenant: uma Gold compartilhada, um dashboard e isolamento seguro por ID_CUSTOMER.</p>
-        <div class="architecture-strip">
-          <span>Blob</span><i>→</i><span>PySpark</span><i>→</i><span>PostgreSQL</span><i>→</i><span>Superset</span>
-        </div>
+        <div class="brand-lockup"><span class="portal-symbol"><i></i><i></i></span><strong>NeoRetail <b>2.0</b></strong></div>
+        <p class="eyebrow">INTELIGÊNCIA PARA O VAREJO</p>
+        <h1>Decisões melhores começam com uma visão completa.</h1>
+        <p class="brand-copy">Vendas, estoque, disponibilidade e oportunidades reunidos em um produto simples de usar.</p>
+        <div class="login-features"><span>Visão executiva</span><span>Operação diária</span><span>Ambiente seguro</span></div>
       </section>
       <section class="login-card">
         <div>
-          <p class="eyebrow blue">Ambiente local</p>
+          <p class="eyebrow blue">MEU PORTAL</p>
           <h2>Bem-vindo</h2>
-          <p>Entre com um usuário configurado para a POC.</p>
+          <p>Entre para acessar o NeoRetail.</p>
         </div>
         <form id="login-form">
           <label>Usuário<input name="username" value="demo.multitenant" autocomplete="username" required /></label>
           <label>Senha<input name="password" type="password" autocomplete="current-password" required /></label>
           <p id="login-error" class="form-error" role="alert"></p>
-          <button type="submit">Entrar no NeoRetail</button>
+          <button type="submit">Entrar <span>→</span></button>
         </form>
-        <p class="login-note">Login mock exclusivo da POC. A autorização real continuará pertencendo ao backend NeoRetail.</p>
+        <p class="login-note">Ambiente demonstrativo protegido por sessão e isolamento de dados por indústria.</p>
       </section>
     </main>
     <script src="/app.bundle.js"></script>
