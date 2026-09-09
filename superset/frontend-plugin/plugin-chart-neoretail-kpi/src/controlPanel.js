@@ -69,6 +69,8 @@ export default {
                 ['rankbars', t('Ranking em barras')],
                 ['stacked', t('Colunas empilhadas')],
                 ['verticalbars', t('Barras verticais')],
+                ['headlinearea', t('Indicador com área')],
+                ['stackedrank', t('Ranking empilhado')],
               ],
               renderTrigger: true,
             },

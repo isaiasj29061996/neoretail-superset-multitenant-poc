@@ -125,3 +125,18 @@ O dashboard de OSA em valor e criado por `superset/bootstrap_osa_industry.py`.
 Ele usa o historico para o evolutivo e rankings e a fato mensal de causas para
 as colunas empilhadas e barras por motivo/causa. A validacao reproduzivel fica
 em `superset/validate_osa_industry.py`.
+
+## Tarefas de otimizacao de estoque
+
+As variantes `headlinearea` e `stackedrank` reproduzem os indicadores com
+tendencia e os rankings empilhados de TVD/IVD. O dashboard possui abas para
+Pre-ruptura, Excesso e Otimizacao do estoque, alem das tabelas detalhadas de
+incidencias.
+
+O cadastro usa datasets virtuais fixados na industria inicial 3CORACOES
+(`id_customer = 259`) e nao cria objetos no banco Analytics:
+
+```powershell
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_stock_optimization.py
+```

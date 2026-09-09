@@ -236,6 +236,7 @@ charts e layouts no banco de metadados do Superset.
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
 ```
 
 | Dashboard | Slug | Conteúdo principal |
@@ -243,6 +244,7 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 | NeoRetail V9 — Visão geral da indústria | `neoretail-v9-visao-geral-industria` | TVD, IVD, giro, vendas, estoque, ROI, markup e OSA |
 | NeoRetail V9 — Panorama Indústria | `neoretail-v9-panorama-industria` | evolutivos, comparativos, rankings e análise detalhada |
 | NeoRetail V9 — OSA Indústria | `neoretail-v9-osa-industria` | visão mensal, perdas por motivo/causa e rankings OSA |
+| NeoRetail V9 — Tarefas de Otimização — Estoque | `neoretail-v9-tarefas-otimizacao-estoque` | tendências TVD/IVD, rankings e incidências de estoque |
 
 Exemplo de URL:
 
@@ -344,6 +346,7 @@ Validação das consultas dos dashboards:
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_overview.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_panorama.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_osa_industry.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_stock_optimization.py
 ```
 
 Teste de regressão do plugin, quando Node.js estiver instalado no host:

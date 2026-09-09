@@ -43,6 +43,9 @@ equal(query.orderby, [['data', true]], 'Order daily observations');
 const bars = buildQuery({ ...raw, card_variant: 'bars', groupby: ['activity_level'] }, { ownState: { marker: true } }).queries;
 equal(bars.length, 2, 'Bar cards request summary and grouped series');
 equal(bars[1].columns, ['data', 'activity_level'], 'Group bars by activity');
+const stackedRank = buildQuery({ ...raw, metrics: ['TVD', 'IVD'], metric: undefined, card_variant: 'stackedrank', groupby: ['rede'] }, { ownState: { marker: true } }).queries;
+equal(stackedRank.length, 1, 'Stacked ranking requests one grouped query');
+equal(stackedRank[0].columns, ['rede'], 'Stacked ranking groups by category without date');
 let missingAxisRejected = false;
 try { buildQuery({ metric: 'TVD' }); } catch (error) {
   missingAxisRejected = error.message.includes('coluna temporal');
@@ -83,6 +86,12 @@ const rawSpecificVariant = transform({
 equal(rawSpecificVariant.variant, 'stacked', 'Specific raw variant wins over camelCase area default');
 equal([result.showTasks, result.accentColor, result.analysisUrl], [false, '#123abc', '/tvd'], 'Preserve false flags and custom styles');
 equal(result.hasData, true, 'Daily results are usable');
+const groupedResult = transform({
+  formData: { ...formData, cardVariant: 'stackedrank', groupby: ['rede'] },
+  queriesData: [{ data: [{ rede: 'B', TVD: 4, Qtd: 8 }, { rede: 'A', TVD: 10, Qtd: 20 }] }],
+});
+equal(groupedResult.rankSeries[0], { category: 'A', values: [10, 20] }, 'Stacked ranking sorts categories by combined value');
+equal(groupedResult.hasData, true, 'Grouped stacked ranking has data without a date column');
 const transformRows = data => transform({ rawFormData: raw, queriesData: [{ data }] });
 equal(transformRows([{ TVD: 100 }]).hasData, false, 'An aggregate without date is not a daily series');
 equal(transformRows([]).hasData, false, 'Empty query response');

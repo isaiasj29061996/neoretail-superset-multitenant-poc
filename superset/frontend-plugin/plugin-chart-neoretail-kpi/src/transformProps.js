@@ -52,6 +52,11 @@ export default function transformProps(chartProps) {
     category: String(row[groupColumn] ?? 'Outros'),
     value: numeric(row[metricLabels[0]]),
   })).sort((left, right) => right.value - left.value);
+  const rankSeries = (queriesData[0]?.data || []).map(row => ({
+    category: String(row[groupColumn] ?? 'Outros'),
+    values: metricLabels.map(label => numeric(row[label])),
+  })).sort((left, right) => right.values.reduce((sum, value) => sum + Math.abs(value), 0)
+    - left.values.reduce((sum, value) => sum + Math.abs(value), 0));
   const grouped = normalize(queriesData[1]?.data || [], true);
   const latest = timeline[timeline.length - 1] || null;
   const currentMonth = latest ? monthKey(latest.date) : null;
@@ -94,6 +99,7 @@ export default function transformProps(chartProps) {
     timeline: timeline.map(row => ({ date: row.date, values: row.values })),
     bars: [...categories].map(([category, values]) => ({ category, current: values.current || 0, previous: values.previous || 0 })),
     rankItems,
-    hasData: ['rankbars', 'verticalbars'].includes(variant) ? rankItems.length > 0 : timeline.length > 0,
+    rankSeries,
+    hasData: ['rankbars', 'verticalbars', 'stackedrank'].includes(variant) ? rankItems.length > 0 : timeline.length > 0,
   };
 }
