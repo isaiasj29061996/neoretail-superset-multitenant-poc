@@ -1,7 +1,7 @@
 """Create the NeoRetail stock-optimization task dashboard in Superset.
 
 Only Superset metadata is changed. The Analytics database is queried read-only
-through virtual datasets fixed to the initial industry (id_customer = 259).
+through virtual datasets; industry 259 is selected by default in the dashboard.
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ SELECT
   m.loja AS deposito,
   'unidade'::text AS unidade_medida
 FROM gold.vw_mart_visao_industria m
-WHERE m.id_customer = 259
 """.strip()
 
 TASKS_SQL = """
@@ -55,7 +54,6 @@ LEFT JOIN gold.dim_local l
   ON l.id_customer = c.id_customer AND l.id_location = c.id_location
 LEFT JOIN gold.dim_itens i
   ON i.id_customer = c.id_customer AND i.id_item = c.id_item
-WHERE c.id_customer = 259
 """.strip()
 
 TVD = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
@@ -90,6 +88,7 @@ def detail_table_params(dataset, metrics, expression):
 
 def task_filters(dataset_id):
     definitions = [
+        ("id_customer", "Indústria", []),
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
@@ -113,7 +112,15 @@ def task_filters(dataset_id):
         },
         "name": label, "filterType": "filter_select",
         "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
+        "defaultDataMask": ({
+            "extraFormData": {
+                "filters": [{"col": "id_customer", "op": "IN", "val": [259]}]
+            },
+            "filterState": {"value": [259], "label": "3CORACOES"},
+            "ownState": {},
+        } if column == "id_customer" else {
+            "extraFormData": {}, "filterState": {}, "ownState": {},
+        }),
         "cascadeParentIds": [ids[parent] for parent in parents],
         "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
         "type": "NATIVE_FILTER", "description": "",

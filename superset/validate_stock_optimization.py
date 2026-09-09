@@ -26,6 +26,7 @@ with app.test_request_context('/'):
     for chart in sorted(dashboard.slices, key=lambda item: item.id):
         form = json.loads(chart.params)
         metrics = form.get('metrics', [])
+        filters = [{'col': 'id_customer', 'op': 'IN', 'val': [259]}]
         sql_filters = [
             item.get('sqlExpression') for item in form.get('adhoc_filters', [])
             if item.get('expressionType') == 'SQL' and item.get('sqlExpression')
@@ -37,7 +38,7 @@ with app.test_request_context('/'):
         ):
             queries = [{
                 'columns': form.get('groupby', []), 'metrics': metrics,
-                'extras': extras, 'granularity': form.get('x_axis'),
+                'filters': filters, 'extras': extras, 'granularity': form.get('x_axis'),
                 'time_range': form.get('time_range', 'No filter'),
                 'row_limit': form.get('row_limit', 100),
             }]
@@ -51,14 +52,15 @@ with app.test_request_context('/'):
             }
             queries = [{
                 'columns': [time_column], 'metrics': metrics,
-                'extras': {**extras, 'time_grain_sqla': grain},
+                'filters': filters, 'extras': {**extras, 'time_grain_sqla': grain},
                 'orderby': [[axis, True]],
                 'row_limit': form.get('row_limit', 10000),
             }]
         else:
             queries = [{
                 'columns': form.get('groupby', []), 'metrics': metrics,
-                'extras': extras, 'row_limit': form.get('row_limit', 1000),
+                'filters': filters, 'extras': extras,
+                'row_limit': form.get('row_limit', 1000),
             }]
         try:
             result = ChartDataCommand(factory.create(
