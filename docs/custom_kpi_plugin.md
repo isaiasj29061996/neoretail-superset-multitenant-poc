@@ -133,9 +133,10 @@ tendencia e os rankings empilhados de TVD/IVD. O dashboard possui abas para
 Pre-ruptura, Excesso e Otimizacao do estoque, alem das tabelas detalhadas de
 incidencias.
 
-O cadastro usa datasets virtuais multi-industria e inicia com 3CORACOES
-(`id_customer = 259`) selecionada no filtro nativo. Ele nao cria objetos no
-banco Analytics:
+O cadastro usa datasets virtuais multi-industria. No portal embedded, a
+industria e aplicada pelo RLS do Guest Token; isso evita conflito entre um valor
+padrao persistido e a organizacao escolhida pelo usuario. O cadastro nao cria
+objetos no banco Analytics:
 
 ```powershell
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py

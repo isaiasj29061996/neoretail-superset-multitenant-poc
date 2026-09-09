@@ -165,10 +165,9 @@ def native_filters(dataset_id):
     return [{
         "id": ids[column], "controlValues": {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": True, "searchAllOptions": True, "inverseSelection": False},
         "name": label, "filterType": "filter_select", "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        "defaultDataMask": ({
-            "extraFormData": {"filters": [{"col": "id_customer", "op": "IN", "val": [259]}]},
-            "filterState": {"value": [259], "label": "3CORACOES"}, "ownState": {},
-        } if column == "id_customer" else {"extraFormData": {}, "filterState": {}, "ownState": {}}),
+        # The portal applies id_customer through Guest Token RLS. Persisting a
+        # customer here would conflict when another industry is selected.
+        "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
         "type": "NATIVE_FILTER", "description": "",
     } for column, label, parents in definitions]

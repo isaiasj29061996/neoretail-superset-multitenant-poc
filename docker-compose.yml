@@ -65,6 +65,7 @@ services:
     environment: *superset-environment
     volumes:
       - ./superset:/app/pythonpath:ro
+      - ./config:/app/config:ro
       - ./generated:/generated
       - ./certs:/certs:ro
     depends_on:
@@ -81,6 +82,7 @@ services:
     ports: ["8088:8088"]
     volumes:
       - ./superset:/app/pythonpath:ro
+      - ./config:/app/config:ro
       - ./generated:/generated
       - ./certs:/certs:ro
     depends_on:
@@ -152,10 +154,9 @@ services:
       PUBLIC_SUPERSET_URL: ${PUBLIC_SUPERSET_URL:-http://localhost:8088}
       SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
-      SUPERSET_EMBEDDED_DASHBOARD_ID: ${SUPERSET_EMBEDDED_DASHBOARD_ID:-}
       ANALYTICS_MODE: local_postgres
       TENANTS_CONFIG: /app/config/tenants.yaml
-      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-neoretail-demo}
     ports: ["3000:3000"]
     volumes: ["./config:/app/config:ro"]
     depends_on:

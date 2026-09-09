@@ -112,15 +112,8 @@ def task_filters(dataset_id):
         },
         "name": label, "filterType": "filter_select",
         "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        "defaultDataMask": ({
-            "extraFormData": {
-                "filters": [{"col": "id_customer", "op": "IN", "val": [259]}]
-            },
-            "filterState": {"value": [259], "label": "3CORACOES"},
-            "ownState": {},
-        } if column == "id_customer" else {
-            "extraFormData": {}, "filterState": {}, "ownState": {},
-        }),
+        # The portal applies id_customer through Guest Token RLS.
+        "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents],
         "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
         "type": "NATIVE_FILTER", "description": "",
@@ -151,7 +144,7 @@ def main():
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
                 last_date = connection.execute(text(
-                    "SELECT MAX(id_time)::date FROM gold.fato_ivd_tvd WHERE id_customer = 259"
+                    "SELECT MAX(id_time)::date FROM gold.fato_ivd_tvd"
                 )).scalar_one()
 
         history = upsert_dataset(
@@ -220,7 +213,7 @@ def main():
         parents = ["ROOT_ID", "GRID_ID"]
         add_markdown(
             layout, "GRID_ID", parents,
-            f"**Data do último movimento:** {last_date.strftime('%d/%m/%Y')}", height=4,
+            f"**Data da última carga:** {last_date.strftime('%d/%m/%Y')}", height=4,
         )
         layout.row("GRID_ID", parents, [charts["tvd_card"], charts["ivd_card"]], 34)
         add_markdown(

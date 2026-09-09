@@ -5,9 +5,6 @@ Only Superset metadata is changed. All analytics sources are virtual/read-only.
 from __future__ import annotations
 
 import json
-from datetime import date
-
-from sqlalchemy import text
 
 from superset.app import create_app
 
@@ -36,7 +33,16 @@ LEFT JOIN gold.dim_local l
   ON l.id_customer = f.id_customer AND l.id_location = f.id_location
 LEFT JOIN gold.dim_itens i
   ON i.id_customer = f.id_customer AND i.id_item = f.id_item
-WHERE f.id_customer = 259
+""".strip()
+
+LATEST_SQL = f"""
+SELECT h.*
+FROM ({HISTORY_SQL}) h
+JOIN (
+  SELECT id_customer, MAX(mes_ano) AS max_data
+  FROM gold.fato_historico
+  GROUP BY id_customer
+) d ON d.id_customer = h.id_customer AND d.max_data = h.data
 """.strip()
 
 LOSS_VALUE = metric("Perda R$ OSA", "SUM(COALESCE(qtd_perda_osa * NULLIF(preco_medio, 0), 0))")
@@ -62,14 +68,9 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        with database.get_sqla_engine() as engine:
-            with engine.connect() as connection:
-                latest_cause_date = connection.execute(text("SELECT MAX(data) FROM gold.fato_mensal_causa_osa")).scalar_one()
-        next_month = date(latest_cause_date.year + (latest_cause_date.month == 12), 1 if latest_cause_date.month == 12 else latest_cause_date.month + 1, 1)
-        latest_cause_range = f"{latest_cause_date.isoformat()} : {next_month.isoformat()}"
         history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", sql=HISTORY_SQL)
         causes = upsert_dataset(db.session, SqlaTable, database, "nr_osa_industry_causes_259", sql=CAUSE_SQL)
-        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", sql=f"SELECT h.* FROM ({HISTORY_SQL}) h WHERE h.data = (SELECT MAX(mes_ano) FROM gold.fato_historico)")
+        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", sql=LATEST_SQL)
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
@@ -86,8 +87,6 @@ def main():
 
         motive = custom_params(causes, "Perda OSA", [LOSS_VALUE], groupby=["motivo_osa"], variant="verticalbars", formats="currency", row_limit=10)
         cause = custom_params(causes, "Perda por causa OSA", [LOSS_VALUE], groupby=["causa_osa"], variant="verticalbars", formats="currency", row_limit=15)
-        motive["time_range"] = latest_cause_range
-        cause["time_range"] = latest_cause_range
         add("motive", causes, "Perda OSA por motivo", motive)
         add("cause", causes, "Perda por causa OSA", cause)
 

@@ -157,7 +157,20 @@ def main() -> None:
     embedded = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in embedded
     assert "allowedCustomerIds.includes(idCustomer)" in embedded
+    assert 'app.get("/api/catalog"' in embedded
+    assert "dashboardKey" in embedded
+    assert "authorizedDashboard(identity, dashboardKey)" in embedded
     assert "tenant_id =" not in embedded
+
+    tenants = yaml.safe_load(
+        (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
+    )
+    assert tenants["default_dashboard"] == "overview"
+    assert set(tenants["dashboards"]) == {"overview", "panorama", "osa", "tasks"}
+    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 4
+    assert [item["key"] for item in tenants["navigation"]] == [
+        "overview", "panorama", "tasks"
+    ]
 
     print("Validacao V9 concluida: clientes, particoes, Gold e RLS aprovados.")
 
