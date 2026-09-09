@@ -19,9 +19,7 @@ ALLOWED_DOMAINS = os.getenv(
 ).split(",")
 
 EMBEDDED_FIT_CSS = (
-    " .dashboard-content { width: 100% !important; max-width: 100% !important; "
-    "overflow-x: hidden !important; } .grid-container { width: 100% !important; "
-    "max-width: 100% !important; } body { overflow-x: hidden !important; }"
+    " body { overflow-x: hidden !important; }"
 )
 
 

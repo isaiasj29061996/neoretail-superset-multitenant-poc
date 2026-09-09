@@ -207,7 +207,7 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = position_json(charts)
-        dashboard.css = ".dashboard-content { width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; background: #e7f0f5 !important; } .grid-container { width: 100% !important; max-width: 100% !important; } .dashboard-component-chart-holder { border-radius: 8px; } .dashboard-component-chart-holder > .header { display: none !important; }"
+        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; } .dashboard-component-chart-holder > .header { display: none !important; }"
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"})
         dashboard.slices = charts
         db.session.commit()

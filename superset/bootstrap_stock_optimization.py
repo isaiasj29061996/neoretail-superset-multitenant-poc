@@ -238,8 +238,7 @@ def main():
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
         dashboard.css = (
-            ".dashboard-content { width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; background: #e7f0f5 !important; } "
-            ".grid-container { width: 100% !important; max-width: 100% !important; } "
+            ".dashboard-content { background: #e7f0f5 !important; } "
             ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
             ".dashboard-component-chart-holder > .header { display: none !important; } "
             ".dashboard-component-tabs { background: #fff; border-radius: 8px; }"
