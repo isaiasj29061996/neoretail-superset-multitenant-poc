@@ -23,7 +23,7 @@ from neoretail_local.candidates import run
 
 FAMILY = "all"
 MAX_FILES = 0
-INVENTORY_ONLY = True
+INVENTORY_ONLY = False
 
 # %%
 result = run(
