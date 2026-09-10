@@ -16,6 +16,10 @@ x-superset-environment: &superset-environment
   ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-analytics}
   ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analytics}
   ANALYTICS_SQLALCHEMY_URI: ${ANALYTICS_SQLALCHEMY_URI:-}
+  NEORETAIL_TENANTS_CONFIG: /app/config/tenants.yaml
+  NEORETAIL_PUBLISHED_CATALOG: /generated/neoretail-published-dashboards.json
+  NEORETAIL_PRODUCT_URL: ${NEORETAIL_PRODUCT_URL:-http://localhost:3000}
+  EMBED_ALLOWED_DOMAINS: ${EMBED_ALLOWED_DOMAINS:-http://localhost:3000}
 
 services:
   superset-db:
@@ -156,9 +160,12 @@ services:
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
       ANALYTICS_MODE: local_postgres
       TENANTS_CONFIG: /app/config/tenants.yaml
+      PUBLISHED_DASHBOARDS_CONFIG: /app/generated/neoretail-published-dashboards.json
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-neoretail-demo}
     ports: ["3000:3000"]
-    volumes: ["./config:/app/config:ro"]
+    volumes:
+      - ./config:/app/config:ro
+      - ./generated:/app/generated:ro
     depends_on:
       superset: { condition: service_healthy }
     healthcheck:

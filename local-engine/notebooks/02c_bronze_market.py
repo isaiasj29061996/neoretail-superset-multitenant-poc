@@ -21,7 +21,7 @@
 from neoretail_local.market import run
 
 MAX_FILES = 0
-INVENTORY_ONLY = True
+INVENTORY_ONLY = False
 
 # %%
 result = run(max_files=MAX_FILES, inventory_only=INVENTORY_ONLY)

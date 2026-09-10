@@ -18,28 +18,19 @@ ALLOWED_DOMAINS = os.getenv(
     "EMBED_ALLOWED_DOMAINS", "http://localhost:3000"
 ).split(",")
 
+EMBEDDED_FIT_CSS = (
+    " body { overflow-x: hidden !important; }"
+)
+
 
 def main():
     catalog = yaml.safe_load(open(CATALOG_PATH, encoding="utf-8"))
     app = create_app()
     with app.app_context():
         from superset import db
-        from superset.connectors.sqla.models import SqlaTable
         from superset.models.dashboard import Dashboard
         from superset.models.embedded_dashboard import EmbeddedDashboard
         from superset.models.slice import Slice
-        from bootstrap_osa_industry import CAUSE_SQL, LATEST_SQL
-
-        causes = db.session.query(SqlaTable).filter(
-            SqlaTable.table_name == "nr_osa_industry_causes_259"
-        ).one_or_none()
-        if causes is not None:
-            causes.sql = CAUSE_SQL
-        latest = db.session.query(SqlaTable).filter(
-            SqlaTable.table_name == "nr_panorama_latest"
-        ).one_or_none()
-        if latest is not None:
-            latest.sql = LATEST_SQL
 
         for chart_name in (
             "[OSA Indústria] Perda OSA por motivo",
@@ -63,13 +54,17 @@ def main():
                 )
 
             metadata = json.loads(dashboard.json_metadata or "{}")
-            for native_filter in metadata.get("native_filter_configuration", []):
-                targets = native_filter.get("targets", [])
-                if any(target.get("column", {}).get("name") == "id_customer" for target in targets):
-                    native_filter["defaultDataMask"] = {
-                        "extraFormData": {}, "filterState": {}, "ownState": {},
-                    }
+            metadata["native_filter_configuration"] = [
+                native_filter
+                for native_filter in metadata.get("native_filter_configuration", [])
+                if not any(
+                    target.get("column", {}).get("name") == "id_customer"
+                    for target in native_filter.get("targets", [])
+                )
+            ]
             dashboard.json_metadata = json.dumps(metadata, ensure_ascii=False)
+            if EMBEDDED_FIT_CSS not in (dashboard.css or ""):
+                dashboard.css = (dashboard.css or "") + EMBEDDED_FIT_CSS
 
             embedded_uuid = uuid.UUID(str(definition["embedded_id"]))
             embedded = db.session.query(EmbeddedDashboard).filter(

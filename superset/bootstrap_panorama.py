@@ -1,7 +1,7 @@
 """Create the NeoRetail Panorama Industria dashboard in Superset metadata.
 
-The script creates virtual datasets, charts and dashboard layout. It only reads
-the analytics PostgreSQL database and never creates or changes analytics objects.
+The script creates physical-dataset metadata, charts and dashboard layout. The
+serving marts are materialized before this script runs.
 """
 from __future__ import annotations
 
@@ -146,6 +146,22 @@ class Layout:
                 self.row(tab_id, [*parents, tabs_id, tab_id], row_charts, height)
         return tabs_id
 
+    def period_tabs(self, parent, parents, title, entries, height=52):
+        """Render business views with an inner Mensal/Semanal selector."""
+        outer_id = self._id("TABS")
+        outer_tabs = []
+        self.nodes[outer_id] = {"id": outer_id, "type": "TABS", "parents": parents, "children": outer_tabs, "meta": {"defaultText": title}}
+        self.nodes[parent]["children"].append(outer_id)
+        for label, periods in entries:
+            tab_id = self._id("TAB")
+            outer_tabs.append(tab_id)
+            tab_parents = [*parents, outer_id]
+            self.nodes[tab_id] = {"id": tab_id, "type": "TAB", "parents": tab_parents, "children": [], "meta": {"text": label}}
+            self.tabs(tab_id, [*tab_parents, tab_id], f"Período de {label}", [
+                (period.title(), [[chart]]) for period, chart in periods
+            ], height)
+        return outer_id
+
     def row(self, parent, parents, charts, height):
         row_id = self._id("ROW")
         children = []
@@ -168,26 +184,24 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", sql=HISTORY_SQL)
-        weekly = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_weekly", sql=WEEKLY_SQL)
-        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", sql=LATEST_SQL)
-        mart = upsert_dataset(db.session, SqlaTable, database, "vw_mart_visao_industria", table_name="vw_mart_visao_industria")
-        opportunities = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", sql=OPPORTUNITIES_SQL)
-        opportunities_latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities_latest", sql=OPPORTUNITIES_LATEST_SQL)
+        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
+        weekly = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_weekly", table_name="nr_panorama_weekly")
+        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
+        mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
+        opportunities = mart
+        opportunities_latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities_latest", table_name="nr_panorama_opportunities_latest")
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
             charts[key] = upsert_chart(db.session, Slice, dataset, f"[Panorama] {title}", params, viz)
 
         sales = [P["sellout"], P["cost"], P["markup"]]
-        quantity = [P["sales_qty"], P["loss_qty"], P["price"]]
         stock = [P["stock_cost"], P["stock_qty"]]
         giro_roi = [P["roi"], P["coverage"], P["giro"]]
         osa = [P["osa"], P["rup"], P["isv"]]
         periods = (("mensal", history, "P1M"), ("semanal", weekly, "P1W"))
         for period, dataset, grain in periods:
             add(f"sales_value_{period}", dataset, f"Evolutivo de vendas — Valor {period}", custom_params(dataset, "Evolutivo de vendas", sales, grain=grain, styles="bar|bar|line", formats="currency|currency|percent"))
-            add(f"sales_qty_{period}", dataset, f"Evolutivo de vendas — Quantidade {period}", custom_params(dataset, "Evolutivo de vendas", quantity, grain=grain, styles="bar|bar|line", formats="number|number|currency"))
             add(f"stock_{period}", dataset, f"Evolutivo de estoque — Estoque {period}", custom_params(dataset, "Evolutivo de estoque", stock, grain=grain, styles="bar|bar", formats="currency|number"))
             add(f"giro_roi_{period}", dataset, f"Evolutivo de estoque — Giro e ROI {period}", custom_params(dataset, "Evolutivo de estoque", giro_roi, grain=grain, styles="bar|line|line", formats="percent|number|number"))
             add(f"osa_{period}", dataset, f"Evolutivo de estoque — OSA {period}", custom_params(dataset, "Evolutivo de estoque", osa, grain=grain, styles="line|line|line", formats="percent|percent|percent"))
@@ -218,14 +232,12 @@ def main():
 
         layout = Layout()
         grid_parents = ["ROOT_ID", "GRID_ID"]
-        layout.tabs("GRID_ID", grid_parents, "Evolutivo de vendas", [
-            ("Valor · Mensal", [[charts["sales_value_mensal"]]]), ("Valor · Semanal", [[charts["sales_value_semanal"]]]),
-            ("Quantidade · Mensal", [[charts["sales_qty_mensal"]]]), ("Quantidade · Semanal", [[charts["sales_qty_semanal"]]]),
+        layout.period_tabs("GRID_ID", grid_parents, "Evolutivo de vendas", [
+            ("Valor", [(period, charts[f"sales_value_{period}"]) for period in ("mensal", "semanal")]),
         ], 58)
-        layout.tabs("GRID_ID", grid_parents, "Evolutivo de estoque", [
-            (f"{section} · {period.title()}", [[charts[f"{key}_{period}"]]])
+        layout.period_tabs("GRID_ID", grid_parents, "Evolutivo de estoque", [
+            (section, [(period, charts[f"{key}_{period}"]) for period in ("mensal", "semanal")])
             for section, key in (("Estoque", "stock"), ("Giro x ROI", "giro_roi"), ("OSA", "osa"), ("Falta x Excesso", "gap"))
-            for period in ("mensal", "semanal")
         ], 58)
         layout.row("GRID_ID", grid_parents, [charts[f"compare_{column}"] for column, _ in dimensions], 48)
         layout.tabs("GRID_ID", grid_parents, "Ranking de oportunidades", [
@@ -241,7 +253,7 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; }"
+        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()

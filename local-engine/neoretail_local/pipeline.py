@@ -374,33 +374,6 @@ def step_03b_silver_facts(settings: Settings, spark) -> dict[str, Any]:
         write_lake(transformed, settings, "silver", target, customer_scoped=True)
         written.append(target)
         source_tables += len(tables)
-    market_contract = contracts.get("market", {})
-    market_tables = sorted(
-        path.name
-        for path in (settings.data_root / "lake" / "bronze").glob("candidate_mercado_*")
-        if path.is_dir() and (path / settings.customer.partition).is_dir()
-    )
-    if market_tables:
-        market_frames = [
-            normalize_frame(
-                read_lake(
-                    spark, settings, "bronze", table, customer_scoped=True
-                ),
-                id_customer=settings.id_customer,
-                customer_name=settings.nm_customer,
-                source_table=table,
-            )
-            for table in market_tables
-        ]
-        target = validate_identifier(market_contract["target_table"])
-        transformed = apply_fact_contract(
-            union_frames(market_frames), market_contract, "FATO_MERCADO"
-        )
-        write_lake(transformed, settings, "silver", target, customer_scoped=True)
-        written.append(target)
-        source_tables += len(market_tables)
-    else:
-        skipped.append("mercado")
     post_fact_written: list[str] = []
     activity = contracts.get("post_fact_dimensions", {}).get("dim_nivel_atividade")
     if activity and "fato_nivel_atividade" in written:
@@ -539,36 +512,6 @@ def step_03d_silver_validation(settings: Settings, spark) -> dict[str, Any]:
                 passed=passed,
             )
         )
-    market = contracts.get("market", {})
-    market_tables = sorted(
-        path.name
-        for path in (settings.data_root / "lake" / "bronze").glob("candidate_mercado_*")
-        if path.is_dir() and (path / settings.customer.partition).is_dir()
-    )
-    if market_tables:
-        source_count = sum(
-            read_lake(
-                spark, settings, "bronze", table, customer_scoped=True
-            ).count()
-            for table in market_tables
-        )
-        target = validate_identifier(market["target_table"])
-        target_count = read_lake(
-            spark, settings, "silver", target, customer_scoped=True
-        ).count()
-        passed = source_count > 0 and target_count == source_count
-        checks.append(Row(
-            id_customer=settings.id_customer,
-            check_name="fact_mercado", source_count=source_count,
-            target_count=target_count, missing_columns="",
-            status="passed" if passed else "failed", passed=passed,
-        ))
-    else:
-        checks.append(Row(
-            id_customer=settings.id_customer,
-            check_name="fact_mercado", source_count=0, target_count=0,
-            missing_columns="", status="skipped_no_bronze", passed=True,
-        ))
     activity = contracts.get("post_fact_dimensions", {}).get("dim_nivel_atividade")
     if activity:
         fact_source = validate_identifier(activity["source_table"])

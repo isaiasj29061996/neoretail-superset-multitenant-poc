@@ -163,7 +163,6 @@ fica em `generated/local_pipeline_summary.json`.
 | `01` | descobre e inventaria os arquivos do Blob |
 | `02A` | carrega dimensões aprovadas na Bronze |
 | `02B` | materializa fatos candidatos por família e varejista |
-| `02C` | carrega fatos de mercado, quando solicitado |
 | `03A` | normaliza as dimensões na Silver |
 | `03B` | consolida fatos com tratamento de schema drift |
 | `03C` | estrutura oportunidades a partir do `ETL_CALC_V2` |
@@ -196,11 +195,8 @@ Para atualizar os três clientes:
 .\run-multitenant-refresh.ps1
 ```
 
-Inclua as fontes de mercado somente quando necessário:
-
-```powershell
-.\run-multitenant-refresh.ps1 -IncludeMarket
-```
+`FATO_MERCADO` está fora do pipeline da POC. Mesmo que existam candidatos de
+mercado antigos no lake local, as etapas Silver e de validação não os processam.
 
 As etapas `04` e `06` retornam `blocked` enquanto
 [`config/approved_facts.yaml`](config/approved_facts.yaml) não possuir fatos
@@ -222,15 +218,20 @@ cadastra a conexão `NeoRetail Gold - PostgreSQL Local`. Os dashboards são
 criados por scripts idempotentes, que podem ser executados novamente para
 atualizar charts e layouts existentes.
 
-Se a Gold acabou de ser publicada e as views ainda não existem, execute:
+Se a Gold acabou de ser publicada ou atualizada, execute:
 
 ```powershell
 .\create-superset-kpi-views.ps1
 ```
 
-Esse comando aplica os SQLs de `analytics-db/views` ao schema Gold. Os scripts
-de dashboard abaixo fazem somente leitura do Analytics e escrevem datasets,
-charts e layouts no banco de metadados do Superset.
+Esse comando aplica as views de `analytics-db/views` e recria os marts físicos
+de `analytics-db/marts` no schema Gold. Os marts persistem os joins, recortes de
+último período e janelas usados pelos dashboards e possuem índices iniciados por
+`id_customer`, que também é a chave de RLS. Depois da carga, o comando executa
+`ANALYZE` para o PostgreSQL escolher planos com estatísticas atualizadas.
+
+Os scripts abaixo apontam o Superset para esses objetos físicos e escrevem
+somente datasets, charts e layouts no banco de metadados do Superset.
 
 ```powershell
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview.py
@@ -238,6 +239,24 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
+```
+
+Os oito marts compartilhados são:
+
+- `gold.nr_overview_history` e `gold.nr_panorama_latest`;
+- `gold.nr_panorama_weekly`;
+- `gold.nr_panorama_opportunities` e
+  `gold.nr_panorama_opportunities_latest`;
+- `gold.nr_tvd_daily`, pré-agregado para a série diária e alertas de TVD;
+- `gold.nr_osa_industry_causes`;
+- `gold.nr_stock_tasks`.
+
+O refresh multitenant completo já chama `create-superset-kpi-views.ps1` depois
+de atualizar os três clientes. Portanto, a camada física sempre é reconstruída
+com o estado final da Gold:
+
+```powershell
+.\run-multitenant-refresh.ps1
 ```
 
 | Dashboard | Slug | Conteúdo principal |
@@ -326,9 +345,14 @@ Antes de testar o embedded:
 4. recrie o serviço com `docker compose up -d --build embedded-app`;
 5. teste pelo menos dois clientes e uma tentativa com cliente não autorizado.
 
-O catálogo em `config/tenants.yaml` é a fonte única dos menus, módulos, slugs e
-UUIDs embedded. Adicionar uma tela exige cadastrá-la ali e reaplicar o bootstrap
-embedded.
+O catálogo base em `config/tenants.yaml` define os menus, módulos, slugs e UUIDs
+reproduzíveis da POC. Administradores também podem abrir um dashboard no
+Superset e usar **Publicar no NeoRetail**, ao lado de **Editar dashboard**. A
+ação publica o dashboard, habilita o recurso embedded, remove o filtro visível
+de indústria e grava sua entrada dinâmica em
+`generated/neoretail-published-dashboards.json`. O portal lê esse arquivo a cada
+requisição, portanto a nova tela fica disponível sem editar YAML ou reiniciar o
+produto.
 
 ## Validação
 
@@ -450,6 +474,7 @@ Veja o guia completo em
 - [Paridade com Power Query](docs/power_query_parity.md)
 - [Agendamento no GitLab](docs/gitlab_scheduling.md)
 - [Relatório de validação](docs/validation_report.md)
+- [Histórico da POC e plano de evolução para produto](docs/poc_history_and_productization.md)
 
 ## Segurança e versionamento
 

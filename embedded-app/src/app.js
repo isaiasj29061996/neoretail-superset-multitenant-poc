@@ -194,6 +194,8 @@ async function productPage() {
     $("#setup-state").hidden = true;
     $("#dashboard-loading").hidden = false;
     const mountPoint = $("#superset-container");
+    const embeddedHeight = Math.max(Number(dashboard.embeddedHeight) || 1200, window.innerHeight - 136);
+    document.documentElement.style.setProperty("--dashboard-height", `${embeddedHeight}px`);
     mountPoint.replaceChildren();
     try {
       await embedDashboard({
@@ -208,11 +210,15 @@ async function productPage() {
           hideTitle: true,
           hideTab: true,
           hideChartControls: true,
-          filters: { visible: true, expanded: false },
-          urlParams: { standalone: 3 },
+          filters: { visible: true, expanded: true },
         },
         referrerPolicy: "strict-origin-when-cross-origin",
       });
+      const iframe = mountPoint.querySelector("iframe");
+      if (iframe) {
+        iframe.height = String(embeddedHeight);
+        iframe.setAttribute("scrolling", "no");
+      }
       $("#dashboard-loading").hidden = true;
     } catch (reason) {
       showDashboardError(reason.message);

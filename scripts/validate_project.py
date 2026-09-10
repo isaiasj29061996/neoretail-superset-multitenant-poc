@@ -146,7 +146,49 @@ def main() -> None:
     )
     assert len(power_query_contracts["dimensions"]) == 8
     assert len(power_query_contracts["fact_families"]["etl_calc_v2"]["columns"]) == 39
-    assert power_query_contracts["market"]["target_table"] == "fato_mercado"
+    assert power_query_contracts["market"]["status"] == "excluded_from_pipeline"
+    assert 'glob("candidate_mercado_*")' not in pipeline_module
+    assert '"02C"' not in pipeline_script
+
+    mart_sql = (
+        ROOT / "analytics-db/marts/30_neoretail_serving_marts.sql"
+    ).read_text(encoding="utf-8")
+    physical_marts = {
+        "nr_overview_history",
+        "nr_panorama_latest",
+        "nr_panorama_weekly",
+        "nr_panorama_opportunities",
+        "nr_tvd_daily",
+        "nr_panorama_opportunities_latest",
+        "nr_osa_industry_causes",
+        "nr_stock_tasks",
+    }
+    for mart_name in physical_marts:
+        assert f"CREATE MATERIALIZED VIEW gold.{mart_name}" in mart_sql
+    assert mart_sql.count("CREATE MATERIALIZED VIEW gold.") == len(physical_marts)
+    assert "ANALYZE gold.nr_overview_history" in mart_sql
+    assert "id_customer" in mart_sql
+
+    mart_runner = (ROOT / "create-superset-kpi-views.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert '"analytics-db\\marts"' in mart_runner
+
+    dashboard_bootstraps = [
+        ROOT / "superset/bootstrap_overview.py",
+        ROOT / "superset/bootstrap_panorama.py",
+        ROOT / "superset/bootstrap_osa_industry.py",
+        ROOT / "superset/bootstrap_stock_optimization.py",
+        ROOT / "superset/bootstrap_embedded.py",
+    ]
+    bootstrap_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in dashboard_bootstraps
+    )
+    for mart_name in physical_marts:
+        assert mart_name in bootstrap_text
+    assert '"nr_osa_industry_causes_259", sql=' not in bootstrap_text
+    assert '"nr_stock_tasks_259", sql=' not in bootstrap_text
+    assert ".sql = LATEST_SQL" not in bootstrap_text
 
     customers = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")

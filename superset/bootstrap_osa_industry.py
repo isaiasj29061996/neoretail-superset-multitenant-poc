@@ -1,6 +1,7 @@
 """Create the NeoRetail OSA Industria dashboard (Valor view only).
 
-Only Superset metadata is changed. All analytics sources are virtual/read-only.
+Only Superset metadata is changed. All analytics sources are physical serving
+marts created before this script runs.
 """
 from __future__ import annotations
 
@@ -68,9 +69,9 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", sql=HISTORY_SQL)
-        causes = upsert_dataset(db.session, SqlaTable, database, "nr_osa_industry_causes_259", sql=CAUSE_SQL)
-        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", sql=LATEST_SQL)
+        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
+        causes = upsert_dataset(db.session, SqlaTable, database, "nr_osa_industry_causes", table_name="nr_osa_industry_causes")
+        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
@@ -109,7 +110,7 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; }"
+        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; }"
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()

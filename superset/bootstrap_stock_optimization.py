@@ -1,7 +1,7 @@
 """Create the NeoRetail stock-optimization task dashboard in Superset.
 
-Only Superset metadata is changed. The Analytics database is queried read-only
-through virtual datasets; industry 259 is selected by default in the dashboard.
+Only Superset metadata is changed. The Analytics database is queried through
+physical serving marts; industry 259 is selected by default in the dashboard.
 """
 from __future__ import annotations
 
@@ -59,6 +59,7 @@ LEFT JOIN gold.dim_itens i
 TVD = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
 TVD_HISTORY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd_simplificado, 0))")
+TVD_DAILY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD_HISTORY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd_simplificado, 0))")
 STOCK = metric("Qtde Estoque", "SUM(COALESCE(estoque_unidades, 0))")
 STOCK_MIN = metric("Qtde Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
@@ -88,7 +89,6 @@ def detail_table_params(dataset, metrics, expression):
 
 def task_filters(dataset_id):
     definitions = [
-        ("id_customer", "Indústria", []),
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
@@ -112,7 +112,6 @@ def task_filters(dataset_id):
         },
         "name": label, "filterType": "filter_select",
         "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        # The portal applies id_customer through Guest Token RLS.
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents],
         "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
@@ -148,10 +147,13 @@ def main():
                 )).scalar_one()
 
         history = upsert_dataset(
-            db.session, SqlaTable, database, "nr_stock_task_history_259", sql=HISTORY_SQL
+            db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities"
+        )
+        tvd_daily = upsert_dataset(
+            db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
         )
         tasks = upsert_dataset(
-            db.session, SqlaTable, database, "nr_stock_tasks_259", sql=TASKS_SQL
+            db.session, SqlaTable, database, "nr_stock_tasks", table_name="nr_stock_tasks"
         )
 
         charts = {}
@@ -162,15 +164,15 @@ def main():
             )
 
         tvd_card = custom_params(
-            history, "TVD - Pré-ruptura", [TVD_HISTORY], grain="P1D",
-            formats="decimal", variant="headlinearea",
+            tvd_daily, "TVD - Pré-ruptura", [TVD_DAILY], grain="P1D",
+            formats="currency", variant="headlinearea",
         )
         tvd_card["accent_color"] = "#7C43DF"
-        add("tvd_card", history, "TVD - Pré-ruptura", tvd_card)
+        add("tvd_card", tvd_daily, "TVD - Pré-ruptura", tvd_card)
 
         ivd_card = custom_params(
             history, "IVD - Excesso de estoque", [IVD_HISTORY], grain="P1D",
-            formats="decimal", variant="headlinearea",
+            formats="currency", variant="headlinearea",
         )
         ivd_card["accent_color"] = "#C91878"
         add("ivd_card", history, "IVD - Excesso de estoque", ivd_card)
@@ -242,6 +244,7 @@ def main():
         dashboard.css = (
             ".dashboard-content { background: #e7f0f5 !important; } "
             ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
+            ".dashboard-component-chart-holder > .header { display: none !important; } "
             ".dashboard-component-tabs { background: #fff; border-radius: 8px; }"
         )
         dashboard.json_metadata = json.dumps({
@@ -256,7 +259,7 @@ def main():
             "dashboard_id": dashboard.id, "slug": dashboard.slug,
             "industry": {"id_customer": 259, "label": "3CORACOES"},
             "last_movement": last_date.isoformat(),
-            "datasets": {"history": history.id, "tasks": tasks.id},
+            "datasets": {"history": history.id, "tvd_daily": tvd_daily.id, "tasks": tasks.id},
             "charts": {key: chart.id for key, chart in charts.items()},
         }, ensure_ascii=False))
 

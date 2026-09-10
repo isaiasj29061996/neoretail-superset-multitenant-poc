@@ -1,6 +1,6 @@
 param(
     [ValidateSet(
-        "all", "00", "01", "02", "02A", "02B", "02C",
+        "all", "00", "01", "02", "02A", "02B",
         "03", "03A", "03B", "03C", "03D",
         "04", "05", "06", "07", "08"
     )]
@@ -35,14 +35,6 @@ if ($Step -eq "02B") {
         "compose", "exec", "-T", "local-engine",
         "python", "-m", "neoretail_local.candidates",
         "--family", $Family, "--max-files", "$MaxFiles",
-        "--customer", $Customer
-    )
-    if ($InventoryOnly) { $arguments += "--inventory-only" }
-    & docker @arguments
-} elseif ($Step -eq "02C") {
-    $arguments = @(
-        "compose", "exec", "-T", "local-engine",
-        "python", "-m", "neoretail_local.market", "--max-files", "$MaxFiles",
         "--customer", $Customer
     )
     if ($InventoryOnly) { $arguments += "--inventory-only" }

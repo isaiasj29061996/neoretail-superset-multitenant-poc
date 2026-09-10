@@ -1,7 +1,7 @@
 """Create/update the NeoRetail overview datasets, charts and dashboard.
 
-Only Superset metadata is changed. The analytics database is queried by virtual
-datasets and is never modified by this script.
+Only Superset metadata is changed. Charts use physical serving marts created by
+``create-superset-kpi-views.ps1``.
 """
 from __future__ import annotations
 
@@ -84,20 +84,34 @@ M = {
     "markup": metric("Markup", "100.0 * (CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END) / NULLIF(SUM(volume_unidades * avg_price_cost), 0)"),
 }
 
+TVD_DAILY = {
+    "tvd": metric("TVD", "SUM(tvd)"),
+    "critical": metric("Itens críticos TVD", "SUM(itens_criticos_tvd)"),
+    "risk": metric("Itens risco TVD", "SUM(itens_risco_tvd)"),
+}
+
 
 def upsert_dataset(session, model, database, name, *, table_name=None, sql=None):
     dataset = session.query(model).filter(model.table_name == name).one_or_none()
+    needs_metadata = dataset is None
     if dataset is None:
         dataset = model(table_name=name, schema="gold", database=database)
         session.add(dataset)
+    else:
+        needs_metadata = (
+            dataset.sql != sql
+            or (table_name is not None and dataset.table_name != table_name)
+            or not dataset.columns
+        )
     dataset.database = database
     dataset.schema = "gold"
     dataset.sql = sql
     if table_name:
         dataset.table_name = table_name
     session.flush()
-    dataset.fetch_metadata()
-    session.flush()
+    if needs_metadata:
+        dataset.fetch_metadata()
+        session.flush()
     return dataset
 
 
@@ -147,7 +161,6 @@ def position_json(charts):
 
 def native_filters(dataset_id):
     definitions = [
-        ("id_customer", "Indústria", []),
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
@@ -165,8 +178,6 @@ def native_filters(dataset_id):
     return [{
         "id": ids[column], "controlValues": {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": True, "searchAllOptions": True, "inverseSelection": False},
         "name": label, "filterType": "filter_select", "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        # The portal applies id_customer through Guest Token RLS. Persisting a
-        # customer here would conflict when another industry is selected.
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
         "type": "NATIVE_FILTER", "description": "",
@@ -183,10 +194,11 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        mart = upsert_dataset(db.session, SqlaTable, database, "vw_mart_visao_industria", table_name="vw_mart_visao_industria")
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", sql=HISTORY_SQL)
+        mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
+        tvd_daily = upsert_dataset(db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily")
+        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
         specs = [
-            (mart, "TVD - Pré-ruptura", chart_params(mart, "TVD - Pré-ruptura", "area", [M["tvd"]], show_tasks=True, critical_metric=M["tvd_critical"], risk_metric=M["tvd_risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),
+            (tvd_daily, "TVD - Pré-ruptura", chart_params(tvd_daily, "TVD - Pré-ruptura", "area", [TVD_DAILY["tvd"]], show_tasks=True, critical_metric=TVD_DAILY["critical"], risk_metric=TVD_DAILY["risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),
             (mart, "IVD - Excesso", chart_params(mart, "IVD - Excesso", "area", [M["ivd"]], show_tasks=True, critical_metric=M["ivd_critical"], risk_metric=M["ivd_risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),
             (history, "Giro", chart_params(history, "Giro", "bars", [M["giro"]], groupby=["activity_level"], metric_formats="number", metric_directions="lower")),
             (history, "OSA", chart_params(history, "OSA", "osa", [M["osa"], M["osa_loss"]], show_tasks=True, critical_metric=M["osa_critical"], risk_metric=M["osa_risk"], metric_labels="% Numérico|Perda R$", metric_formats="percent|currency", metric_directions="higher|lower", task_labels="itens críticos|itens em risco")),
@@ -206,7 +218,7 @@ def main():
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"})
         dashboard.slices = charts
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "datasets": [mart.id, history.id], "charts": {c.slice_name: c.id for c in charts}}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "datasets": [mart.id, tvd_daily.id, history.id], "charts": {c.slice_name: c.id for c in charts}}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

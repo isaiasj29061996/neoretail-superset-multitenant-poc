@@ -12,6 +12,18 @@ const customers = tenantConfig.customers || {};
 const users = tenantConfig.users || [];
 const dashboards = tenantConfig.dashboards || {};
 const navigation = tenantConfig.navigation || [];
+const publishedCatalogPath = process.env.PUBLISHED_DASHBOARDS_CONFIG
+  || "/app/generated/neoretail-published-dashboards.json";
+
+function dashboardCatalog() {
+  try {
+    const dynamic = JSON.parse(fs.readFileSync(publishedCatalogPath, "utf8"));
+    return { ...dashboards, ...(dynamic.dashboards || {}) };
+  } catch (error) {
+    if (error?.code !== "ENOENT") console.error("Catálogo publicado inválido:", error.message);
+    return dashboards;
+  }
+}
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "32kb" }));
@@ -29,7 +41,7 @@ app.use("/api", (_req, res, next) => {
 
 app.get("/health", (_req, res) => res.json({
   status: "ok", service: "neoretail-embedded", version: "9.1",
-  dashboards: Object.keys(dashboards).length,
+  dashboards: Object.keys(dashboardCatalog()).length,
   source: "azure-blob", analytics: "local-postgres",
 }));
 
@@ -42,7 +54,7 @@ function customerList(identity) {
 function authorizedDashboards(identity) {
   const customer = customers[String(identity.selectedCustomerId)];
   const modules = customer?.modules || [];
-  return Object.entries(dashboards)
+  return Object.entries(dashboardCatalog())
     .filter(([, item]) => !item.required_module || modules.includes(item.required_module))
     .map(([key, item]) => ({
       key,
@@ -50,6 +62,7 @@ function authorizedDashboards(identity) {
       menuLabel: item.menu_label,
       section: item.section,
       embeddedId: String(item.embedded_id),
+      embeddedHeight: Number(item.embedded_height || 1200),
     }));
 }
 

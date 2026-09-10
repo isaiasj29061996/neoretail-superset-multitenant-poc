@@ -1,5 +1,7 @@
 import os
 
+from neoretail_publication import register_neoretail_publication
+
 SECRET_KEY = os.getenv("SUPERSET_SECRET_KEY", "change-me-local-only")
 SQLALCHEMY_DATABASE_URI = os.getenv(
     "SUPERSET_METADATA_URI",
@@ -71,6 +73,7 @@ TALISMAN_CONFIG = {
 }
 
 ENABLE_PROXY_FIX = True
+FLASK_APP_MUTATOR = register_neoretail_publication
 ROW_LIMIT = 100000
 SQL_MAX_ROW = 100000
 SQLLAB_TIMEOUT = 180

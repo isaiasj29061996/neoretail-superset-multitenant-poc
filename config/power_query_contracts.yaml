@@ -99,7 +99,7 @@ market:
   exclude_path_contains: gpa
   segment_source: aux_contratado_segmento
   allowed_segments: [AGUA_DE_COCO, AGUA_MINERAL, BEBIDA_ALCOOLICA_MISTA, CERVEJA, ISOTONICO, REFRIGERANTE]
-  status: ready_for_bronze_ingestion
+  status: excluded_from_pipeline
   columns: [segmento, id_retailer, mes_ano, id_product_segment, uf, contagem_itens, volume_unidades, faturamento, estoque_unidades, rup, est_virtual, qtd_perda_osa, positivacao, demanda_media, status_item_osa, qtd_problemas_osa, qtd_cnpj, id_customer, status_item_geral, estoque_medio, giro, nivel_atividade, avg_sales_price, avg_price_cost, estoque_valor]
   fill_nulls: {nivel_atividade: I}
   types: {segmento: text, id_retailer: text, mes_ano: date, id_product_segment: long, uf: text, contagem_itens: long, volume_unidades: double, faturamento: double, estoque_unidades: double, rup: double, est_virtual: double, qtd_perda_osa: double, positivacao: long, demanda_media: double, status_item_osa: long, qtd_problemas_osa: double, qtd_cnpj: long, id_customer: long, status_item_geral: long, estoque_medio: double, giro: long, nivel_atividade: text, avg_sales_price: double, avg_price_cost: double, estoque_valor: double}
