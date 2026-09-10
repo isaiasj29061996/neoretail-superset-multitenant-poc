@@ -10,6 +10,7 @@ DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_opportunities_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_stock_tasks;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_industry_causes;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_tvd_daily;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_opportunities;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_weekly;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_history;
@@ -226,6 +227,45 @@ CREATE INDEX ix_nr_panorama_opportunities_customer_place
 CREATE INDEX ix_nr_panorama_opportunities_customer_product
     ON gold.nr_panorama_opportunities (id_customer, descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3, item);
 
+CREATE MATERIALIZED VIEW gold.nr_tvd_daily AS
+WITH opportunity_daily AS (
+    SELECT
+        id_customer, data, opportunity_key, rede, bandeira, uf, cidade,
+        tipo_local, loja, regiao, deposito, tp_activity_level, item,
+        descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3,
+        hierarquia_4, unidade_medida,
+        SUM(COALESCE(tvd_simplificado, 0)) AS tvd,
+        MAX(CASE WHEN regra_critico = 'CRITICO' AND COALESCE(oportunidade_tvd, 0) > 0 THEN 1 ELSE 0 END) AS itens_criticos_tvd,
+        MAX(CASE WHEN regra_critico = 'F' AND COALESCE(oportunidade_tvd, 0) > 0 THEN 1 ELSE 0 END) AS itens_risco_tvd
+    FROM gold.nr_panorama_opportunities
+    GROUP BY
+        id_customer, data, opportunity_key, rede, bandeira, uf, cidade,
+        tipo_local, loja, regiao, deposito, tp_activity_level, item,
+        descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3,
+        hierarquia_4, unidade_medida
+)
+SELECT
+    id_customer, data, rede, bandeira, uf, cidade, tipo_local, loja,
+    regiao, deposito, tp_activity_level, item, descricao_marca,
+    hierarquia_1, hierarquia_2, hierarquia_3, hierarquia_4, unidade_medida,
+    SUM(tvd) AS tvd,
+    SUM(itens_criticos_tvd)::bigint AS itens_criticos_tvd,
+    SUM(itens_risco_tvd)::bigint AS itens_risco_tvd
+FROM opportunity_daily
+GROUP BY
+    id_customer, data, rede, bandeira, uf, cidade, tipo_local, loja,
+    regiao, deposito, tp_activity_level, item, descricao_marca,
+    hierarquia_1, hierarquia_2, hierarquia_3, hierarquia_4, unidade_medida;
+
+CREATE INDEX ix_nr_tvd_daily_customer_data
+    ON gold.nr_tvd_daily (id_customer, data);
+CREATE INDEX ix_nr_tvd_daily_customer_retail
+    ON gold.nr_tvd_daily (id_customer, rede, bandeira);
+CREATE INDEX ix_nr_tvd_daily_customer_place
+    ON gold.nr_tvd_daily (id_customer, uf, cidade, tipo_local, deposito);
+CREATE INDEX ix_nr_tvd_daily_customer_product
+    ON gold.nr_tvd_daily (id_customer, descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3, item);
+
 CREATE MATERIALIZED VIEW gold.nr_panorama_opportunities_latest AS
 SELECT o.*
 FROM gold.nr_panorama_opportunities o
@@ -325,6 +365,8 @@ COMMENT ON MATERIALIZED VIEW gold.nr_panorama_weekly IS
 'Physical serving mart for weekly panorama charts.';
 COMMENT ON MATERIALIZED VIEW gold.nr_panorama_opportunities IS
 'Physical daily TVD/IVD mart with reusable period-end markers.';
+COMMENT ON MATERIALIZED VIEW gold.nr_tvd_daily IS
+'Pre-aggregated daily TVD mart with additive alert counts, native-filter dimensions and id_customer RLS key.';
 COMMENT ON MATERIALIZED VIEW gold.nr_panorama_opportunities_latest IS
 'Latest daily TVD/IVD snapshot per customer.';
 COMMENT ON MATERIALIZED VIEW gold.nr_osa_industry_causes IS
@@ -336,6 +378,7 @@ ANALYZE gold.nr_overview_history;
 ANALYZE gold.nr_panorama_latest;
 ANALYZE gold.nr_panorama_weekly;
 ANALYZE gold.nr_panorama_opportunities;
+ANALYZE gold.nr_tvd_daily;
 ANALYZE gold.nr_panorama_opportunities_latest;
 ANALYZE gold.nr_osa_industry_causes;
 ANALYZE gold.nr_stock_tasks;

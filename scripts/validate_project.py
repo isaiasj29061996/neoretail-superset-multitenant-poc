@@ -158,6 +158,7 @@ def main() -> None:
         "nr_panorama_latest",
         "nr_panorama_weekly",
         "nr_panorama_opportunities",
+        "nr_tvd_daily",
         "nr_panorama_opportunities_latest",
         "nr_osa_industry_causes",
         "nr_stock_tasks",

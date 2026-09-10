@@ -59,6 +59,7 @@ LEFT JOIN gold.dim_itens i
 TVD = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
 TVD_HISTORY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd_simplificado, 0))")
+TVD_DAILY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD_HISTORY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd_simplificado, 0))")
 STOCK = metric("Qtde Estoque", "SUM(COALESCE(estoque_unidades, 0))")
 STOCK_MIN = metric("Qtde Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
@@ -148,6 +149,9 @@ def main():
         history = upsert_dataset(
             db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities"
         )
+        tvd_daily = upsert_dataset(
+            db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
+        )
         tasks = upsert_dataset(
             db.session, SqlaTable, database, "nr_stock_tasks", table_name="nr_stock_tasks"
         )
@@ -160,11 +164,11 @@ def main():
             )
 
         tvd_card = custom_params(
-            history, "TVD - Pré-ruptura", [TVD_HISTORY], grain="P1D",
+            tvd_daily, "TVD - Pré-ruptura", [TVD_DAILY], grain="P1D",
             formats="currency", variant="headlinearea",
         )
         tvd_card["accent_color"] = "#7C43DF"
-        add("tvd_card", history, "TVD - Pré-ruptura", tvd_card)
+        add("tvd_card", tvd_daily, "TVD - Pré-ruptura", tvd_card)
 
         ivd_card = custom_params(
             history, "IVD - Excesso de estoque", [IVD_HISTORY], grain="P1D",
@@ -255,7 +259,7 @@ def main():
             "dashboard_id": dashboard.id, "slug": dashboard.slug,
             "industry": {"id_customer": 259, "label": "3CORACOES"},
             "last_movement": last_date.isoformat(),
-            "datasets": {"history": history.id, "tasks": tasks.id},
+            "datasets": {"history": history.id, "tvd_daily": tvd_daily.id, "tasks": tasks.id},
             "charts": {key: chart.id for key, chart in charts.items()},
         }, ensure_ascii=False))
 

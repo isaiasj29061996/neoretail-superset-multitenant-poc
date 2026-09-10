@@ -241,12 +241,13 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
 ```
 
-Os sete marts compartilhados são:
+Os oito marts compartilhados são:
 
 - `gold.nr_overview_history` e `gold.nr_panorama_latest`;
 - `gold.nr_panorama_weekly`;
 - `gold.nr_panorama_opportunities` e
   `gold.nr_panorama_opportunities_latest`;
+- `gold.nr_tvd_daily`, pré-agregado para a série diária e alertas de TVD;
 - `gold.nr_osa_industry_causes`;
 - `gold.nr_stock_tasks`.
 

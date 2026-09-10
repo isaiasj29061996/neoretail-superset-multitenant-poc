@@ -18,7 +18,7 @@ A POC prova que o NeoRetail pode operar como produto analítico multitenant com:
 - quatro dashboards publicados;
 - filtros nativos e navegação semelhante ao produto de referência;
 - publicação de dashboards do Superset para o portal;
-- sete marts físicos compartilhados e indexados no PostgreSQL;
+- oito marts físicos compartilhados e indexados no PostgreSQL;
 - 58 gráficos publicados consumindo somente datasets físicos;
 - carregamento percebido como instantâneo após a otimização.
 
@@ -229,7 +229,7 @@ o principal responsável. Os fatores mais prováveis são:
 - limites de CPU, memória e disco da máquina local;
 - falta de marts agregados e de otimização específica para consultas de BI.
 
-**Tratamento:** os SQLs virtuais compartilhados foram convertidos em sete marts
+**Tratamento:** os SQLs virtuais compartilhados foram convertidos inicialmente em sete marts
 físicos, com índices por indústria, período e dimensões de filtro. Os datasets
 dos 58 gráficos publicados foram migrados para esses objetos.
 
@@ -465,7 +465,7 @@ Testes dbt mínimos:
 
 1. Criar o projeto dbt apontando para um schema isolado de desenvolvimento.
 2. Declarar as fontes Silver e freshness das tabelas.
-3. Portar os sete contratos SQL físicos já validados para modelos dbt.
+3. Portar os oito contratos SQL físicos já validados para modelos dbt.
 4. Substituir a recriação integral por estratégias incrementais.
 5. Comparar linha, grão e métricas com as materialized views atuais.
 6. Executar `dbt build` no pipeline automatizado antes de liberar dashboards.
@@ -559,7 +559,7 @@ federada/OIDC, Key Vault ou identidade gerenciada.
 
 - medir tempo por `/api/v1/chart/data`;
 - capturar SQL e plano de execução dos gráficos mais lentos;
-- acompanhar crescimento, duração do refresh e uso de disco dos sete marts;
+- acompanhar crescimento, duração do refresh e uso de disco dos oito marts;
 - avaliar dimensões físicas específicas para as listas dos filtros;
 - converter a recriação integral local em modelos dbt incrementais;
 - testar Databricks SQL com warehouse frio e aquecido;
@@ -655,7 +655,7 @@ certificação dos números pelo negócio.
 ## 17. Implementação da camada física de serving
 
 Em 10/09/2026, os SQLs virtuais usados pelos quatro dashboards foram
-substituídos por sete materialized views no PostgreSQL:
+substituídos por oito materialized views no PostgreSQL:
 
 | Mart físico | Uso principal |
 |---|---|
@@ -663,6 +663,7 @@ substituídos por sete materialized views no PostgreSQL:
 | `gold.nr_panorama_latest` | comparativos, rankings e detalhamento do último mês por indústria |
 | `gold.nr_panorama_weekly` | evolutivos semanais |
 | `gold.nr_panorama_opportunities` | TVD/IVD diário, fechamento mensal/semanal e cards de estoque |
+| `gold.nr_tvd_daily` | série diária TVD e contagens aditivas de itens críticos/em risco, preservando filtros e RLS |
 | `gold.nr_panorama_opportunities_latest` | rankings de falta e excesso no último movimento |
 | `gold.nr_osa_industry_causes` | perdas OSA por motivo e causa |
 | `gold.nr_stock_tasks` | rankings e tabelas de tarefas de pré-ruptura e excesso |
@@ -698,9 +699,32 @@ As contagens dos cinco conjuntos comparados permaneceram idênticas às fontes.
 Os deltas dos totais ficaram entre 10^-10 e 4,6 x 10^-5, causados apenas pela
 ordem de soma de colunas `double precision`.
 
-Os sete marts ocupam aproximadamente 4,4 GiB neste snapshot. Esse é o trade-off
+Os oito marts ocupam aproximadamente 6,25 GiB neste snapshot. Esse é o trade-off
 da POC: mais disco e alguns minutos no refresh em troca de menor latência
 interativa. A recriação ocorre em uma transação; uma falha preserva a camada
 anterior, mas consultas concorrentes podem aguardar o lock durante o refresh.
 Na arquitetura dbt/Databricks, modelos Delta incrementais devem reduzir tanto o
 tempo de atualização quanto o volume reprocessado.
+
+### 17.2 Segunda rodada de otimização — TVD diário
+
+O card `TVD - Pré-ruptura` ainda executava duas expressões
+`COUNT(DISTINCT CASE ...)` sobre 6.205.243 linhas. O plano medido levou 5.621 ms,
+fez `Seq Scan`, `GroupAggregate` e uma ordenação `external merge` de
+aproximadamente 299 MiB. Com RLS para o cliente 259, que concentra 4.301.431
+linhas, a consulta levou 4.288 ms.
+
+Foi criado `gold.nr_tvd_daily`, que calcula durante o refresh a soma de TVD e
+as quantidades aditivas de itens críticos e em risco. O mart mantém
+`id_customer` e todas as dimensões usadas pelos filtros nativos. Ele possui
+6.077.891 linhas e ocupa aproximadamente 1,81 GiB incluindo índices.
+
+A reconciliação comparou 272 combinações de indústria e dia: não houve diferença
+nas contagens e o maior delta de TVD foi `1,58 x 10^-8`, decorrente apenas da
+ordem da soma. Também foi confirmado que uma oportunidade não aparece em mais
+de uma combinação de dimensões de filtro no mesmo dia.
+
+A nova consulta não usa `COUNT DISTINCT`, não cria arquivo temporário e executou
+em 1.722 ms na primeira medição e 1.525 ms na repetição. Com
+`id_customer = 259`, executou em 1.746 ms e 1.558 ms. Os cards TVD da Visão Geral
+e de Tarefas de Estoque passaram a consumir esse mart físico.
