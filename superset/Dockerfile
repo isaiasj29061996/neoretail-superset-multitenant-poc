@@ -19,6 +19,8 @@ RUN npm ci --no-audit --no-fund
 RUN apt-get update \
  && apt-get install -y --no-install-recommends zstd \
  && rm -rf /var/lib/apt/lists/*
+COPY frontend-extension/setupExtensions.ts \
+  /src/superset-frontend/src/setup/setupExtensions.ts
 RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
 FROM apache/superset:6.0.0
@@ -33,6 +35,6 @@ RUN apt-get update \
 RUN /app/.venv/bin/python -m pip install --no-cache-dir \
       psycopg2-binary redis
 
-COPY superset_config.py bootstrap_analytics.py init.sh /app/pythonpath/
+COPY superset_config.py neoretail_publication.py smoke_publication.py bootstrap_analytics.py init.sh /app/pythonpath/
 COPY --from=neoretail-frontend /src/superset/static/assets /app/superset/static/assets
 USER superset

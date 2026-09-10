@@ -326,9 +326,14 @@ Antes de testar o embedded:
 4. recrie o serviço com `docker compose up -d --build embedded-app`;
 5. teste pelo menos dois clientes e uma tentativa com cliente não autorizado.
 
-O catálogo em `config/tenants.yaml` é a fonte única dos menus, módulos, slugs e
-UUIDs embedded. Adicionar uma tela exige cadastrá-la ali e reaplicar o bootstrap
-embedded.
+O catálogo base em `config/tenants.yaml` define os menus, módulos, slugs e UUIDs
+reproduzíveis da POC. Administradores também podem abrir um dashboard no
+Superset e usar **Publicar no NeoRetail**, ao lado de **Editar dashboard**. A
+ação publica o dashboard, habilita o recurso embedded, remove o filtro visível
+de indústria e grava sua entrada dinâmica em
+`generated/neoretail-published-dashboards.json`. O portal lê esse arquivo a cada
+requisição, portanto a nova tela fica disponível sem editar YAML ou reiniciar o
+produto.
 
 ## Validação
 
