@@ -15,10 +15,33 @@ multitenant da V9. Toda dimensão e fato publicada na Gold carrega
 - normalização tolerante a schema drift e rastreabilidade da origem;
 - quality gates para Silver, Gold e prontidão de métricas;
 - PostgreSQL Analytics separado do banco de metadados do Superset;
-- dashboards reproduzíveis de Visão Geral, Panorama e OSA da Indústria;
+- dashboards reproduzíveis de Visão Geral, Panorama, OSA da Indústria e
+  Tarefas de Otimização de Estoque;
 - plugin React `NeoRetail KPI Card` integrado ao frontend do Superset;
 - portal embedded com Guest Token e RLS por `id_customer`;
+- publicação de dashboards do Superset diretamente no catálogo do portal;
+- oito marts físicos compartilhados e indexados no PostgreSQL;
+- 58 gráficos publicados, todos consumindo datasets físicos;
 - scripts de inicialização, atualização, saúde, validação e reset.
+
+## Estado da POC
+
+| Capacidade | Estado | Evidência principal |
+|---|---|---|
+| Pipeline com dados reais do Blob | validado na POC | descoberta, Raw cache, Bronze, Silver, Gold e quality gates |
+| Multitenancy | validado para 3 indústrias | `id_customer` em todas as camadas, Guest Token e RLS |
+| Dashboards | validado | 4 dashboards e 58 gráficos executados sem erro |
+| Serving físico | validado | 8 materialized views e índices no PostgreSQL Analytics |
+| Embedded | validado na POC | portal próprio, catálogo autorizado e 12 combinações de Guest Token |
+| Publicação administrativa | validado na POC | botão `Publicar no NeoRetail`/`Atualizar no NeoRetail` |
+| Performance TVD | validado localmente | consulta reduzida de 5,62 s para 1,72 s na primeira medição |
+| Certificação das métricas | pendente | requer reconciliação formal com o Power BI e aceite do negócio |
+| Escala para aproximadamente 22 tenants | pendente | requer testes de volume, concorrência, SLA e custo |
+| Databricks, Delta e dbt | arquitetura alvo | ainda não implantados nesta POC |
+
+Dashboard renderizado e teste técnico aprovado não significam que uma métrica
+foi certificada pelo negócio. Os números de performance são do ambiente Docker
+local e servem como evidência comparativa, não como previsão de produção.
 
 ## Arquitetura
 
@@ -42,6 +65,26 @@ O Azure Blob continua sendo a fonte de verdade. O lake e o PostgreSQL locais
 são materializações para desenvolvimento e validação. Na arquitetura alvo, o
 Databricks substitui o PySpark e o serving local sem mudar o contrato
 multitenant baseado em `id_customer`.
+
+### Arquitetura alvo para produto
+
+```mermaid
+flowchart LR
+    A[Azure Blob / ADLS] --> B[Databricks Jobs / Auto Loader]
+    B --> C[Delta Bronze]
+    C --> D[Delta Silver]
+    D --> E[dbt]
+    E --> F[Gold e marts Delta incrementais]
+    F --> G[Databricks SQL Warehouse]
+    G --> H[Apache Superset]
+    H --> I[Backend NeoRetail]
+    I --> J[Guest Token + RLS]
+    J --> K[Portal embedded]
+```
+
+Esse desenho é uma proposta de industrialização. Databricks, dbt e Databricks
+SQL não fazem parte do runtime atual. Migrar o banco sem corrigir grão, filtros,
+agregações e consultas caras não garante dashboards rápidos.
 
 ### Isolamento por cliente
 
@@ -243,13 +286,21 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 
 Os oito marts compartilhados são:
 
-- `gold.nr_overview_history` e `gold.nr_panorama_latest`;
-- `gold.nr_panorama_weekly`;
-- `gold.nr_panorama_opportunities` e
-  `gold.nr_panorama_opportunities_latest`;
-- `gold.nr_tvd_daily`, pré-agregado para a série diária e alertas de TVD;
-- `gold.nr_osa_industry_causes`;
-- `gold.nr_stock_tasks`.
+| Mart físico | Uso principal |
+|---|---|
+| `gold.nr_overview_history` | visão mensal, Panorama e OSA |
+| `gold.nr_panorama_latest` | comparativos e rankings do último mês por indústria |
+| `gold.nr_panorama_weekly` | evolutivos semanais |
+| `gold.nr_panorama_opportunities` | TVD/IVD diário e marcadores de fechamento |
+| `gold.nr_panorama_opportunities_latest` | falta/excesso no último movimento |
+| `gold.nr_osa_industry_causes` | perdas OSA por motivo e causa |
+| `gold.nr_stock_tasks` | rankings e incidências de pré-ruptura/excesso |
+| `gold.nr_tvd_daily` | TVD diário e contagens aditivas de criticidade, com filtros e RLS |
+
+O SQL versionado desses contratos está em
+[`analytics-db/marts/30_neoretail_serving_marts.sql`](analytics-db/marts/30_neoretail_serving_marts.sql).
+Na arquitetura futura, eles devem ser portados para modelos dbt incrementais
+antes de o Superset trocar de fonte.
 
 O refresh multitenant completo já chama `create-superset-kpi-views.ps1` depois
 de atualizar os três clientes. Portanto, a camada física sempre é reconstruída
@@ -265,6 +316,43 @@ com o estado final da Gold:
 | NeoRetail V9 — Panorama Indústria | `neoretail-v9-panorama-industria` | evolutivos, comparativos, rankings e análise detalhada |
 | NeoRetail V9 — OSA Indústria | `neoretail-v9-osa-industria` | visão mensal, perdas por motivo/causa e rankings OSA |
 | NeoRetail V9 — Tarefas de Otimização — Estoque | `neoretail-v9-tarefas-otimizacao-estoque` | tendências TVD/IVD, rankings e incidências de estoque |
+
+### Performance medida
+
+A primeira rodada substituiu SQLs virtuais reutilizados por marts físicos:
+
+| Consulta mensal representativa | Tempo local |
+|---|---:|
+| SQL virtual | 1.646,7 ms |
+| Mart físico | 433,6 ms |
+| Redução | 73,7% |
+| Ganho aproximado | 3,8x |
+
+A segunda rodada investigou o card `TVD - Pré-ruptura` com
+`EXPLAIN (ANALYZE, BUFFERS)`. A consulta antiga lia 6.205.243 linhas, fazia
+`COUNT(DISTINCT CASE...)`, `GroupAggregate` e uma ordenação `external merge` de
+aproximadamente 299 MiB.
+
+O mart `gold.nr_tvd_daily` transfere esse cálculo para o refresh e entrega ao
+Superset métricas somáveis. Ele preserva `id_customer` e todas as dimensões dos
+filtros nativos.
+
+| Consulta TVD | Antes | Depois |
+|---|---:|---:|
+| Sem filtro de indústria | 5.621 ms | 1.722 ms |
+| Repetição | cerca de 5–6 s | 1.525 ms |
+| RLS `id_customer = 259` | 4.288 ms | 1.746 ms |
+| RLS 259, repetição | — | 1.558 ms |
+| Arquivo temporário de ordenação | ~299 MiB | zero |
+
+A reconciliação comparou 272 combinações de indústria e dia, sem divergência
+nas contagens. O maior delta de TVD foi `1,58 x 10^-8`, causado pela ordem da
+soma de valores de ponto flutuante. Também foi confirmado que uma oportunidade
+não pertence a mais de uma combinação de filtros no mesmo dia.
+
+Os oito marts ocupam aproximadamente 6,25 GiB no snapshot atual; somente
+`nr_tvd_daily` ocupa cerca de 1,81 GiB com índices. Esse é o trade-off local:
+mais custo e armazenamento no refresh para reduzir a latência interativa.
 
 Exemplo de URL:
 
@@ -445,6 +533,123 @@ Não crie fórmulas de TVD, IVD, OSA, giro ou oportunidades por aproximação. O
 contratos de métricas em `config/metric_contracts.yaml` exigem definição de
 negócio, expressão, fontes, grão, filtros, política de nulos, exemplos e
 aprovação antes da publicação.
+
+## Evolução para produto
+
+O caminho recomendado mantém a separação de responsabilidades já validada:
+
+```text
+ingestão e schema drift
+    → PySpark/Databricks
+
+transformações analíticas estáveis
+    → dbt entre Silver e Gold
+
+serving interativo
+    → marts físicos/incrementais preparados para BI
+
+exploração e apresentação
+    → Superset
+
+identidade e autorização
+    → backend NeoRetail + Guest Token + RLS
+```
+
+### Papel proposto do dbt
+
+Os oito marts atuais funcionam como contratos de referência. A primeira etapa
+do dbt deve portar esses SQLs para modelos governados e provar equivalência,
+antes de criar novas regras.
+
+Estrutura inicial sugerida:
+
+```text
+dbt/
+  models/
+    staging/       tipagem e padronização das fontes Silver
+    intermediate/ joins e regras reutilizadas
+    marts/         grão final consumido pelo Superset
+  tests/
+  macros/
+  snapshots/
+```
+
+Materializações sugeridas:
+
+| Camada | Estratégia inicial |
+|---|---|
+| `staging` | `view` |
+| `intermediate` reutilizado | `table` ou `incremental` |
+| marts de dashboard | `incremental` |
+| dimensões pequenas e listas de filtros | `table` |
+| lógica simples de uso único | `ephemeral` |
+
+Cada modelo multitenant deve declarar grão, chave única, `id_customer`, regra
+incremental, coluna temporal, fontes, joins, política de nulos e duplicidade,
+métricas atendidas e orçamento de performance. Os testes mínimos incluem
+`not_null`, `unique`, `relationships`, valores aceitos, reconciliação Silver ×
+Gold e isolamento por indústria.
+
+### Prioridades antes da produção
+
+**P0 — bloqueiam a liberação:**
+
+- reconciliar e aprovar as métricas prioritárias com o Power BI e o negócio;
+- testar vazamento cruzado de tenant em CI, inclusive filtros e endpoints;
+- integrar identidade corporativa e autorização oficial do NeoRetail;
+- definir SLA, p95 de dashboards, volume e concorrência esperados;
+- automatizar pipeline incremental e bloquear publicação quando gates falharem;
+- validar a arquitetura com volume representativo dos aproximadamente 22 tenants.
+
+**P1 — operação confiável:**
+
+- separar DEV, HML e PROD;
+- persistir e auditar o catálogo de dashboards, com aprovação e rollback;
+- centralizar logs, métricas e alertas de pipeline, marts, queries e embedded;
+- definir backup e recuperação do metadata database do Superset;
+- medir warehouse frio/aquecido, cache, custo e concorrência;
+- substituir a recriação integral dos marts por processamento incremental.
+
+**P2 — evolução e acabamento:**
+
+- criar dimensões enxutas para listas de filtros com muitos valores;
+- revisar responsividade, alturas embedded, labels, loading e estados de erro;
+- dividir o plugin visual quando surgirem comportamentos próprios de combo,
+  ranking, mapa ou interação operacional;
+- documentar linhagem e contratos dbt e publicar a documentação técnica.
+
+### Escala para novos tenants
+
+O pipeline aceita processamento parametrizado por cliente, mas a estratégia de
+agrupar aproximadamente 22 tenants deve ser definida por medição. Clientes com
+volumes diferentes podem exigir janelas e recursos diferentes. Antes de fixar
+um tamanho de lote, registre por tenant:
+
+- arquivos e linhas processadas;
+- duração de cada etapa e do refresh de marts;
+- volume armazenado e crescimento;
+- tempo p50/p95/p99 dos gráficos;
+- concorrência e cache hit;
+- custo de compute/SQL Warehouse;
+- impacto de falha e tempo de recuperação.
+
+GitHub Actions ou GitLab CI pode validar código e disparar o processamento. No
+ambiente local, o refresh exige runner self-hosted com Docker e acesso ao Azure.
+Na arquitetura alvo, CI/CD deve autenticar por identidade federada/OIDC e
+disparar Databricks Workflows; secrets permanentes não devem ficar no
+repositório.
+
+## Limites conhecidos da POC
+
+- autenticação do portal ainda é demonstrativa;
+- o catálogo dinâmico usa um JSON compartilhado local;
+- os marts são recriados integralmente e podem segurar locks durante o refresh;
+- métricas renderizadas ainda precisam de certificação formal do negócio;
+- não há evidência suficiente de escala e concorrência para 22 tenants;
+- não há implantação real de Databricks, Delta, dbt ou SQL Warehouse;
+- resultados locais de performance não determinam o sizing produtivo;
+- observabilidade, DR, rollback e ambientes separados ainda precisam ser
+  implementados.
 
 ## Solução de problemas
 
