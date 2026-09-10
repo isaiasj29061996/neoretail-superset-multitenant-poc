@@ -451,6 +451,7 @@ Veja o guia completo em
 - [Paridade com Power Query](docs/power_query_parity.md)
 - [Agendamento no GitLab](docs/gitlab_scheduling.md)
 - [Relatório de validação](docs/validation_report.md)
+- [Histórico da POC e plano de evolução para produto](docs/poc_history_and_productization.md)
 
 ## Segurança e versionamento
 
