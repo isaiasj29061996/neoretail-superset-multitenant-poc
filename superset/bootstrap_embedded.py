@@ -28,22 +28,9 @@ def main():
     app = create_app()
     with app.app_context():
         from superset import db
-        from superset.connectors.sqla.models import SqlaTable
         from superset.models.dashboard import Dashboard
         from superset.models.embedded_dashboard import EmbeddedDashboard
         from superset.models.slice import Slice
-        from bootstrap_osa_industry import CAUSE_SQL, LATEST_SQL
-
-        causes = db.session.query(SqlaTable).filter(
-            SqlaTable.table_name == "nr_osa_industry_causes_259"
-        ).one_or_none()
-        if causes is not None:
-            causes.sql = CAUSE_SQL
-        latest = db.session.query(SqlaTable).filter(
-            SqlaTable.table_name == "nr_panorama_latest"
-        ).one_or_none()
-        if latest is not None:
-            latest.sql = LATEST_SQL
 
         for chart_name in (
             "[OSA Indústria] Perda OSA por motivo",

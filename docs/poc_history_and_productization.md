@@ -600,3 +600,56 @@ de `FATO_MERCADO` estar excluída do pipeline automático.
 
 Esses testes validam a estrutura técnica da POC. Eles não substituem a
 certificação dos números pelo negócio.
+
+## 17. Implementação da camada física de serving
+
+Em 10/09/2026, os SQLs virtuais usados pelos quatro dashboards foram
+substituídos por sete materialized views no PostgreSQL:
+
+| Mart físico | Uso principal |
+|---|---|
+| `gold.nr_overview_history` | visão geral mensal, panorama mensal e visão OSA |
+| `gold.nr_panorama_latest` | comparativos, rankings e detalhamento do último mês por indústria |
+| `gold.nr_panorama_weekly` | evolutivos semanais |
+| `gold.nr_panorama_opportunities` | TVD/IVD diário, fechamento mensal/semanal e cards de estoque |
+| `gold.nr_panorama_opportunities_latest` | rankings de falta e excesso no último movimento |
+| `gold.nr_osa_industry_causes` | perdas OSA por motivo e causa |
+| `gold.nr_stock_tasks` | rankings e tabelas de tarefas de pré-ruptura e excesso |
+
+Os objetos mantêm `id_customer` no grão e os datasets do Superset continuam
+sob RLS. Índices compostos cobrem período, varejo, localização, atividade e
+produto dentro de cada indústria. `ANALYZE` é executado ao final do refresh.
+
+Esta implementação entrega a camada física da POC sem adicionar um runtime dbt
+ao ambiente local. Cada materialized view corresponde a um futuro modelo dbt;
+na migração para Databricks, os mesmos contratos devem virar modelos
+incrementais em Delta, executados por `dbt build`. Até essa migração, o arquivo
+`analytics-db/marts/30_neoretail_serving_marts.sql` é a fonte versionada das
+transformações de serving.
+
+O script `create-superset-kpi-views.ps1` aplica views e marts. O
+`run-multitenant-refresh.ps1` já o chama somente depois de terminar a carga dos
+três clientes, evitando materializar resultados parciais entre indústrias.
+
+O próximo passo de produto continua sendo migrar esses contratos para um projeto
+dbt com `staging`, `intermediate` e `marts`, testes de unicidade/não nulidade,
+reconciliação de métricas e documentação de linhagem. No PostgreSQL da POC, a
+recriação integral é simples e segura; no Databricks, a materialização incremental
+evitará reprocessar todo o histórico a cada execução.
+### 17.1 Benchmark local e custo da materialização
+
+No teste controlado com `id_customer = 259`, agregando faturamento e volume por
+mês, a consulta física executou em 433,6 ms. A consulta equivalente com os joins
+virtuais executou em 1.646,7 ms. Nesse cenário local, o tempo de banco caiu 73,7%
+e a consulta ficou aproximadamente 3,8 vezes mais rápida.
+
+As contagens dos cinco conjuntos comparados permaneceram idênticas às fontes.
+Os deltas dos totais ficaram entre 10^-10 e 4,6 x 10^-5, causados apenas pela
+ordem de soma de colunas `double precision`.
+
+Os sete marts ocupam aproximadamente 4,4 GiB neste snapshot. Esse é o trade-off
+da POC: mais disco e alguns minutos no refresh em troca de menor latência
+interativa. A recriação ocorre em uma transação; uma falha preserva a camada
+anterior, mas consultas concorrentes podem aguardar o lock durante o refresh.
+Na arquitetura dbt/Databricks, modelos Delta incrementais devem reduzir tanto o
+tempo de atualização quanto o volume reprocessado.

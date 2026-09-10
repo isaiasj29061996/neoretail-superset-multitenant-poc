@@ -1,7 +1,7 @@
 """Create/update the NeoRetail overview datasets, charts and dashboard.
 
-Only Superset metadata is changed. The analytics database is queried by virtual
-datasets and is never modified by this script.
+Only Superset metadata is changed. Charts use physical serving marts created by
+``create-superset-kpi-views.ps1``.
 """
 from __future__ import annotations
 
@@ -188,8 +188,8 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        mart = upsert_dataset(db.session, SqlaTable, database, "vw_mart_visao_industria", table_name="vw_mart_visao_industria")
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", sql=HISTORY_SQL)
+        mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
+        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
         specs = [
             (mart, "TVD - Pré-ruptura", chart_params(mart, "TVD - Pré-ruptura", "area", [M["tvd"]], show_tasks=True, critical_metric=M["tvd_critical"], risk_metric=M["tvd_risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),
             (mart, "IVD - Excesso", chart_params(mart, "IVD - Excesso", "area", [M["ivd"]], show_tasks=True, critical_metric=M["ivd_critical"], risk_metric=M["ivd_risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),

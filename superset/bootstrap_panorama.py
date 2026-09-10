@@ -1,7 +1,7 @@
 """Create the NeoRetail Panorama Industria dashboard in Superset metadata.
 
-The script creates virtual datasets, charts and dashboard layout. It only reads
-the analytics PostgreSQL database and never creates or changes analytics objects.
+The script creates physical-dataset metadata, charts and dashboard layout. The
+serving marts are materialized before this script runs.
 """
 from __future__ import annotations
 
@@ -184,12 +184,12 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", sql=HISTORY_SQL)
-        weekly = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_weekly", sql=WEEKLY_SQL)
-        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", sql=LATEST_SQL)
-        mart = upsert_dataset(db.session, SqlaTable, database, "vw_mart_visao_industria", table_name="vw_mart_visao_industria")
-        opportunities = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", sql=OPPORTUNITIES_SQL)
-        opportunities_latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities_latest", sql=OPPORTUNITIES_LATEST_SQL)
+        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
+        weekly = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_weekly", table_name="nr_panorama_weekly")
+        latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
+        mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
+        opportunities = mart
+        opportunities_latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities_latest", table_name="nr_panorama_opportunities_latest")
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):

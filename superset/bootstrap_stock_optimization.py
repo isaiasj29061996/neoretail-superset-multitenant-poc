@@ -1,7 +1,7 @@
 """Create the NeoRetail stock-optimization task dashboard in Superset.
 
-Only Superset metadata is changed. The Analytics database is queried read-only
-through virtual datasets; industry 259 is selected by default in the dashboard.
+Only Superset metadata is changed. The Analytics database is queried through
+physical serving marts; industry 259 is selected by default in the dashboard.
 """
 from __future__ import annotations
 
@@ -146,10 +146,10 @@ def main():
                 )).scalar_one()
 
         history = upsert_dataset(
-            db.session, SqlaTable, database, "nr_stock_task_history_259", sql=HISTORY_SQL
+            db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities"
         )
         tasks = upsert_dataset(
-            db.session, SqlaTable, database, "nr_stock_tasks_259", sql=TASKS_SQL
+            db.session, SqlaTable, database, "nr_stock_tasks", table_name="nr_stock_tasks"
         )
 
         charts = {}
