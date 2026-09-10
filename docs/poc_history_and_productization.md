@@ -17,7 +17,10 @@ A POC prova que o NeoRetail pode operar como produto analítico multitenant com:
 - Guest Token e RLS por `id_customer`;
 - quatro dashboards publicados;
 - filtros nativos e navegação semelhante ao produto de referência;
-- publicação de dashboards do Superset para o portal.
+- publicação de dashboards do Superset para o portal;
+- sete marts físicos compartilhados e indexados no PostgreSQL;
+- 58 gráficos publicados consumindo somente datasets físicos;
+- carregamento percebido como instantâneo após a otimização.
 
 A experiência e a arquitetura estão suficientes para uma POC. A paridade final
 das métricas, o desempenho em escala e o acabamento de UX ainda precisam ser
@@ -50,8 +53,8 @@ o RLS.
 - Indicadores MTD, mês anterior e média dos últimos três meses.
 - Gráficos de área e barras comparativas.
 - Ações de tarefas críticas e itens em risco nos cards aplicáveis.
-- Dataset físico atual: `vw_mart_visao_industria`.
-- Dataset virtual compartilhado: `nr_overview_history`.
+- Marts físicos: `nr_panorama_opportunities` para TVD/IVD e
+  `nr_overview_history` para os demais indicadores.
 
 ### 3.2 Panorama da indústria
 
@@ -62,10 +65,9 @@ o RLS.
   esperado do Power BI.
 - Seções de estoque, giro/ROI, OSA e falta/excesso.
 - Valores adicionados sobre barras e junto aos pontos das linhas.
-- Datasets virtuais: `nr_overview_history`, `nr_panorama_weekly`,
+- Marts físicos: `nr_overview_history`, `nr_panorama_weekly`,
   `nr_panorama_latest`, `nr_panorama_opportunities` e
   `nr_panorama_opportunities_latest`.
-- Dataset físico atual: `vw_mart_visao_industria`.
 
 ### 3.3 OSA Indústria
 
@@ -75,9 +77,8 @@ o RLS.
 - Aba `Perdas` usada como equivalente ao bookmark do Power BI.
 - Perdas por motivo e por causa.
 - Comparativos por região, varejo e hierarquia de item.
-- Dataset de filtro principal: `nr_overview_history`.
-- Outros datasets virtuais: `nr_osa_industry_causes_259` e
-  `nr_panorama_latest`.
+- Mart físico de filtro e visão mensal: `nr_overview_history`.
+- Outros marts físicos: `nr_osa_industry_causes` e `nr_panorama_latest`.
 
 ### 3.4 Tarefas de otimização de estoque
 
@@ -88,7 +89,44 @@ o RLS.
 - Tabelas de incidências de excesso e pré-ruptura.
 - Filtros de rede, bandeira, UF, cidade, depósito, nível de atividade, marca,
   hierarquias, item e unidade de medida.
-- Datasets virtuais: `nr_stock_task_history_259` e `nr_stock_tasks_259`.
+- Marts físicos: `nr_panorama_opportunities` para a série TVD/IVD e
+  `nr_stock_tasks` para rankings e tabelas.
+
+### 3.5 Arquitetura dos componentes visuais
+
+Foi criado do zero um único tipo público de visualização no Superset: o
+`NeoRetail KPI Card`. Ele é reutilizado em 33 gráficos configurados. Os outros
+25 componentes publicados usam a tabela nativa do Superset, totalizando 58
+gráficos nos quatro dashboards.
+
+| Dashboard | NeoRetail KPI Card | Tabela nativa | Total |
+|---|---:|---:|---:|
+| Visão geral | 8 | 0 | 8 |
+| Panorama | 13 | 20 | 33 |
+| OSA Indústria | 4 | 3 | 7 |
+| Tarefas de estoque | 8 | 2 | 10 |
+| **Total** | **33** | **25** | **58** |
+
+O componente recebe métricas, agrupamentos, formatos e uma variante visual. As
+variantes atuais incluem área, barras, múltiplas métricas, OSA, panorama,
+barras empilhadas, rankings e cards de destaque. Assim, TVD, IVD, giro, ROI,
+markup, vendas, estoque e OSA compartilham tratamento de datas, moeda,
+percentual, rótulos, responsividade e estados sem dados.
+
+A escolha evitou duplicar um componente React para cada gráfico. Uma correção
+de formatação ou responsividade pode atender às 33 instâncias. Para o produto,
+a recomendação é manter poucos tipos públicos no Superset e separar o código
+internamente por família de comportamento:
+
+- `NeoRetail KPI Card`: indicadores, tendências e resumos;
+- `NeoRetail Combo Chart`: evolutivos com barras e linhas;
+- `NeoRetail Ranking`: comparativos, rankings e barras empilhadas;
+- tabelas continuam nativas enquanto atenderem ao caso de uso.
+
+Essa evolução mantém o reaproveitamento atual, mas reduz o tamanho e a
+responsabilidade de cada módulo. Um componente separado só se justifica quando
+possui interação própria, como mapa, edição operacional, calendário, fluxo de
+aprovação ou drill-down especializado.
 
 ## 4. Histórico do feedback e das correções
 
@@ -177,7 +215,8 @@ permitir a seleção das três indústrias.
 
 ### Desempenho percebido
 
-**Feedback:** dashboards lentos tanto no portal quanto no próprio Superset.
+**Feedback inicial:** dashboards lentos tanto no portal quanto no próprio
+Superset.
 
 **Leitura técnica:** como a lentidão também ocorre no Superset, o iframe não é
 o principal responsável. Os fatores mais prováveis são:
@@ -190,9 +229,14 @@ o principal responsável. Os fatores mais prováveis são:
 - limites de CPU, memória e disco da máquina local;
 - falta de marts agregados e de otimização específica para consultas de BI.
 
-Essa hipótese deve ser confirmada medindo `/api/v1/chart/data`, histórico de
-consultas e plano de execução SQL. A causa não deve ser atribuída apenas ao
-ambiente local sem essas medições.
+**Tratamento:** os SQLs virtuais compartilhados foram convertidos em sete marts
+físicos, com índices por indústria, período e dimensões de filtro. Os datasets
+dos 58 gráficos publicados foram migrados para esses objetos.
+
+**Resultado:** uma consulta mensal representativa caiu de 1.646,7 ms para
+433,6 ms, aproximadamente 3,8 vezes mais rápida. Após a mudança, o feedback do
+usuário foi que o dashboard passou a carregar instantaneamente. Ainda devem ser
+medidos os tempos de `/api/v1/chart/data` por dashboard em ambiente controlado.
 
 ## 5. Portal embedded construído
 
@@ -291,22 +335,20 @@ Datasets virtuais são úteis para prototipação. Quando vários gráficos reut
 joins, janelas e agregações complexas, o custo é pago repetidamente. Para o
 produto, as transformações estáveis devem virar marts físicos ou incrementais.
 
-## 9. Candidatos a modelos físicos/dbt
+## 9. Modelos físicos implementados e próximos modelos dbt
 
-| Prioridade | Dataset atual | Modelo físico sugerido | Motivo |
+| Prioridade | Modelo físico atual | Estado | Evolução no dbt/Databricks |
 |---|---|---|---|
-| P0 | `nr_overview_history` | `gold.mart_overview_history` | Compartilhado por Visão geral, Panorama e OSA; alimenta gráficos e filtros. |
-| P0 | `vw_mart_visao_industria` | `gold.mart_visao_industria` | Base de TVD/IVD e cards principais; deve ser tabela incremental ou materializada. |
-| P0 | `nr_stock_task_history_259` | `gold.mart_stock_task_history` | Série temporal dos cards TVD/IVD; remover o sufixo fixo de cliente. |
-| P0 | `nr_stock_tasks_259` | `gold.mart_stock_tasks` | Rankings e tabelas detalhadas; provável alto volume e múltiplas agregações. |
-| P1 | `nr_panorama_weekly` | `gold.mart_panorama_weekly` | Evita recalcular agrupamentos semanais em cada gráfico. |
-| P1 | `nr_panorama_latest` | `gold.mart_panorama_latest` | Centraliza a seleção do último período por indústria. |
-| P1 | `nr_panorama_opportunities` | `gold.mart_panorama_opportunities` | Reutilve joins e regras reutilizadas nos rankings. |
-| P1 | `nr_panorama_opportunities_latest` | `gold.mart_panorama_opportunities_latest` | Evita repetir lógica de último registro nas análises detalhadas. |
-| P1 | `nr_osa_industry_causes_259` | `gold.mart_osa_causes` | Alimenta perdas por motivo e causa; remover dependência nominal do cliente 259. |
-| P2 | listas de filtros | `gold.dim_filter_*` ou dimensões enxutas | Reduz `DISTINCT` sobre fatos para Rede, Bandeira, UF, Cidade, Item e hierarquias. |
+| P0 | `gold.nr_overview_history` | materialized view ativa | transformar em modelo Delta incremental compartilhado |
+| P0 | `gold.nr_panorama_opportunities` | materialized view ativa | particionar por período e aplicar clustering pelos filtros mais usados |
+| P0 | `gold.nr_stock_tasks` | materialized view ativa e sem sufixo de cliente | tornar incremental pela data da oportunidade |
+| P1 | `gold.nr_panorama_weekly` | materialized view ativa | materializar somente semanas novas ou alteradas |
+| P1 | `gold.nr_panorama_latest` | materialized view ativa | derivar incrementalmente do mart mensal |
+| P1 | `gold.nr_panorama_opportunities_latest` | materialized view ativa | manter snapshot atual por indústria |
+| P1 | `gold.nr_osa_industry_causes` | materialized view ativa e sem sufixo de cliente | tornar incremental por mês e indústria |
+| P2 | listas de filtros | ainda consultadas nos marts | criar dimensões enxutas para reduzir consultas `DISTINCT` |
 
-Antes de materializar, cada modelo precisa declarar:
+Cada futuro modelo dbt deve declarar:
 
 - grão;
 - chave única;
@@ -423,13 +465,13 @@ Testes dbt mínimos:
 
 1. Criar o projeto dbt apontando para um schema isolado de desenvolvimento.
 2. Declarar as fontes Silver e freshness das tabelas.
-3. Migrar `nr_overview_history` para o primeiro modelo físico P0.
-4. Comparar linha, grão e métricas com o dataset virtual atual.
-5. Migrar os marts de tarefas TVD/IVD.
-6. Migrar mensal, semanal, OSA e oportunidades.
-7. Trocar os datasets do Superset gradualmente para os marts físicos.
-8. Medir tempo antes/depois e remover SQL virtual somente após equivalência.
-9. Executar `dbt build` no pipeline automatizado antes de liberar dashboards.
+3. Portar os sete contratos SQL físicos já validados para modelos dbt.
+4. Substituir a recriação integral por estratégias incrementais.
+5. Comparar linha, grão e métricas com as materialized views atuais.
+6. Executar `dbt build` no pipeline automatizado antes de liberar dashboards.
+7. Apontar o Superset para os modelos dbt somente após equivalência.
+8. Medir warehouse frio e aquecido e definir o orçamento de desempenho.
+9. Adicionar freshness, testes de contrato e reconciliação por indústria.
 10. Gerar e publicar a documentação dbt para linhagem e suporte.
 
 ### 10.3 dbt com Databricks
@@ -517,9 +559,9 @@ federada/OIDC, Key Vault ou identidade gerenciada.
 
 - medir tempo por `/api/v1/chart/data`;
 - capturar SQL e plano de execução dos gráficos mais lentos;
-- materializar datasets P0;
-- criar agregações mensais e semanais;
-- avaliar índices no PostgreSQL durante a transição;
+- acompanhar crescimento, duração do refresh e uso de disco dos sete marts;
+- avaliar dimensões físicas específicas para as listas dos filtros;
+- converter a recriação integral local em modelos dbt incrementais;
 - testar Databricks SQL com warehouse frio e aquecido;
 - estabelecer orçamento de desempenho por dashboard.
 
@@ -574,12 +616,16 @@ Principais marcos já registrados no Git:
 | `08cabcf` | publicação do Superset para o produto |
 | `ab26d6e` | exibição dos filtros no embedded |
 | `edb6975` | retirada de FATO_MERCADO do pipeline |
+| `cd02977` | histórico completo da POC e plano de evolução com dbt |
+| `fc922cb` | sete marts físicos e migração dos dashboards |
+| `87bf9a9` | execução completa habilitada nos notebooks Bronze 02b e 02c |
 
-No momento desta atualização, os três últimos commits estão apenas na branch
-local `feat/neoretail-dashboards`; o remoto está em `a2578eb`. A PR existente
-precisa receber esses commits quando houver autorização explícita para o push.
+No momento desta atualização, a branch local `feat/neoretail-dashboards` está
+seis commits à frente do remoto, que permanece em `a2578eb`. O envio foi
+bloqueado pela revisão automática até haver autorização explícita para o
+repositório e a branch informados.
 
-Existem duas alterações locais do usuário, preservadas fora dos commits:
+As alterações dos notebooks foram incluídas no commit `87bf9a9`:
 
 - `local-engine/notebooks/02b_bronze_fact_candidates.py`: `INVENTORY_ONLY=False`;
 - `local-engine/notebooks/02c_bronze_market.py`: `INVENTORY_ONLY=False`.
@@ -596,7 +642,12 @@ de `FATO_MERCADO` estar excluída do pipeline automático.
 - rejeição de indústria não autorizada;
 - validação estrutural de clientes, partições, Gold e RLS;
 - suíte local com 18 testes após a retirada de `FATO_MERCADO`;
-- validação de sintaxe dos scripts PowerShell alterados.
+- validação de sintaxe dos scripts PowerShell alterados;
+- validação das consultas dos 58 gráficos sem erros;
+- confirmação de que os 58 gráficos anexados usam somente datasets físicos;
+- reconciliação de contagens entre fatos Gold e marts;
+- benchmark SQL físico versus virtual;
+- validação estrutural após a materialização dos marts.
 
 Esses testes validam a estrutura técnica da POC. Eles não substituem a
 certificação dos números pelo negócio.
