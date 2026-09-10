@@ -211,7 +211,6 @@ async function productPage() {
           hideTab: true,
           hideChartControls: true,
           filters: { visible: true, expanded: true },
-          urlParams: { standalone: 3 },
         },
         referrerPolicy: "strict-origin-when-cross-origin",
       });
