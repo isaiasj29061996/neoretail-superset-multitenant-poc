@@ -8,21 +8,19 @@
 
 O comando executa `python -m neoretail_local.pipeline --step all` dentro do
 `local-engine`. Cada etapa tambem possui um notebook Jupytext em
-`local-engine/notebooks`. A etapa Bronze possui tres subfluxos:
+`local-engine`. A etapa Bronze usada pela POC possui dois subfluxos:
 
 - `02A`: dimensoes com paths aprovados;
-- `02B`: fatos candidatos da 3CORACOES.
-- `02C`: fatos de mercado fora do prefixo particular (opcional).
+- `02B`: fatos candidatos por industria.
 
 Os caminhos podem ser executados pelo PowerShell:
 
 ```powershell
 .\run-local-pipeline.ps1 -Step 02A
 .\run-local-pipeline.ps1 -Step 02B -Family fato_ivd_tvd
-.\run-local-pipeline.ps1 -Step 02C
 ```
 
-O `all` nao executa automaticamente `02B` ou `02C`, porque a materializacao de
+O `all` nao executa automaticamente `02B`, porque a materializacao de
 todos os candidatos e volumosa e deve ser disparada conscientemente.
 
 Depois de materializar as familias necessarias, execute a Silver completa:
@@ -40,12 +38,8 @@ Ou acompanhe cada responsabilidade separadamente:
 .\run-local-pipeline.ps1 -Step 03D  # validacao Bronze x Silver
 ```
 
-Os fatos de mercado, que ficam fora de `PARTICULAR_3/3CORACOES`, possuem uma
-ingestao Bronze separada:
-
-```powershell
-.\run-local-pipeline.ps1 -Step 02C
-```
+`FATO_MERCADO` foi excluida do pipeline da POC. Candidatos antigos de mercado
+que ainda existam no lake nao sao lidos pela Silver nem pelo quality gate.
 
 ## Camadas
 
@@ -104,7 +98,7 @@ tabela Bronze e nao interrompem os demais candidatos da familia.
 ## Reconstrucao do Power Query
 
 O contrato `config/power_query_contracts.yaml` registra oito consultas
-dimensionais, nove familias particulares, `FATO_MERCADO` e a evidencia de que
+dimensionais, nove familias particulares e a evidencia de que
 `CALCULO_OPORTUNIDADES` consome os
 arquivos `ETL_CALC_V2` por varejista. A etapa 03:
 

@@ -48,7 +48,6 @@ No fato diario, `DIAS_SEM_VENDAS` (Parquet) e consolidada em
 | `FATOS_PARTICULAR_NIVEL_ATIVIDADE` | `fato_nivel_atividade` | `fato_nivel_atividade` |
 | `FATOS_PRECO` | `fato_preco` | `fato_preco` |
 | `CALCULO_OPORTUNIDADES` | `etl_calc_v2` | `etl_calc_v2` e `calculo_oportunidades` |
-| `FATO_MERCADO` | `candidate_mercado_*` | `fato_mercado` |
 
 `ETL_CALC` sem `V2` continua disponível apenas como staging tecnico. O modelo
 atual consulta explicitamente `ETL_CALC_V2`.
@@ -58,19 +57,14 @@ atual consulta explicitamente `ETL_CALC_V2`.
 ```powershell
 .\run-local-pipeline.ps1 -Step 02A
 .\run-local-pipeline.ps1 -Step 02B -Family all
-.\run-local-pipeline.ps1 -Step 02C
 .\run-local-pipeline.ps1 -Step 03A
 .\run-local-pipeline.ps1 -Step 03B
 .\run-local-pipeline.ps1 -Step 03C
 .\run-local-pipeline.ps1 -Step 03D
 ```
 
-02C e opcional quando a POC nao precisa dos dados de mercado. Nesse caso, 03D
-registra `fact_mercado` como `skipped_no_bronze`. Para apenas conferir os paths:
-
-```powershell
-.\run-local-pipeline.ps1 -Step 02C -InventoryOnly
-```
+`FATO_MERCADO` está fora do pipeline da POC e não participa da Silver nem do
+quality gate.
 
 ## Validacao
 

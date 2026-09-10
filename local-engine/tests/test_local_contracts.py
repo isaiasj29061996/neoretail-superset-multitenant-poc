@@ -101,7 +101,16 @@ def test_power_query_contract_covers_dimensions_facts_and_opportunities():
         "dias_sem_venda": ["dias_sem_vendas"]
     }
     assert contract["fact_families"]["etl_calc_v2"]["types"]["tvd"] == "decimal_19_4"
-    assert contract["market"]["status"] == "ready_for_bronze_ingestion"
+    assert contract["market"]["status"] == "excluded_from_pipeline"
+
+
+def test_market_fact_is_excluded_from_pipeline():
+    pipeline = (ROOT / "local-engine/neoretail_local/pipeline.py").read_text(encoding="utf-8")
+    runner = (ROOT / "run-local-pipeline.ps1").read_text(encoding="utf-8")
+    refresh = (ROOT / "run-multitenant-refresh.ps1").read_text(encoding="utf-8")
+    assert 'glob("candidate_mercado_*")' not in pipeline
+    assert '"02C"' not in runner
+    assert "IncludeMarket" not in refresh
 
 
 def test_gold_dimension_set_includes_market_and_activity_dimensions():

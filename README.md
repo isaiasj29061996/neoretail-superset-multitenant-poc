@@ -163,7 +163,6 @@ fica em `generated/local_pipeline_summary.json`.
 | `01` | descobre e inventaria os arquivos do Blob |
 | `02A` | carrega dimensões aprovadas na Bronze |
 | `02B` | materializa fatos candidatos por família e varejista |
-| `02C` | carrega fatos de mercado, quando solicitado |
 | `03A` | normaliza as dimensões na Silver |
 | `03B` | consolida fatos com tratamento de schema drift |
 | `03C` | estrutura oportunidades a partir do `ETL_CALC_V2` |
@@ -196,11 +195,8 @@ Para atualizar os três clientes:
 .\run-multitenant-refresh.ps1
 ```
 
-Inclua as fontes de mercado somente quando necessário:
-
-```powershell
-.\run-multitenant-refresh.ps1 -IncludeMarket
-```
+`FATO_MERCADO` está fora do pipeline da POC. Mesmo que existam candidatos de
+mercado antigos no lake local, as etapas Silver e de validação não os processam.
 
 As etapas `04` e `06` retornam `blocked` enquanto
 [`config/approved_facts.yaml`](config/approved_facts.yaml) não possuir fatos

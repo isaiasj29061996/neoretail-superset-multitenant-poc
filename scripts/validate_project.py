@@ -146,7 +146,9 @@ def main() -> None:
     )
     assert len(power_query_contracts["dimensions"]) == 8
     assert len(power_query_contracts["fact_families"]["etl_calc_v2"]["columns"]) == 39
-    assert power_query_contracts["market"]["target_table"] == "fato_mercado"
+    assert power_query_contracts["market"]["status"] == "excluded_from_pipeline"
+    assert 'glob("candidate_mercado_*")' not in pipeline_module
+    assert '"02C"' not in pipeline_script
 
     customers = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
