@@ -72,6 +72,12 @@ equal([result.indicators[1].label, result.indicators[1].format, result.indicator
 equal([result.critical, result.risk], [7, 9], 'Read task labels from camelCase props');
 equal(result.series.map(row => row.value), [20, 15], 'Sort and retain latest month');
 equal([result.title, result.helpText, result.variant], ['Meu TVD', 'Detalhes', 'multi'], 'Read presentation options');
+equal(result.timeGrain, 'P1M', 'Expose time grain to the renderer');
+const weeklyResult = transform({
+  formData: { ...formData, timeGrainSqla: 'P1W' },
+  queriesData: [{ data: rows }],
+});
+equal(weeklyResult.timeGrain, 'P1W', 'Preserve weekly grain for week labels');
 const precedence = transform({
   formData: { ...formData, cardVariant: 'panorama' },
   rawFormData: { card_variant: 'area', chart_styles: undefined },

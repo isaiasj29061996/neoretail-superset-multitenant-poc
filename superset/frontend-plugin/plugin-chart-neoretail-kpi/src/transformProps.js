@@ -91,6 +91,7 @@ export default function transformProps(chartProps) {
     showTasks: formData.show_tasks !== false,
     taskLabels: splitConfig(formData.task_labels, ['itens críticos', 'itens com risco']),
     chartStyles: splitConfig(formData.chart_styles, ['bar', 'bar', 'line']),
+    timeGrain: formData.time_grain_sqla || 'P1M',
     summaryCount: Math.max(0, Number(formData.summary_count) || metricLabels.length),
     indicators,
     critical: latest?.critical || 0,
