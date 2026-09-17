@@ -97,6 +97,7 @@ def main() -> None:
 
     plugin = ROOT / "superset/frontend-plugin/plugin-chart-neoretail-kpi/src"
     assert (plugin / "NeoRetailKpi.jsx").is_file()
+    assert (plugin / "NeoRetailKpiRouter.jsx").is_file()
     assert (plugin / "buildQuery.js").is_file()
     assert (plugin / "controlPanel.js").is_file()
     assert (plugin / "transformProps.js").is_file()
@@ -176,6 +177,7 @@ def main() -> None:
 
     dashboard_bootstraps = [
         ROOT / "superset/bootstrap_overview.py",
+        ROOT / "superset/bootstrap_overview_quantity.py",
         ROOT / "superset/bootstrap_panorama.py",
         ROOT / "superset/bootstrap_osa_industry.py",
         ROOT / "superset/bootstrap_stock_optimization.py",
@@ -208,8 +210,10 @@ def main() -> None:
         (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
     )
     assert tenants["default_dashboard"] == "overview"
-    assert set(tenants["dashboards"]) == {"overview", "panorama", "osa", "tasks"}
-    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 4
+    assert set(tenants["dashboards"]) == {
+        "overview", "overview_quantity", "panorama", "osa", "tasks"
+    }
+    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 5
     assert [item["key"] for item in tenants["navigation"]] == [
         "overview", "panorama", "tasks"
     ]
