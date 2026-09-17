@@ -190,7 +190,12 @@ async function productPage() {
     history.replaceState({}, "", `/app?dashboard=${encodeURIComponent(key)}`);
     renderNavigation(catalog, key, loadDashboard);
     $("#dashboard-title").textContent = dashboard.title;
-    $("#breadcrumb").textContent = `NeoRetail / ${dashboard.section === "tasks" ? "Tarefas do dia" : "Análises"}`;
+    const sectionLabel = dashboard.section === "tasks"
+      ? "Tarefas do dia"
+      : dashboard.section === "export"
+        ? "Exportação"
+        : "Análises";
+    $("#breadcrumb").textContent = `NeoRetail / ${sectionLabel}`;
     $("#setup-state").hidden = true;
     $("#dashboard-loading").hidden = false;
     const mountPoint = $("#superset-container");
@@ -209,7 +214,7 @@ async function productPage() {
         dashboardUiConfig: {
           hideTitle: true,
           hideTab: true,
-          hideChartControls: true,
+          hideChartControls: dashboard.section !== "export",
           filters: { visible: true, expanded: true },
         },
         referrerPolicy: "strict-origin-when-cross-origin",

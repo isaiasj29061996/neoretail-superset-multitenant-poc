@@ -45,6 +45,22 @@ dashboards:
     embedded_id: 41b8a47c-9e46-5f87-be63-4efd6757c0bd
     required_module: tarefas
     embedded_height: 1500
+  export_daily:
+    title: Exportação — Histórico dia
+    menu_label: Histórico dia
+    section: export
+    slug: neoretail-v9-exportacao-historico-dia
+    embedded_id: a20f5684-8182-5815-95c7-8cf1353bdbcd
+    required_module: exportacao_diaria
+    embedded_height: 1500
+  export_monthly:
+    title: Exportação — Histórico mês
+    menu_label: Histórico mês
+    section: export
+    slug: neoretail-v9-exportacao-historico-mes
+    embedded_id: 535fd5b3-ea7b-56b3-8cf2-94cd8962f88a
+    required_module: exportacao_mensal
+    embedded_height: 1500
 
 navigation:
   - key: overview
@@ -53,6 +69,8 @@ navigation:
     label: Panorama
   - key: tasks
     label: Tarefas do dia
+  - key: export
+    label: Exportação
 
 # POC local. Em produção, usuários e permissões virão do backend NeoRetail.
 customers:
