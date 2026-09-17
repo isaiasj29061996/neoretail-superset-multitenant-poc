@@ -1,11 +1,14 @@
 from pathlib import Path
+import os
 import re
 import sys
 
 import yaml
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(
+    os.getenv("NEORETAIL_REPO_ROOT", str(Path(__file__).resolve().parents[2]))
+).resolve()
 sys.path.insert(0, str(ROOT / "local-engine"))
 
 from neoretail_local.candidate_rules import candidate_table, classify_file, family_rules
