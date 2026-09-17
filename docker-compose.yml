@@ -118,7 +118,7 @@ services:
       METRIC_CONTRACTS_PATH: /workspace/config/metric_contracts.yaml
       POWER_QUERY_CONTRACTS_PATH: /workspace/config/power_query_contracts.yaml
       CUSTOMERS_CONFIG_PATH: /workspace/config/customers.yaml
-      NEORETAIL_CUSTOMER: ${NEORETAIL_CUSTOMER:-259}
+      NEORETAIL_CUSTOMER: ${NEORETAIL_CUSTOMER:-142}
       LOCAL_DATA_ROOT: /data
       LOCAL_LAKE_FORMAT: ${LOCAL_LAKE_FORMAT:-parquet}
       LOCAL_DISCOVERY_MAX_FILES: ${LOCAL_DISCOVERY_MAX_FILES:-5000}

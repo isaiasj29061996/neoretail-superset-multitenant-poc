@@ -24,7 +24,7 @@ with app.test_request_context('/'):
     for chart in charts:
         form = json.loads(chart.params)
         metrics = form.get('metrics', [])
-        filters = [{'col': 'id_customer', 'op': 'IN', 'val': [259]}]
+        filters = [{'col': 'id_customer', 'op': 'IN', 'val': [142]}]
         if form.get('viz_type') == 'neoretail-kpi-card':
             if form.get('card_variant') == 'rankbars':
                 queries = [{'columns': form.get('groupby', []), 'metrics': metrics, 'filters': filters, 'row_limit': form.get('row_limit', 10)}]

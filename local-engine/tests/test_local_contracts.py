@@ -175,7 +175,10 @@ def test_v9_customer_registry_and_embedded_rls():
     registry = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
     )
-    assert [row["id_customer"] for row in registry["customers"]] == [259, 609, 16868]
+    assert [row["id_customer"] for row in registry["customers"]] == [142]
+    assert registry["default_customer"] == 142
+    assert registry["customers"][0]["nm_customer"] == "AMBEV"
+    assert registry["customers"][0]["source_prefix"] == "FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV"
     server = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in server
     assert "allowedCustomerIds.includes(idCustomer)" in server

@@ -257,7 +257,7 @@ def main():
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 259, "label": "3CORACOES"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id}, "chart_count": len(charts)}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id}, "chart_count": len(charts)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

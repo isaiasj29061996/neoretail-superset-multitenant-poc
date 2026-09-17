@@ -1,7 +1,7 @@
 """Create the NeoRetail stock-optimization task dashboard in Superset.
 
 Only Superset metadata is changed. The Analytics database is queried through
-physical serving marts; industry 259 is selected by default in the dashboard.
+physical serving marts; AMBEV (industry 142) is selected by default in the dashboard.
 """
 from __future__ import annotations
 
@@ -257,7 +257,7 @@ def main():
         db.session.commit()
         print(json.dumps({
             "dashboard_id": dashboard.id, "slug": dashboard.slug,
-            "industry": {"id_customer": 259, "label": "3CORACOES"},
+            "industry": {"id_customer": 142, "label": "AMBEV"},
             "last_movement": last_date.isoformat(),
             "datasets": {"history": history.id, "tvd_daily": tvd_daily.id, "tasks": tasks.id},
             "charts": {key: chart.id for key, chart in charts.items()},

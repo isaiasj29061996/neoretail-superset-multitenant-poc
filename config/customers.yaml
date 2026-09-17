@@ -1,5 +1,5 @@
 version: "9.0"
-default_customer: 259
+default_customer: 142
 
 # Identidade corporativa oficial. O id_customer vem de
 # DIMENSAO/DIMENSAO_CUSTOMER.snappy.parquet e sera a chave do RLS.
@@ -9,35 +9,13 @@ identity:
   name_column: nm_customer
   rls_column: id_customer
 
-# Primeiro conjunto real de validacao multi-industria da V9.
-# Horarios permanecem desabilitados ate confirmacao do refresh de cada fonte.
+# Escopo ativo da POC: somente AMBEV.
+# Horarios permanecem desabilitados ate confirmacao do refresh da nova fonte.
 customers:
-  - id_customer: 259
-    nm_customer: 3CORACOES
-    display_name: 3 Corações
-    source_prefix: PARTICULAR_3/3CORACOES
-    enabled: true
-    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
-    schedule:
-      enabled: false
-      timezone: America/Sao_Paulo
-      cron: null
-
-  - id_customer: 609
-    nm_customer: BASTON
-    display_name: Baston
-    source_prefix: PARTICULAR_3/BASTON
-    enabled: true
-    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
-    schedule:
-      enabled: false
-      timezone: America/Sao_Paulo
-      cron: null
-
-  - id_customer: 16868
-    nm_customer: SAFIRA
-    display_name: Safira
-    source_prefix: PARTICULAR_3/SAFIRA
+  - id_customer: 142
+    nm_customer: AMBEV
+    display_name: AMBEV
+    source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV
     enabled: true
     modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
     schedule:

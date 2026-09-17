@@ -92,7 +92,7 @@ agregações e consultas caras não garante dashboards rápidos.
 2. O backend lê os clientes permitidos em `config/tenants.yaml`.
 3. O usuário seleciona uma indústria autorizada.
 4. O backend solicita ao Superset um Guest Token com uma cláusula como
-   `id_customer = 259`.
+   `id_customer = 142`.
 5. O Superset aplica o RLS antes de calcular métricas e renderizar os gráficos.
 
 Os filtros visíveis refinam a análise. Eles não substituem o RLS e não devem
@@ -102,9 +102,15 @@ ser usados como fronteira de segurança.
 
 | `id_customer` | Cliente | Prefixo no Blob |
 |---:|---|---|
-| 259 | 3 Corações | `PARTICULAR_3/3CORACOES` |
-| 609 | Baston | `PARTICULAR_3/BASTON` |
-| 16868 | Safira | `PARTICULAR_3/SAFIRA` |
+| 142 | AMBEV | `FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV` |
+
+O portal, o catálogo embedded e o RLS da POC estão configurados exclusivamente
+para a AMBEV. A descoberta da origem diária particionada já foi validada, com
+902 arquivos encontrados. A promoção desses dados aos contratos Silver/Gold e
+aos sete marts ainda exige um adaptador explícito para esse layout de origem;
+até essa etapa, os dashboards da AMBEV podem abrir sem dados. O pipeline atual
+foi criado para as famílias legadas e não deve inferir fórmulas de negócio para
+preencher os marts.
 
 O cadastro corporativo fica em [`config/customers.yaml`](config/customers.yaml).
 As permissões da POC embedded ficam em
@@ -194,7 +200,7 @@ O modo `delta` pode exigir acesso externo na primeira inicialização.
 O comando principal executa uma etapa para um cliente por vez:
 
 ```powershell
-.\run-local-pipeline.ps1 -Step 02A -Customer 259
+.\run-local-pipeline.ps1 -Step 02A -Customer 142
 ```
 
 O parâmetro `-Customer` aceita o ID ou o nome cadastrado. O resumo da execução
@@ -219,20 +225,20 @@ fica em `generated/local_pipeline_summary.json`.
 Fluxo recomendado para o primeiro cliente:
 
 ```powershell
-.\run-local-pipeline.ps1 -Step 02A -Customer 259
-.\run-local-pipeline.ps1 -Step 02B -Customer 259
-.\run-local-pipeline.ps1 -Step 03A -Customer 259
-.\run-local-pipeline.ps1 -Step 03B -Customer 259
-.\run-local-pipeline.ps1 -Step 03C -Customer 259
-.\run-local-pipeline.ps1 -Step 03D -Customer 259
-.\run-local-pipeline.ps1 -Step 04  -Customer 259
-.\run-local-pipeline.ps1 -Step 05  -Customer 259
-.\run-local-pipeline.ps1 -Step 06  -Customer 259
-.\run-local-pipeline.ps1 -Step 07  -Customer 259
-.\run-local-pipeline.ps1 -Step 08  -Customer 259
+.\run-local-pipeline.ps1 -Step 02A -Customer 142
+.\run-local-pipeline.ps1 -Step 02B -Customer 142
+.\run-local-pipeline.ps1 -Step 03A -Customer 142
+.\run-local-pipeline.ps1 -Step 03B -Customer 142
+.\run-local-pipeline.ps1 -Step 03C -Customer 142
+.\run-local-pipeline.ps1 -Step 03D -Customer 142
+.\run-local-pipeline.ps1 -Step 04  -Customer 142
+.\run-local-pipeline.ps1 -Step 05  -Customer 142
+.\run-local-pipeline.ps1 -Step 06  -Customer 142
+.\run-local-pipeline.ps1 -Step 07  -Customer 142
+.\run-local-pipeline.ps1 -Step 08  -Customer 142
 ```
 
-Para atualizar os três clientes:
+Para atualizar o tenant ativo:
 
 ```powershell
 .\run-multitenant-refresh.ps1
@@ -303,7 +309,7 @@ Na arquitetura futura, eles devem ser portados para modelos dbt incrementais
 antes de o Superset trocar de fonte.
 
 O refresh multitenant completo já chama `create-superset-kpi-views.ps1` depois
-de atualizar os três clientes. Portanto, a camada física sempre é reconstruída
+de atualizar os clientes configurados. Portanto, a camada física sempre é reconstruída
 com o estado final da Gold:
 
 ```powershell
@@ -337,6 +343,9 @@ O mart `gold.nr_tvd_daily` transfere esse cálculo para o refresh e entrega ao
 Superset métricas somáveis. Ele preserva `id_customer` e todas as dimensões dos
 filtros nativos.
 
+Este benchmark histórico foi executado antes da mudança de escopo para a AMBEV
+e usou o tenant 259. Ele comprova a otimização do mart, mas não mede o tenant 142.
+
 | Consulta TVD | Antes | Depois |
 |---|---:|---:|
 | Sem filtro de indústria | 5.621 ms | 1.722 ms |
@@ -363,7 +372,7 @@ http://localhost:8088/superset/dashboard/neoretail-v9-osa-industria/
 O Panorama usa abas do Superset para as alternâncias Mensal/Semanal,
 Valor/Quantidade e Estoque/Giro/OSA/Falta e Excesso. A tela OSA usa as abas
 Valor/Perdas, equivalentes aos bookmarks do Power BI. O cliente inicial desses
-dois dashboards é 3 Corações (`id_customer = 259`).
+dois dashboards é AMBEV (`id_customer = 142`).
 
 ### Filtros nativos
 

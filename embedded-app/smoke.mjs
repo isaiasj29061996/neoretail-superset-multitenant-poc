@@ -24,7 +24,7 @@ const login = await request("/api/login", {
 });
 if (!login.response.ok) throw new Error(`Login falhou: ${login.response.status}`);
 
-const expectedCustomers = [259, 609, 16868];
+const expectedCustomers = [142];
 let issuedTokens = 0;
 for (const idCustomer of expectedCustomers) {
   const context = await request("/api/context", {
@@ -58,12 +58,18 @@ for (const idCustomer of expectedCustomers) {
   }
 }
 
-const denied = await request("/api/context", {
-  method: "POST", body: JSON.stringify({ idCustomer: 999999 }),
-});
-if (denied.response.status !== 403) throw new Error("Cliente não autorizado foi aceito");
+const deniedCustomers = [259, 609, 16868, 999999];
+for (const idCustomer of deniedCustomers) {
+  const denied = await request("/api/context", {
+    method: "POST", body: JSON.stringify({ idCustomer }),
+  });
+  if (denied.response.status !== 403) {
+    throw new Error(`Cliente não autorizado foi aceito: ${idCustomer}`);
+  }
+}
 
 console.log(JSON.stringify({
   status: "ok", customers: expectedCustomers.length,
-  dashboards: 4, guestTokens: issuedTokens, unauthorizedCustomer: 403,
+  dashboards: 4, guestTokens: issuedTokens,
+  deniedCustomers: deniedCustomers.length,
 }));
