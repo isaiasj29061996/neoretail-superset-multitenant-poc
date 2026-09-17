@@ -1,8 +1,9 @@
 """Create/update the NeoRetail quantity overview dashboard.
 
-The dashboard reproduces the Power BI page "Visão geral - visão indústria quantidade"
-using the existing Gold serving mart and the NeoRetail KPI plugin. Only Superset
-metadata is changed here; no source data is mutated.
+Most quantity KPIs use the additive overview summary mart. Only the
+"Distribuição e sortimento" card stays on the detailed monthly mart because
+exact distinct counts of stores/items are not additive across arbitrary native
+filters.
 """
 from __future__ import annotations
 
@@ -11,10 +12,9 @@ import json
 from superset.app import create_app
 
 from bootstrap_overview import (
-    M,
     chart_params,
     metric,
-    native_filters,
+    overview_native_filters,
     position_json,
     upsert_chart,
     upsert_dataset,
@@ -24,36 +24,55 @@ from bootstrap_overview import (
 DASHBOARD_TITLE = "NeoRetail V9 — Visão geral quantidade"
 DASHBOARD_SLUG = "neoretail-v9-visao-geral-quantidade"
 
-Q = {
-    "sales_qty": M["sales_qty"],
-    "loss_qty": metric("Perda OSA qtd", "SUM(qtd_perda_osa)"),
-    "price": metric("Preço médio", "SUM(faturamento) / NULLIF(SUM(volume_unidades), 0)"),
+Q_SUM = {
+    "sales_qty": metric("Venda qtd", "SUM(sales_qty_sum)"),
+    "loss_qty": metric("Perda OSA qtd", "SUM(osa_loss_qty_sum)"),
+    "price": metric(
+        "Preço médio",
+        "SUM(faturamento_sum) / NULLIF(SUM(sales_qty_sum), 0)",
+    ),
+    "osa": metric(
+        "OSA",
+        "100.0 * (1 - SUM(osa_problem_sum) / NULLIF(SUM(osa_active_sum), 0))",
+    ),
+    "rupture": metric(
+        "Ruptura",
+        "100.0 * SUM(rupture_sum) / NULLIF(SUM(osa_active_sum), 0)",
+    ),
+    "isv": metric(
+        "Item sem venda",
+        "100.0 * SUM(isv_sum) / NULLIF(SUM(osa_active_sum), 0)",
+    ),
+    "coverage": metric(
+        "Cobertura de estoque",
+        "SUM(stock_qty_sum) / NULLIF(SUM(sales_qty_sum) / 4.33, 0)",
+    ),
+    "osa_critical": metric("Itens críticos OSA", "SUM(osa_critical_count)"),
+    "osa_risk": metric("Itens risco OSA", "SUM(osa_risk_count)"),
+    "rup_critical": metric("Itens críticos Ruptura", "SUM(rupture_critical_count)"),
+    "rup_risk": metric("Itens risco Ruptura", "SUM(rupture_risk_count)"),
+    "isv_critical": metric("Itens críticos ISV", "SUM(isv_critical_count)"),
+    "isv_risk": metric("Itens risco ISV", "SUM(isv_risk_count)"),
+}
+
+Q_DETAIL = {
     "stores": metric("Quantidade de lojas", "COUNT(DISTINCT id_location)"),
     "items": metric("Quantidade de itens", "COUNT(DISTINCT id_item)"),
-    "osa": M["osa"],
-    "rupture": metric("Ruptura", "100.0 * SUM(rup) / NULLIF(SUM(qtd_item_ativo_osa), 0)"),
-    "isv": metric("Item sem venda", "100.0 * SUM(est_virtual) / NULLIF(SUM(qtd_item_ativo_osa), 0)"),
-    "coverage": metric("Cobertura de estoque", "SUM(estoque_unidades) / NULLIF(SUM(volume_unidades) / 4.33, 0)"),
-    "rup_critical": metric(
-        "Itens críticos Ruptura",
-        "COUNT(DISTINCT CASE WHEN COALESCE(rup, 0) > 0 AND tp_activity_level = 'F' THEN opportunity_key END)",
-    ),
-    "rup_risk": metric(
-        "Itens risco Ruptura",
-        "COUNT(DISTINCT CASE WHEN COALESCE(rup, 0) > 0 AND tp_activity_level = 'S' THEN opportunity_key END)",
-    ),
-    "isv_critical": metric(
-        "Itens críticos ISV",
-        "COUNT(DISTINCT CASE WHEN COALESCE(est_virtual, 0) > 0 AND tp_activity_level = 'F' THEN opportunity_key END)",
-    ),
-    "isv_risk": metric(
-        "Itens risco ISV",
-        "COUNT(DISTINCT CASE WHEN COALESCE(est_virtual, 0) > 0 AND tp_activity_level = 'S' THEN opportunity_key END)",
-    ),
 }
 
 
-def comparison_params(dataset, title, measure, *, fmt="number", direction="higher", show_tasks=False, critical_metric=None, risk_metric=None, plain=False):
+def comparison_params(
+    dataset,
+    title,
+    measure,
+    *,
+    fmt="number",
+    direction="higher",
+    show_tasks=False,
+    critical_metric=None,
+    risk_metric=None,
+    plain=False,
+):
     return chart_params(
         dataset,
         title,
@@ -82,6 +101,13 @@ def main():
         database = db.session.query(Database).filter(
             Database.database_name == "NeoRetail Gold - PostgreSQL Local"
         ).one()
+        summary = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_overview_summary",
+            table_name="nr_overview_summary",
+        )
         history = upsert_dataset(
             db.session,
             SqlaTable,
@@ -92,24 +118,37 @@ def main():
 
         specs = [
             (
+                summary,
                 "Vendas",
-                comparison_params(history, "Vendas", Q["sales_qty"], fmt="number", direction="higher"),
+                comparison_params(
+                    summary, "Vendas", Q_SUM["sales_qty"],
+                    fmt="number", direction="higher",
+                ),
             ),
             (
+                summary,
                 "Perda de vendas OSA",
-                comparison_params(history, "Perda de vendas OSA", Q["loss_qty"], fmt="number", direction="lower"),
+                comparison_params(
+                    summary, "Perda de vendas OSA", Q_SUM["loss_qty"],
+                    fmt="number", direction="lower",
+                ),
             ),
             (
+                summary,
                 "Preço médio",
-                comparison_params(history, "Preço médio", Q["price"], fmt="currency", direction="higher", plain=True),
+                comparison_params(
+                    summary, "Preço médio", Q_SUM["price"],
+                    fmt="currency", direction="higher", plain=True,
+                ),
             ),
             (
+                history,
                 "Distribuição e sortimento",
                 chart_params(
                     history,
                     "Distribuição e sortimento",
                     "multi",
-                    [Q["stores"], Q["items"]],
+                    [Q_DETAIL["stores"], Q_DETAIL["items"]],
                     metric_labels="Quantidade de lojas|Quantidade de itens",
                     metric_formats="number|number",
                     metric_directions="higher|higher",
@@ -118,53 +157,66 @@ def main():
                 ),
             ),
             (
+                summary,
                 "% OSA",
                 comparison_params(
-                    history,
+                    summary,
                     "% OSA",
-                    Q["osa"],
+                    Q_SUM["osa"],
                     fmt="percent",
                     direction="higher",
                     show_tasks=True,
-                    critical_metric=M["osa_critical"],
-                    risk_metric=M["osa_risk"],
+                    critical_metric=Q_SUM["osa_critical"],
+                    risk_metric=Q_SUM["osa_risk"],
                 ),
             ),
             (
+                summary,
                 "Ruptura",
                 comparison_params(
-                    history,
+                    summary,
                     "Ruptura",
-                    Q["rupture"],
+                    Q_SUM["rupture"],
                     fmt="percent",
                     direction="lower",
                     show_tasks=True,
-                    critical_metric=Q["rup_critical"],
-                    risk_metric=Q["rup_risk"],
+                    critical_metric=Q_SUM["rup_critical"],
+                    risk_metric=Q_SUM["rup_risk"],
                 ),
             ),
             (
+                summary,
                 "Item sem venda",
                 comparison_params(
-                    history,
+                    summary,
                     "Item sem venda",
-                    Q["isv"],
+                    Q_SUM["isv"],
                     fmt="percent",
                     direction="lower",
                     show_tasks=True,
-                    critical_metric=Q["isv_critical"],
-                    risk_metric=Q["isv_risk"],
+                    critical_metric=Q_SUM["isv_critical"],
+                    risk_metric=Q_SUM["isv_risk"],
                 ),
             ),
             (
+                summary,
                 "Cobertura de estoque",
-                comparison_params(history, "Cobertura de estoque", Q["coverage"], fmt="number", direction="lower"),
+                comparison_params(
+                    summary, "Cobertura de estoque", Q_SUM["coverage"],
+                    fmt="number", direction="lower",
+                ),
             ),
         ]
 
         charts = [
-            upsert_chart(db.session, Slice, history, f"[Visão quantidade] {title}", params)
-            for title, params in specs
+            upsert_chart(
+                db.session,
+                Slice,
+                dataset,
+                f"[Visão quantidade] {title}",
+                params,
+            )
+            for dataset, title, params in specs
         ]
 
         dashboard = db.session.query(Dashboard).filter(
@@ -191,9 +243,12 @@ def main():
                 "expanded_slices": {},
                 "refresh_frequency": 0,
                 "color_scheme": "supersetColors",
-                "native_filter_configuration": native_filters(history.id),
+                "native_filter_configuration": overview_native_filters(
+                    [summary.id, history.id]
+                ),
                 "filter_bar_orientation": "HORIZONTAL",
-            }
+            },
+            ensure_ascii=False,
         )
         dashboard.slices = charts
         db.session.commit()
@@ -202,7 +257,10 @@ def main():
                 {
                     "dashboard_id": dashboard.id,
                     "slug": dashboard.slug,
-                    "dataset": history.id,
+                    "datasets": {
+                        "summary": summary.id,
+                        "history_distincts": history.id,
+                    },
                     "charts": {chart.slice_name: chart.id for chart in charts},
                 },
                 ensure_ascii=False,
