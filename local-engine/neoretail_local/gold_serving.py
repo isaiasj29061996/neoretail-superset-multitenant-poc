@@ -155,6 +155,37 @@ def _publish_daily_export_source(
     }
 
 
+def publish_daily_export_only(settings: Settings, spark) -> dict[str, object]:
+    """Atualiza somente o source PostgreSQL da exportacao diaria.
+
+    Usa o Gold lake completo ja publicado pelo pipeline, sem republicar as
+    demais familias. E o caminho rapido para atualizar a aba Exportacao.
+    """
+
+    frame = read_lake(
+        spark,
+        settings,
+        "gold",
+        "fato_diaria",
+        customer_scoped=True,
+    )
+    if "id_customer" not in frame.columns:
+        raise RuntimeError("fato_diaria Gold: id_customer ausente")
+    invalid = frame.filter(
+        F.col("id_customer").cast("long") != F.lit(settings.id_customer)
+    ).limit(1).count()
+    if invalid:
+        raise RuntimeError("fato_diaria Gold contem linhas de outro tenant")
+
+    window = _publish_daily_export_source(frame, settings)
+    return {
+        "step": "export_daily_serving",
+        "status": "passed",
+        "postgres_table": AMBEV_EXPORT_DAILY_SOURCE,
+        "serving_window": window,
+    }
+
+
 def publish(settings: Settings, spark) -> dict[str, object]:
     facts = approved_facts(settings)
     if not facts:
@@ -266,6 +297,11 @@ def main() -> None:
         description="Publica Gold e serving PostgreSQL do NeoRetail"
     )
     parser.add_argument("--customer", default="142")
+    parser.add_argument(
+        "--export-daily-only",
+        action="store_true",
+        help="Publica somente o source PostgreSQL da exportacao diaria.",
+    )
     args = parser.parse_args()
 
     settings = Settings.from_env(
@@ -275,7 +311,11 @@ def main() -> None:
     ensure_schemas(settings)
     spark = create_spark(settings)
     try:
-        result = publish(settings, spark)
+        result = (
+            publish_daily_export_only(settings, spark)
+            if args.export_daily_only
+            else publish(settings, spark)
+        )
         print(json.dumps(result, ensure_ascii=False, indent=2))
     finally:
         spark.stop()
