@@ -50,6 +50,8 @@ SELECT
     SUM(COALESCE(f.volume_unidades, 0)) AS sales_qty_sum,
     SUM(COALESCE(f.estoque_medio, 0) * COALESCE(f.avg_price_cost, 0)) AS stock_cost_sum,
     SUM(COALESCE(f.estoque_unidades, 0)) AS stock_qty_sum,
+    SUM(COALESCE(f.rup, 0)) AS rupture_sum,
+    SUM(COALESCE(f.est_virtual, 0)) AS isv_sum,
     SUM(CASE WHEN COALESCE(f.giro, 0) > 0 THEN f.giro ELSE 0 END) AS giro_sum_positive,
     COUNT(f.giro) FILTER (WHERE COALESCE(f.giro, 0) > 0)::bigint AS giro_count_positive,
     SUM(COALESCE(f.qtd_problemas_osa, 0)) AS osa_problem_sum,
@@ -66,7 +68,27 @@ SELECT
         WHEN COALESCE(o.qtd_problemas_osa_m0, 0) > 0
          AND o.max_tp_activity_level = 'S'
         THEN CONCAT_WS('|', f.id_customer::text, f.id_location, f.id_item)
-    END)::bigint AS osa_risk_count
+    END)::bigint AS osa_risk_count,
+    COUNT(DISTINCT CASE
+        WHEN COALESCE(f.rup, 0) > 0
+         AND f.tp_activity_level = 'F'
+        THEN CONCAT_WS('|', f.id_customer::text, f.id_location, f.id_item)
+    END)::bigint AS rupture_critical_count,
+    COUNT(DISTINCT CASE
+        WHEN COALESCE(f.rup, 0) > 0
+         AND f.tp_activity_level = 'S'
+        THEN CONCAT_WS('|', f.id_customer::text, f.id_location, f.id_item)
+    END)::bigint AS rupture_risk_count,
+    COUNT(DISTINCT CASE
+        WHEN COALESCE(f.est_virtual, 0) > 0
+         AND f.tp_activity_level = 'F'
+        THEN CONCAT_WS('|', f.id_customer::text, f.id_location, f.id_item)
+    END)::bigint AS isv_critical_count,
+    COUNT(DISTINCT CASE
+        WHEN COALESCE(f.est_virtual, 0) > 0
+         AND f.tp_activity_level = 'S'
+        THEN CONCAT_WS('|', f.id_customer::text, f.id_location, f.id_item)
+    END)::bigint AS isv_risk_count
 FROM gold.fato_historico f
 LEFT JOIN gold.dim_local l
   ON l.id_customer = f.id_customer
