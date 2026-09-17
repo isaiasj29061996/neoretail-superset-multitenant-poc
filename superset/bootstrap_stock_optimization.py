@@ -1,7 +1,7 @@
 """Create the NeoRetail stock-optimization task dashboard in Superset.
 
 Only Superset metadata is changed. The Analytics database is queried through
-physical serving marts; AMBEV (industry 142) is selected by default in the dashboard.
+physical serving marts; tenant isolation is enforced by the embedded RLS layer.
 """
 from __future__ import annotations
 
@@ -61,9 +61,24 @@ IVD = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
 TVD_HISTORY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd_simplificado, 0))")
 TVD_DAILY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD_HISTORY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd_simplificado, 0))")
-STOCK = metric("Qtde Estoque", "SUM(COALESCE(estoque_unidades, 0))")
-STOCK_MIN = metric("Qtde Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
-STOCK_MAX = metric("Qtde Estoque máximo", "SUM(COALESCE(estoque_max, 0))")
+STOCK = metric("Qtd Estoque atual", "SUM(COALESCE(estoque_unidades, 0))")
+STOCK_MIN = metric("Qtd Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
+STOCK_MAX = metric("Qtd Estoque máximo", "SUM(COALESCE(estoque_max, 0))")
+
+# Regras de negócio já definidas para as tabelas de incidência:
+# - excesso = estoque atual - estoque máximo, preservando resultados negativos;
+# - falta = estoque mínimo quando estoque atual <= 0; caso contrário,
+#   estoque mínimo - estoque atual, também sem truncar resultados negativos.
+ITEMS_EXCESS = metric(
+    "Qtd itens em excesso",
+    "SUM(COALESCE(estoque_unidades, 0) - COALESCE(estoque_max, 0))",
+)
+ITEMS_MISSING = metric(
+    "Qtd itens em falta",
+    "SUM(CASE WHEN COALESCE(estoque_unidades, 0) <= 0 "
+    "THEN COALESCE(estoque_min, 0) "
+    "ELSE COALESCE(estoque_min, 0) - COALESCE(estoque_unidades, 0) END)",
+)
 
 
 def sql_filter(expression):
@@ -93,9 +108,10 @@ def task_filters(dataset_id):
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
         ("cidade", "Cidade", ["uf"]),
-        ("deposito", "Depósito", []),
+        ("tipo_local", "Tipo local", []),
+        ("loja", "Loja", ["tipo_local"]),
         ("tp_activity_level", "Nível de atividade", []),
-        ("descricao_marca", "Marca", []),
+        ("descricao_marca", "Descrição marca", []),
         ("hierarquia_1", "Hierarquia 1", ["descricao_marca"]),
         ("hierarquia_2", "Hierarquia 2", ["hierarquia_1"]),
         ("hierarquia_3", "Hierarquia 3", ["hierarquia_2"]),
@@ -202,12 +218,20 @@ def main():
 
         add(
             "table_excess", tasks, "Incidência de Excesso",
-            detail_table_params(tasks, [IVD, STOCK, STOCK_MAX], "COALESCE(ivd, 0) > 0"),
+            detail_table_params(
+                tasks,
+                [ITEMS_EXCESS, STOCK, STOCK_MAX],
+                "COALESCE(ivd, 0) > 0",
+            ),
             "table",
         )
         add(
             "table_pre", tasks, "Incidência de Pré-ruptura",
-            detail_table_params(tasks, [TVD, STOCK, STOCK_MIN], "COALESCE(tvd, 0) > 0"),
+            detail_table_params(
+                tasks,
+                [ITEMS_MISSING, STOCK, STOCK_MIN],
+                "COALESCE(tvd, 0) > 0",
+            ),
             "table",
         )
 
@@ -215,17 +239,18 @@ def main():
         parents = ["ROOT_ID", "GRID_ID"]
         add_markdown(
             layout, "GRID_ID", parents,
-            f"**Data da última carga:** {last_date.strftime('%d/%m/%Y')}", height=4,
+            f"**Data do último movimento:** {last_date.strftime('%d/%m/%Y')} &nbsp;&nbsp;&nbsp; `VERSÃO BETA`",
+            height=4,
         )
         layout.row("GRID_ID", parents, [charts["tvd_card"], charts["ivd_card"]], 34)
         add_markdown(
             layout, "GRID_ID", parents,
-            "## Otimização de estoque — incidências de excesso e pré-ruptura", height=6,
+            "## Otimização de estoque - Incidências de excesso e pré-ruptura", height=6,
         )
         layout.tabs("GRID_ID", parents, "Análise de otimização", [
             ("Pré-ruptura", [[charts["pre_rede"], charts["pre_item"]]]),
             ("Excesso", [[charts["excess_rede"], charts["excess_item"]]]),
-            ("Otimização do estoque", [[charts["combined_rede"], charts["combined_item"]]]),
+            ("Otimização de estoque", [[charts["combined_rede"], charts["combined_item"]]]),
         ], height=50)
         layout.row("GRID_ID", parents, [charts["table_excess"], charts["table_pre"]], 54)
 
@@ -250,14 +275,13 @@ def main():
         dashboard.json_metadata = json.dumps({
             "timed_refresh_immune_slices": [], "expanded_slices": {},
             "refresh_frequency": 0, "color_scheme": "supersetColors",
-            "native_filter_configuration": task_filters(history.id),
+            "native_filter_configuration": task_filters(tasks.id),
             "filter_bar_orientation": "HORIZONTAL",
         }, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
         print(json.dumps({
             "dashboard_id": dashboard.id, "slug": dashboard.slug,
-            "industry": {"id_customer": 142, "label": "AMBEV"},
             "last_movement": last_date.isoformat(),
             "datasets": {"history": history.id, "tvd_daily": tvd_daily.id, "tasks": tasks.id},
             "charts": {key: chart.id for key, chart in charts.items()},
