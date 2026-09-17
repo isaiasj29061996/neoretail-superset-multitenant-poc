@@ -7,7 +7,7 @@ from flask_login import login_user
 from superset.app import create_app
 
 
-CUSTOMER_ID = 259
+CUSTOMER_ID = 142
 app = create_app()
 with app.test_request_context('/'):
     from superset import db, security_manager
