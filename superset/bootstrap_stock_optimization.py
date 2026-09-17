@@ -60,7 +60,7 @@ TVD = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
 TVD_HISTORY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd_simplificado, 0))")
 TVD_DAILY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
-IVD_HISTORY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd_simplificado, 0))")
+IVD_DAILY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
 STOCK = metric("Qtd Estoque atual", "SUM(COALESCE(estoque_unidades, 0))")
 STOCK_MIN = metric("Qtd Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
 STOCK_MAX = metric("Qtd Estoque máximo", "SUM(COALESCE(estoque_max, 0))")
@@ -162,11 +162,11 @@ def main():
                     "SELECT MAX(id_time)::date FROM gold.fato_ivd_tvd"
                 )).scalar_one()
 
-        history = upsert_dataset(
-            db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities"
-        )
         tvd_daily = upsert_dataset(
             db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
+        )
+        ivd_daily = upsert_dataset(
+            db.session, SqlaTable, database, "nr_ivd_daily", table_name="nr_ivd_daily"
         )
         tasks = upsert_dataset(
             db.session, SqlaTable, database, "nr_stock_tasks", table_name="nr_stock_tasks"
@@ -187,11 +187,11 @@ def main():
         add("tvd_card", tvd_daily, "TVD - Pré-ruptura", tvd_card)
 
         ivd_card = custom_params(
-            history, "IVD - Excesso de estoque", [IVD_HISTORY], grain="P1D",
+            ivd_daily, "IVD - Excesso de estoque", [IVD_DAILY], grain="P1D",
             formats="currency", variant="headlinearea",
         )
         ivd_card["accent_color"] = "#C91878"
-        add("ivd_card", history, "IVD - Excesso de estoque", ivd_card)
+        add("ivd_card", ivd_daily, "IVD - Excesso de estoque", ivd_card)
 
         for dimension, label in (("rede", "Redes"), ("item", "Itens")):
             pre = custom_params(
@@ -284,7 +284,7 @@ def main():
         print(json.dumps({
             "dashboard_id": dashboard.id, "slug": dashboard.slug,
             "last_movement": last_date.isoformat(),
-            "datasets": {"history": history.id, "tvd_daily": tvd_daily.id, "tasks": tasks.id},
+            "datasets": {"tvd_daily": tvd_daily.id, "ivd_daily": ivd_daily.id, "tasks": tasks.id},
             "charts": {key: chart.id for key, chart in charts.items()},
         }, ensure_ascii=False))
 
