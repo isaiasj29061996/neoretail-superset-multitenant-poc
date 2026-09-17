@@ -16,6 +16,7 @@ customers:
     nm_customer: AMBEV
     display_name: AMBEV
     source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV
+    source_layout: partitioned_customer_daily_v1
     enabled: true
     modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
     schedule:

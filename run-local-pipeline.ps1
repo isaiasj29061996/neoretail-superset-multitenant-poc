@@ -15,7 +15,7 @@ param(
     [int]$MaxFiles = 0,
     [switch]$InventoryOnly,
     [Parameter(Mandatory = $false)]
-    [string]$Customer = "259"
+    [string]$Customer = "142"
 )
 
 $ErrorActionPreference = "Stop"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -52,8 +54,11 @@ def discover_candidates(
 ) -> tuple[list[Candidate], list[str]]:
     facts_prefix = settings.customer_source_prefix
     prefix = join_blob_path(settings.blob_prefix, facts_prefix)
+    partitioned_daily = settings.customer.source_layout == "partitioned_customer_daily_v1"
     rules = family_rules(catalog)
-    if selected_family != "all" and selected_family not in rules:
+    if partitioned_daily and selected_family not in {"all", "customer_daily"}:
+        raise ValueError("A origem particionada da AMBEV aceita apenas family=all ou customer_daily")
+    if not partitioned_daily and selected_family != "all" and selected_family not in rules:
         raise ValueError(
             f"Familia invalida: {selected_family}. Use uma de {sorted(rules)} ou all."
         )
@@ -65,7 +70,11 @@ def discover_candidates(
         if not blob.name.lower().endswith(".parquet"):
             continue
         file_name = PurePosixPath(blob.name).name
-        classification = classify_file(file_name, rules)
+        classification = (
+            ("customer_daily", safe_identifier(PurePosixPath(file_name).stem.replace(".snappy", "")))
+            if partitioned_daily
+            else classify_file(file_name, rules)
+        )
         if classification is None:
             unclassified.append(blob.name)
             continue
@@ -80,7 +89,11 @@ def discover_candidates(
                 file_name=file_name,
                 family=family,
                 retailer=retailer,
-                bronze_table=candidate_table(family, retailer),
+                bronze_table=(
+                    "candidate_customer_daily"
+                    if partitioned_daily
+                    else candidate_table(family, retailer)
+                ),
                 size_bytes=int(blob.size or 0),
                 last_modified=(
                     blob.last_modified.isoformat() if blob.last_modified else None
@@ -108,7 +121,7 @@ def download_candidate(settings: Settings, candidate: Candidate) -> Path:
     if target.is_file() and etag_path.is_file():
         if etag_path.read_text(encoding="utf-8") == etag:
             return target
-    temporary = target.with_suffix(target.suffix + ".part")
+    temporary = target.with_suffix(target.suffix + f".{uuid.uuid4().hex}.part")
     with temporary.open("wb") as handle:
         blob.download_blob(max_concurrency=4).readinto(handle)
     temporary.replace(target)
@@ -179,7 +192,39 @@ def run(
         loaded: list[str] = []
         empty_sources: list[str] = []
         status_by_path: dict[str, str] = {}
-        if not inventory_only:
+        if not inventory_only and settings.customer.source_layout == "partitioned_customer_daily_v1":
+            local_files: list[str] = []
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                pending = {
+                    executor.submit(download_candidate, settings, candidate): candidate
+                    for candidate in candidates
+                }
+                for index, future in enumerate(as_completed(pending), start=1):
+                    candidate = pending[future]
+                    local_files.append(str(future.result()))
+                    status_by_path[candidate.blob_path] = "bronze_candidate"
+                    print(
+                        f"[{index}/{len(candidates)}] customer_daily: {candidate.relative_path}",
+                        flush=True,
+                    )
+            frame = spark.read.parquet(*local_files)
+            source_customer = "ID_CUSTOMER" if "ID_CUSTOMER" in frame.columns else "id_customer"
+            invalid = frame.filter(F.col(source_customer).cast("long") != F.lit(settings.id_customer)).limit(1).count()
+            if invalid:
+                raise RuntimeError("Fonte diaria particionada contem ID_CUSTOMER fora do tenant selecionado")
+            enriched = (
+                frame.withColumn("id_customer", F.col(source_customer).cast("long"))
+                .withColumn("_customer_name", F.lit(settings.nm_customer))
+                .withColumn("_source_file", F.input_file_name())
+                .withColumn("_retailer", F.regexp_extract(F.input_file_name(), r"/([^/]+?)(?:\\.snappy)?\\.parquet$", 1))
+                .withColumn("_fact_family", F.lit("customer_daily"))
+                .withColumn("_candidate_status", F.lit("candidate"))
+                .withColumn("_ingested_at", F.current_timestamp())
+            )
+            write_lake(enriched, settings, "bronze", "candidate_customer_daily", customer_scoped=True)
+            loaded.append("candidate_customer_daily")
+            write_inventory(spark, settings, candidates, "discovered", status_by_path)
+        elif not inventory_only:
             for index, candidate in enumerate(candidates, start=1):
                 print(
                     f"[{index}/{len(candidates)}] {candidate.family} / "

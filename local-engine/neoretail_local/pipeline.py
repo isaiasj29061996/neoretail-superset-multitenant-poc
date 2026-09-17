@@ -16,6 +16,7 @@ from pyspark.sql import functions as F
 
 from .settings import Settings
 from .power_query import apply_fact_contract, build_activity_dimension, transform_dimensions
+from .partitioned_daily import build_partitioned_daily_facts
 from .silver import normalize_frame, union_frames
 from .silver_contracts import family_table_prefix
 from .spark import create_spark
@@ -343,6 +344,30 @@ def step_03a_silver_dimensions(settings: Settings, spark) -> dict[str, Any]:
 
 
 def step_03b_silver_facts(settings: Settings, spark) -> dict[str, Any]:
+    if settings.customer.source_layout == "partitioned_customer_daily_v1":
+        source = read_lake(
+            spark, settings, "bronze", "candidate_customer_daily", customer_scoped=True
+        )
+        transformed = build_partitioned_daily_facts(source, settings.id_customer)
+        written: list[str] = []
+        for target, frame in transformed.items():
+            write_lake(frame, settings, "silver", target, customer_scoped=True)
+            written.append(target)
+        activity = read_lake(
+            spark, settings, "silver", "fato_nivel_atividade", customer_scoped=True
+        )
+        write_lake(
+            build_activity_dimension(activity, settings.id_customer, settings.nm_customer),
+            settings, "silver", "dim_nivel_atividade", customer_scoped=True,
+        )
+        return {
+            "step": "03B_silver_facts",
+            "status": "passed_partitioned_customer_daily_v1",
+            "tables": written,
+            "bronze_sources": 1,
+            "skipped_families": ["etl_calc_v1"],
+            "post_fact_dimensions": ["dim_nivel_atividade"],
+        }
     contracts = power_query_contracts(settings)
     written: list[str] = []
     skipped: list[str] = []
