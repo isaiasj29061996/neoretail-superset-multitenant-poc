@@ -80,10 +80,19 @@ P = {
     "roi_annual": metric("ROI anual", "1200.0 * ((CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END) - SUM(volume_unidades * avg_price_cost)) / NULLIF(SUM(estoque_medio * avg_price_cost), 0)"),
 }
 
-TVD_MONTH = metric("TVD", "SUM(CASE WHEN data = month_end_data THEN tvd_simplificado ELSE 0 END)")
-IVD_MONTH = metric("IVD", "SUM(CASE WHEN data = month_end_data THEN ivd_simplificado ELSE 0 END)")
-TVD_WEEK = metric("TVD", "SUM(CASE WHEN data = week_end_data THEN tvd_simplificado ELSE 0 END)")
-IVD_WEEK = metric("IVD", "SUM(CASE WHEN data = week_end_data THEN ivd_simplificado ELSE 0 END)")
+GAP_TVD = metric("TVD", "SUM(COALESCE(tvd, 0))")
+GAP_IVD = metric("IVD", "SUM(COALESCE(ivd, 0))")
+
+
+def sql_filter(expression):
+    return {
+        "clause": "WHERE",
+        "comparator": "",
+        "expressionType": "SQL",
+        "filterOptionName": "filter_panorama_gap_period",
+        "fromFormData": True,
+        "sqlExpression": expression,
+    }
 
 
 def upsert_chart(session, Slice, dataset, title, params, viz_type="neoretail-kpi-card"):
@@ -190,6 +199,13 @@ def main():
         mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
         opportunities = mart
         opportunities_latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities_latest", table_name="nr_panorama_opportunities_latest")
+        gap_periodic = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_panorama_gap_periodic",
+            table_name="nr_panorama_gap_periodic",
+        )
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
@@ -205,8 +221,22 @@ def main():
             add(f"stock_{period}", dataset, f"Evolutivo de estoque — Estoque {period}", custom_params(dataset, "Evolutivo de estoque", stock, grain=grain, styles="bar|bar", formats="currency|number"))
             add(f"giro_roi_{period}", dataset, f"Evolutivo de estoque — Giro e ROI {period}", custom_params(dataset, "Evolutivo de estoque", giro_roi, grain=grain, styles="bar|line|line", formats="percent|number|number"))
             add(f"osa_{period}", dataset, f"Evolutivo de estoque — OSA {period}", custom_params(dataset, "Evolutivo de estoque", osa, grain=grain, styles="line|line|line", formats="percent|percent|percent"))
-        for period, grain, metrics in (("mensal", "P1M", [TVD_MONTH, IVD_MONTH]), ("semanal", "P1W", [TVD_WEEK, IVD_WEEK])):
-            add(f"gap_{period}", opportunities, f"Evolutivo de estoque — Falta e Excesso {period}", custom_params(opportunities, "Evolutivo de estoque", metrics, grain=grain, styles="line|line", formats="currency|currency"))
+        for period, grain in (("mensal", "P1M"), ("semanal", "P1W")):
+            params = custom_params(
+                gap_periodic,
+                "Evolutivo de estoque",
+                [GAP_TVD, GAP_IVD],
+                grain=grain,
+                styles="line|line",
+                formats="currency|currency",
+            )
+            params["adhoc_filters"] = [sql_filter(f"period_type = '{period}'")]
+            add(
+                f"gap_{period}",
+                gap_periodic,
+                f"Evolutivo de estoque — Falta e Excesso {period}",
+                params,
+            )
 
         dimensions = (("regiao", "Região"), ("rede", "Varejo"), ("hierarquia_1", "Hierarquia de item"))
         for column, label in dimensions:
@@ -257,7 +287,7 @@ def main():
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id}, "chart_count": len(charts)}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
