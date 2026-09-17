@@ -13,6 +13,14 @@ dashboards:
     embedded_id: 80291d5e-f3aa-5392-854e-d44c22ae3e0b
     required_module: visao_industria
     embedded_height: 980
+  overview_quantity:
+    title: Visão geral — Quantidade
+    menu_label: Visão quantidade
+    section: overview
+    slug: neoretail-v9-visao-geral-quantidade
+    embedded_id: 1bd370c3-bcf1-5f91-a1f0-5800973a805d
+    required_module: visao_industria
+    embedded_height: 1100
   panorama:
     title: Panorama — Indústria
     menu_label: Geral
