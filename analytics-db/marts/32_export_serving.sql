@@ -45,11 +45,14 @@ SELECT
     i.hierarquia_4,
     COALESCE(f.nivel_atividade::text, f.status_item_geral::text, 'I') AS nivel_atividade,
     'unidade'::text AS unidade_medida,
-    'Venda'::text AS indicador,
     COALESCE(f.volume_unidades, 0)::double precision AS venda_qtd,
     COALESCE(f.faturamento, 0)::double precision AS venda_valor,
     COALESCE(f.estoque_unidades, 0)::double precision AS estoque_qtd,
+    COALESCE(f.estoque_transito, 0)::double precision AS estoque_transito_qtd,
     COALESCE(f.qtd_perda_osa, 0)::double precision AS perda_osa_qtd,
+    COALESCE(f.qtd_problemas_osa, 0)::double precision AS osa_problemas,
+    COALESCE(f.qtd_item_ativo_osa, 0)::double precision AS osa_itens_ativos,
+    COALESCE(f.preco_medio_ref, 0)::double precision AS preco_referencia,
     COALESCE(f.rup, 0)::double precision AS ruptura,
     COALESCE(f.est_virtual, 0)::double precision AS item_sem_venda
 FROM gold.nr_export_daily_source f
@@ -105,11 +108,14 @@ SELECT
     i.hierarquia_4,
     COALESCE(f.tp_activity_level::text, 'I') AS nivel_atividade,
     'unidade'::text AS unidade_medida,
-    'Venda'::text AS indicador,
     COALESCE(f.volume_unidades, 0)::double precision AS venda_qtd,
     COALESCE(f.faturamento, 0)::double precision AS venda_valor,
     COALESCE(f.estoque_unidades, 0)::double precision AS estoque_qtd,
+    COALESCE(f.estoque_transito, 0)::double precision AS estoque_transito_qtd,
     COALESCE(f.qtd_perda_osa, 0)::double precision AS perda_osa_qtd,
+    COALESCE(f.qtd_problemas_osa, 0)::double precision AS osa_problemas,
+    COALESCE(f.qtd_item_ativo_osa, 0)::double precision AS osa_itens_ativos,
+    COALESCE(f.avg_sales_price, 0)::double precision AS preco_referencia,
     COALESCE(f.rup, 0)::double precision AS ruptura,
     COALESCE(f.est_virtual, 0)::double precision AS item_sem_venda
 FROM gold.fato_historico f
