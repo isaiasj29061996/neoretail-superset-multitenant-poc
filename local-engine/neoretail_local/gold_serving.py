@@ -23,8 +23,8 @@ from .pipeline import (
     read_lake,
     validate_identifier,
     write_lake,
-    write_postgres_customer,
 )
+from .postgres_serving import write_postgres_customer_named
 from .settings import Settings
 from .spark import create_spark
 
@@ -168,7 +168,7 @@ def publish(settings: Settings, spark) -> dict[str, object]:
                 "cutoff": cutoff,
             }
 
-        write_postgres_customer(
+        write_postgres_customer_named(
             serving_frame,
             settings,
             "gold",
