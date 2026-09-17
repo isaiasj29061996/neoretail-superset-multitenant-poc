@@ -110,6 +110,7 @@ services:
     build: ./local-engine
     environment:
       PYTHONPATH: /workspace/local-engine
+      NEORETAIL_REPO_ROOT: /repo
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
       AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-neoretail}
       AZURE_BLOB_PREFIX: ${AZURE_BLOB_PREFIX:-}
@@ -137,6 +138,7 @@ services:
       OUTPUT_DIR: /workspace/generated
     ports: ["8888:8888"]
     volumes:
+      - ./:/repo:ro
       - ./local-engine:/workspace/local-engine
       - ./generated:/workspace/generated
       - ./config:/workspace/config:ro
