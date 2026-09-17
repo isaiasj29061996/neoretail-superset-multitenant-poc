@@ -13,6 +13,9 @@ param(
     [string]$Family = "all",
     [ValidateRange(0, 10000)]
     [int]$MaxFiles = 0,
+    [ValidateRange(0.01, 1.0)]
+    [double]$SampleFraction = 1.0,
+    [switch]$PruneRawCache,
     [switch]$InventoryOnly,
     [Parameter(Mandatory = $false)]
     [string]$Customer = "142"
@@ -27,16 +30,24 @@ if ($envText -notmatch '(?im)^AZURE_STORAGE_CONNECTION_STRING\s*=\s*\S+') {
     throw "Preencha AZURE_STORAGE_CONNECTION_STRING no .env antes do pipeline."
 }
 
+if ($MaxFiles -gt 0 -and $SampleFraction -lt 1.0) {
+    throw "Use -MaxFiles ou -SampleFraction, nao os dois ao mesmo tempo."
+}
+
 docker compose up -d local-engine analytics-db
 if ($LASTEXITCODE -ne 0) { throw "Nao foi possivel preparar o engine local." }
 
 if ($Step -eq "02B") {
+    $sampleText = $SampleFraction.ToString([System.Globalization.CultureInfo]::InvariantCulture)
     $arguments = @(
         "compose", "exec", "-T", "local-engine",
         "python", "-m", "neoretail_local.candidates",
-        "--family", $Family, "--max-files", "$MaxFiles",
+        "--family", $Family,
+        "--max-files", "$MaxFiles",
+        "--sample-fraction", $sampleText,
         "--customer", $Customer
     )
+    if ($PruneRawCache) { $arguments += "--prune-raw-cache" }
     if ($InventoryOnly) { $arguments += "--inventory-only" }
     & docker @arguments
 } elseif ($Step -eq "03D" -and $Customer -in @("142", "AMBEV")) {
