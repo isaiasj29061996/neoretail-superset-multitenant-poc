@@ -6,7 +6,7 @@ param(
     )]
     [string]$Step = "all",
     [ValidateSet(
-        "all", "etl_calc_v1", "etl_calc_v2", "fato_diaria",
+        "all", "customer_daily", "etl_calc_v1", "etl_calc_v2", "fato_diaria",
         "fato_historico", "fato_ivd_tvd", "fato_nivel_atividade",
         "fato_preco", "mensal_causa_osa", "semanal"
     )]
@@ -39,6 +39,8 @@ if ($Step -eq "02B") {
     )
     if ($InventoryOnly) { $arguments += "--inventory-only" }
     & docker @arguments
+} elseif ($Step -eq "03D" -and $Customer -in @("142", "AMBEV")) {
+    docker compose exec -T local-engine python -m neoretail_local.partitioned_validation --customer $Customer
 } else {
     $pipelineStep = if ($Step -eq "02A") { "02" } else { $Step }
     docker compose exec -T local-engine python -m neoretail_local.pipeline --step $pipelineStep --customer $Customer
