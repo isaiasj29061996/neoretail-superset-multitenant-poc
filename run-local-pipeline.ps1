@@ -41,6 +41,8 @@ if ($Step -eq "02B") {
     & docker @arguments
 } elseif ($Step -eq "03D" -and $Customer -in @("142", "AMBEV")) {
     docker compose exec -T local-engine python -m neoretail_local.partitioned_validation --customer $Customer
+} elseif ($Step -eq "06" -and $Customer -in @("142", "AMBEV")) {
+    docker compose exec -T local-engine python -m neoretail_local.gold_serving --customer $Customer
 } else {
     $pipelineStep = if ($Step -eq "02A") { "02" } else { $Step }
     docker compose exec -T local-engine python -m neoretail_local.pipeline --step $pipelineStep --customer $Customer
