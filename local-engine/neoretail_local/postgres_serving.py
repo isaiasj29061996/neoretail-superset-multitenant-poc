@@ -1,14 +1,16 @@
-"""Escrita PostgreSQL tolerante a reordenacao de colunas.
+"""Escrita PostgreSQL tolerante a reordenacao de colunas e tipos compativeis.
 
 O Spark/JDBC cria uma tabela de staging com o schema atual do DataFrame. Tabelas
 Gold persistentes podem ter sido criadas por uma versao anterior com a mesma
-lista de colunas em outra ordem. INSERT ... SELECT * e posicional e pode, nesse
-caso, tentar inserir texto em uma coluna numerica. Este modulo promove o staging
-por nome de coluna e suporta evolucao aditiva de schema.
+lista de colunas em outra ordem ou com representacoes numericas equivalentes.
+INSERT ... SELECT * e posicional e pode, nesse caso, deslocar valores entre
+colunas. Este modulo promove o staging por nome de coluna, suporta evolucao
+aditiva de schema e faz CAST explicito apenas entre tipos compativeis.
 """
 
 from __future__ import annotations
 
+import re
 import uuid
 
 import psycopg2
@@ -18,6 +20,20 @@ from pyspark.sql import functions as F
 
 from .pipeline import validate_identifier
 from .settings import Settings
+
+
+_NUMERIC_TYPES = {
+    "smallint",
+    "integer",
+    "bigint",
+    "real",
+    "double precision",
+}
+_TEXT_PREFIXES = (
+    "text",
+    "character varying",
+    "character",
+)
 
 
 def _columns_with_types(cursor, schema: str, table: str) -> list[tuple[str, str]]:
@@ -38,6 +54,40 @@ def _columns_with_types(cursor, schema: str, table: str) -> list[tuple[str, str]
         (schema, table),
     )
     return [(str(name), str(pg_type)) for name, pg_type in cursor.fetchall()]
+
+
+def _type_family(pg_type: str) -> str:
+    normalized = re.sub(r"\s+", " ", pg_type.strip().lower())
+    if normalized in _NUMERIC_TYPES or normalized.startswith("numeric(") or normalized == "numeric":
+        return "numeric"
+    if normalized.startswith(_TEXT_PREFIXES):
+        return "text"
+    return normalized
+
+
+def _types_compatible(target_type: str, stage_type: str) -> bool:
+    if target_type == stage_type:
+        return True
+    target_family = _type_family(target_type)
+    stage_family = _type_family(stage_type)
+    return target_family == stage_family and target_family in {"numeric", "text"}
+
+
+def _select_expression(name: str, target_type: str, stage_type: str):
+    """Retorna expressao SQL segura para promover uma coluna do staging.
+
+    Tipos identicos sao lidos diretamente. Familias numericas/textuais
+    compativeis recebem CAST explicito para o tipo fisico da tabela Gold.
+    """
+
+    identifier = sql.Identifier(name)
+    if target_type == stage_type:
+        return identifier
+    if not _types_compatible(target_type, stage_type):
+        raise RuntimeError(
+            f"{name}: target={target_type} stage={stage_type}"
+        )
+    return sql.SQL("CAST({} AS {})").format(identifier, sql.SQL(target_type))
 
 
 def write_postgres_customer_named(
@@ -93,7 +143,6 @@ def write_postgres_customer_named(
 
                 stage_columns = _columns_with_types(cursor, schema, stage)
                 target_columns = _columns_with_types(cursor, schema, table)
-                stage_types = dict(stage_columns)
                 target_types = dict(target_columns)
 
                 if not stage_columns:
@@ -117,7 +166,8 @@ def write_postgres_customer_named(
                 incompatible = [
                     f"{name}: target={target_types[name]} stage={stage_type}"
                     for name, stage_type in stage_columns
-                    if name in target_types and target_types[name] != stage_type
+                    if name in target_types
+                    and not _types_compatible(target_types[name], stage_type)
                 ]
                 if incompatible:
                     raise RuntimeError(
@@ -128,6 +178,10 @@ def write_postgres_customer_named(
                 ordered_names = [name for name, _ in stage_columns]
                 columns_sql = sql.SQL(", ").join(
                     sql.Identifier(name) for name in ordered_names
+                )
+                select_sql = sql.SQL(", ").join(
+                    _select_expression(name, target_types[name], stage_type)
+                    for name, stage_type in stage_columns
                 )
 
                 cursor.execute(
@@ -141,7 +195,7 @@ def write_postgres_customer_named(
                         sql.Identifier(schema),
                         sql.Identifier(table),
                         columns_sql,
-                        columns_sql,
+                        select_sql,
                         sql.Identifier(schema),
                         sql.Identifier(stage),
                     )
