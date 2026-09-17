@@ -60,9 +60,15 @@ LEFT JOIN (
 
 
 def metric(label: str, expression: str) -> dict:
-    return {"expressionType": "SQL", "sqlExpression": expression, "label": label, "optionName": f"metric_{uuid.uuid5(uuid.NAMESPACE_DNS, label).hex[:12]}"}
+    return {
+        "expressionType": "SQL",
+        "sqlExpression": expression,
+        "label": label,
+        "optionName": f"metric_{uuid.uuid5(uuid.NAMESPACE_DNS, label).hex[:12]}",
+    }
 
 
+# Base semantic metrics retained because Panorama and other bootstraps import M.
 M = {
     "tvd": metric("TVD", "SUM(tvd_simplificado)"),
     "ivd": metric("IVD", "SUM(ivd_simplificado)"),
@@ -84,10 +90,43 @@ M = {
     "markup": metric("Markup", "100.0 * (CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END) / NULLIF(SUM(volume_unidades * avg_price_cost), 0)"),
 }
 
+_OVERVIEW_SELLOUT = (
+    "CASE WHEN SUM(faturamento_sum) > 0 "
+    "THEN SUM(faturamento_sum) ELSE SUM(fallback_sellout_sum) END"
+)
+OVERVIEW_M = {
+    "sellout": metric("Venda sell out", _OVERVIEW_SELLOUT),
+    "cost": metric("Venda custo", "SUM(sales_cost_sum)"),
+    "sales_qty": metric("Venda qtd", "SUM(sales_qty_sum)"),
+    "stock_cost": metric("Estoque custo", "SUM(stock_cost_sum)"),
+    "stock_qty": metric("Estoque qtd", "SUM(stock_qty_sum)"),
+    "giro": metric("Giro", "SUM(giro_sum_positive) / NULLIF(SUM(giro_count_positive), 0)"),
+    "osa": metric("OSA", "100.0 * (1 - SUM(osa_problem_sum) / NULLIF(SUM(osa_active_sum), 0))"),
+    "osa_loss": metric(
+        "Perda OSA",
+        "SUM(osa_loss_qty_sum) * SUM(avg_sales_price_sum) / NULLIF(SUM(avg_sales_price_count), 0)",
+    ),
+    "osa_critical": metric("Itens críticos OSA", "SUM(osa_critical_count)"),
+    "osa_risk": metric("Itens risco OSA", "SUM(osa_risk_count)"),
+    "roi": metric(
+        "ROI",
+        f"100.0 * (({_OVERVIEW_SELLOUT}) - SUM(sales_cost_sum)) / NULLIF(SUM(stock_cost_sum), 0)",
+    ),
+    "markup": metric(
+        "Markup",
+        f"100.0 * ({_OVERVIEW_SELLOUT}) / NULLIF(SUM(sales_cost_sum), 0)",
+    ),
+}
+
 TVD_DAILY = {
     "tvd": metric("TVD", "SUM(tvd)"),
     "critical": metric("Itens críticos TVD", "SUM(itens_criticos_tvd)"),
     "risk": metric("Itens risco TVD", "SUM(itens_risco_tvd)"),
+}
+IVD_DAILY = {
+    "ivd": metric("IVD", "SUM(ivd)"),
+    "critical": metric("Itens críticos IVD", "SUM(itens_criticos_ivd)"),
+    "risk": metric("Itens risco IVD", "SUM(itens_risco_ivd)"),
 }
 
 
@@ -117,15 +156,25 @@ def upsert_dataset(session, model, database, name, *, table_name=None, sql=None)
 
 def chart_params(dataset, title, variant, metrics, **extra):
     params = {
-        "datasource": f"{dataset.id}__table", "viz_type": "neoretail-kpi-card",
-        "x_axis": "data", "time_grain_sqla": "P1M", "time_range": "No filter",
-        "metrics": metrics, "row_limit": 10000, "card_title": title,
-        "card_variant": variant, "help_text": extra.pop("help_text", title),
+        "datasource": f"{dataset.id}__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": metrics,
+        "row_limit": 10000,
+        "card_title": title,
+        "card_variant": variant,
+        "help_text": extra.pop("help_text", title),
         "metric_labels": extra.pop("metric_labels", "|".join(m["label"] for m in metrics)),
         "metric_formats": extra.pop("metric_formats", "number"),
         "metric_directions": extra.pop("metric_directions", "higher"),
-        "accent_color": "#7C4AD9", "analysis_url": "", "show_tasks": extra.pop("show_tasks", False),
-        "adhoc_filters": [], "groupby": extra.pop("groupby", []), **extra,
+        "accent_color": "#7C4AD9",
+        "analysis_url": "",
+        "show_tasks": extra.pop("show_tasks", False),
+        "adhoc_filters": [],
+        "groupby": extra.pop("groupby", []),
+        **extra,
     }
     return params
 
@@ -146,7 +195,14 @@ def upsert_chart(session, Slice, dataset, title, params):
 
 def position_json(charts):
     root = {"ROOT_ID": {"id": "ROOT_ID", "type": "ROOT", "children": ["GRID_ID"]}}
-    grid = {"GRID_ID": {"id": "GRID_ID", "type": "GRID", "parents": ["ROOT_ID"], "children": ["ROW-1", "ROW-2"]}}
+    grid = {
+        "GRID_ID": {
+            "id": "GRID_ID",
+            "type": "GRID",
+            "parents": ["ROOT_ID"],
+            "children": ["ROW-1", "ROW-2"],
+        }
+    }
     layout = {**root, **grid}
     for row_index, row_charts in enumerate((charts[:4], charts[4:]), 1):
         row_id = f"ROW-{row_index}"
@@ -154,13 +210,31 @@ def position_json(charts):
         for chart in row_charts:
             chart_id = f"CHART-{chart.id}"
             children.append(chart_id)
-            layout[chart_id] = {"id": chart_id, "type": "CHART", "parents": ["ROOT_ID", "GRID_ID", row_id], "children": [], "meta": {"chartId": chart.id, "height": 50, "width": 3, "sliceName": chart.slice_name, "uuid": str(chart.uuid)}}
-        layout[row_id] = {"id": row_id, "type": "ROW", "parents": ["ROOT_ID", "GRID_ID"], "children": children, "meta": {"background": "BACKGROUND_TRANSPARENT"}}
+            layout[chart_id] = {
+                "id": chart_id,
+                "type": "CHART",
+                "parents": ["ROOT_ID", "GRID_ID", row_id],
+                "children": [],
+                "meta": {
+                    "chartId": chart.id,
+                    "height": 50,
+                    "width": 3,
+                    "sliceName": chart.slice_name,
+                    "uuid": str(chart.uuid),
+                },
+            }
+        layout[row_id] = {
+            "id": row_id,
+            "type": "ROW",
+            "parents": ["ROOT_ID", "GRID_ID"],
+            "children": children,
+            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+        }
     return json.dumps(layout)
 
 
-def native_filters(dataset_id):
-    definitions = [
+def _filter_definitions():
+    return [
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
@@ -174,14 +248,46 @@ def native_filters(dataset_id):
         ("hierarquia_3", "Hierarquia 3", ["hierarquia_2"]),
         ("item", "Item", ["hierarquia_3"]),
     ]
+
+
+def _native_filters_for_targets(targets_by_column):
+    definitions = _filter_definitions()
     ids = {column: f"NATIVE_FILTER-neoretail-{column}" for column, _, _ in definitions}
     return [{
-        "id": ids[column], "controlValues": {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": True, "searchAllOptions": True, "inverseSelection": False},
-        "name": label, "filterType": "filter_select", "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
+        "id": ids[column],
+        "controlValues": {
+            "enableEmptyFilter": False,
+            "defaultToFirstItem": False,
+            "creatable": False,
+            "multiSelect": True,
+            "searchAllOptions": True,
+            "inverseSelection": False,
+        },
+        "name": label,
+        "filterType": "filter_select",
+        "targets": targets_by_column(column),
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
-        "cascadeParentIds": [ids[parent] for parent in parents], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
-        "type": "NATIVE_FILTER", "description": "",
+        "cascadeParentIds": [ids[parent] for parent in parents],
+        "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
+        "type": "NATIVE_FILTER",
+        "description": "",
     } for column, label, parents in definitions]
+
+
+def native_filters(dataset_id):
+    return _native_filters_for_targets(
+        lambda column: [{"datasetId": dataset_id, "column": {"name": column}}]
+    )
+
+
+def overview_native_filters(dataset_ids):
+    ids = list(dict.fromkeys(int(dataset_id) for dataset_id in dataset_ids))
+    return _native_filters_for_targets(
+        lambda column: [
+            {"datasetId": dataset_id, "column": {"name": column}}
+            for dataset_id in ids
+        ]
+    )
 
 
 def main():
@@ -193,32 +299,76 @@ def main():
         from superset.models.dashboard import Dashboard
         from superset.models.slice import Slice
 
-        database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
-        tvd_daily = upsert_dataset(db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily")
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
+        database = db.session.query(Database).filter(
+            Database.database_name == "NeoRetail Gold - PostgreSQL Local"
+        ).one()
+        tvd_daily = upsert_dataset(
+            db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
+        )
+        ivd_daily = upsert_dataset(
+            db.session, SqlaTable, database, "nr_ivd_daily", table_name="nr_ivd_daily"
+        )
+        summary = upsert_dataset(
+            db.session, SqlaTable, database, "nr_overview_summary", table_name="nr_overview_summary"
+        )
+
         specs = [
-            (tvd_daily, "TVD - Pré-ruptura", chart_params(tvd_daily, "TVD - Pré-ruptura", "area", [TVD_DAILY["tvd"]], show_tasks=True, critical_metric=TVD_DAILY["critical"], risk_metric=TVD_DAILY["risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),
-            (mart, "IVD - Excesso", chart_params(mart, "IVD - Excesso", "area", [M["ivd"]], show_tasks=True, critical_metric=M["ivd_critical"], risk_metric=M["ivd_risk"], metric_formats="currency", metric_directions="lower", task_labels="itens críticos|itens com risco", time_grain_sqla="P1D")),
-            (history, "Giro", chart_params(history, "Giro", "bars", [M["giro"]], groupby=["activity_level"], metric_formats="number", metric_directions="lower")),
-            (history, "OSA", chart_params(history, "OSA", "osa", [M["osa"], M["osa_loss"]], show_tasks=True, critical_metric=M["osa_critical"], risk_metric=M["osa_risk"], metric_labels="% Numérico|Perda R$", metric_formats="percent|currency", metric_directions="higher|lower", task_labels="itens críticos|itens em risco")),
-            (history, "Vendas", chart_params(history, "Vendas", "multi", [M["sellout"], M["cost"], M["sales_qty"]], metric_labels="Venda sell out|Venda custo|Venda qtd", metric_formats="currency|currency|number", metric_directions="higher|lower|higher")),
-            (history, "Estoque", chart_params(history, "Estoque", "multi", [M["stock_cost"], M["stock_qty"]], metric_labels="Estoque custo|Estoque qtd", metric_formats="currency|number", metric_directions="lower|lower")),
-            (history, "ROI", chart_params(history, "ROI", "bars", [M["roi"]], groupby=["activity_level"], metric_formats="percent", metric_directions="higher")),
-            (history, "MARKUP", chart_params(history, "MARKUP", "bars", [M["markup"]], groupby=["activity_level"], metric_formats="percent", metric_directions="higher")),
+            (tvd_daily, "TVD - Pré-ruptura", chart_params(
+                tvd_daily, "TVD - Pré-ruptura", "area", [TVD_DAILY["tvd"]],
+                show_tasks=True, critical_metric=TVD_DAILY["critical"], risk_metric=TVD_DAILY["risk"],
+                metric_formats="currency", metric_directions="lower",
+                task_labels="itens críticos|itens com risco", time_grain_sqla="P1D",
+            )),
+            (ivd_daily, "IVD - Excesso", chart_params(
+                ivd_daily, "IVD - Excesso", "area", [IVD_DAILY["ivd"]],
+                show_tasks=True, critical_metric=IVD_DAILY["critical"], risk_metric=IVD_DAILY["risk"],
+                metric_formats="currency", metric_directions="lower",
+                task_labels="itens críticos|itens com risco", time_grain_sqla="P1D",
+            )),
+            (summary, "Giro", chart_params(summary, "Giro", "bars", [OVERVIEW_M["giro"]], groupby=["activity_level"], metric_formats="number", metric_directions="lower")),
+            (summary, "OSA", chart_params(summary, "OSA", "osa", [OVERVIEW_M["osa"], OVERVIEW_M["osa_loss"]], show_tasks=True, critical_metric=OVERVIEW_M["osa_critical"], risk_metric=OVERVIEW_M["osa_risk"], metric_labels="% Numérico|Perda R$", metric_formats="percent|currency", metric_directions="higher|lower", task_labels="itens críticos|itens em risco")),
+            (summary, "Vendas", chart_params(summary, "Vendas", "multi", [OVERVIEW_M["sellout"], OVERVIEW_M["cost"], OVERVIEW_M["sales_qty"]], metric_labels="Venda sell out|Venda custo|Venda qtd", metric_formats="currency|currency|number", metric_directions="higher|lower|higher")),
+            (summary, "Estoque", chart_params(summary, "Estoque", "multi", [OVERVIEW_M["stock_cost"], OVERVIEW_M["stock_qty"]], metric_labels="Estoque custo|Estoque qtd", metric_formats="currency|number", metric_directions="lower|lower")),
+            (summary, "ROI", chart_params(summary, "ROI", "bars", [OVERVIEW_M["roi"]], groupby=["activity_level"], metric_formats="percent", metric_directions="higher")),
+            (summary, "MARKUP", chart_params(summary, "MARKUP", "bars", [OVERVIEW_M["markup"]], groupby=["activity_level"], metric_formats="percent", metric_directions="higher")),
         ]
         charts = [upsert_chart(db.session, Slice, dataset, title, params) for dataset, title, params in specs]
-        dashboard = db.session.query(Dashboard).filter(Dashboard.dashboard_title == DASHBOARD_TITLE).one_or_none()
+
+        dashboard = db.session.query(Dashboard).filter(
+            Dashboard.dashboard_title == DASHBOARD_TITLE
+        ).one_or_none()
         if dashboard is None:
-            dashboard = Dashboard(dashboard_title=DASHBOARD_TITLE, slug="neoretail-v9-visao-geral-industria", published=True)
+            dashboard = Dashboard(
+                dashboard_title=DASHBOARD_TITLE,
+                slug="neoretail-v9-visao-geral-industria",
+                published=True,
+            )
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = position_json(charts)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; } .dashboard-component-chart-holder > .header { display: none !important; }"
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"})
+        dashboard.css = (
+            ".dashboard-content { background: #e7f0f5 !important; } "
+            ".dashboard-component-chart-holder { border-radius: 8px; } "
+            ".dashboard-component-chart-holder > .header { display: none !important; }"
+        )
+        dashboard.json_metadata = json.dumps({
+            "timed_refresh_immune_slices": [],
+            "expanded_slices": {},
+            "refresh_frequency": 0,
+            "color_scheme": "supersetColors",
+            "native_filter_configuration": overview_native_filters(
+                [summary.id, tvd_daily.id, ivd_daily.id]
+            ),
+            "filter_bar_orientation": "HORIZONTAL",
+        })
         dashboard.slices = charts
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "datasets": [mart.id, tvd_daily.id, history.id], "charts": {c.slice_name: c.id for c in charts}}, ensure_ascii=False))
+        print(json.dumps({
+            "dashboard_id": dashboard.id,
+            "slug": dashboard.slug,
+            "datasets": {"summary": summary.id, "tvd_daily": tvd_daily.id, "ivd_daily": ivd_daily.id},
+            "charts": {chart.slice_name: chart.id for chart in charts},
+        }, ensure_ascii=False))
 
 
 if __name__ == "__main__":
