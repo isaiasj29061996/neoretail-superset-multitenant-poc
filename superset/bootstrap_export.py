@@ -10,7 +10,49 @@ from bootstrap_panorama import Layout, upsert_chart
 
 
 DATABASE_NAME = "NeoRetail Gold - PostgreSQL Local"
-EXPORT_VALUE = metric("Venda", "SUM(COALESCE(venda_qtd, 0))")
+INDICATORS = (
+    "Venda",
+    "Cobertura estoque",
+    "Estoque",
+    "Estoque em Trânsito",
+    "ISV (%)",
+    "OSA (%)",
+    "Perda OSA vol.",
+    "Perda OSA R$",
+    "Preço médio (R$)",
+)
+
+# O seletor de indicador segue as fórmulas já usadas nos dashboards NeoRetail
+# (Panorama/Visão geral), evitando criar uma nova definição de negócio só para
+# a exportação.
+EXPORT_VALUE = metric(
+    "Valor",
+    "CASE MAX(indicador) "
+    "WHEN 'Venda' THEN SUM(COALESCE(venda_qtd, 0)) "
+    "WHEN 'Cobertura estoque' THEN SUM(COALESCE(estoque_qtd, 0)) / NULLIF(SUM(COALESCE(venda_qtd, 0)) / 4.33, 0) "
+    "WHEN 'Estoque' THEN SUM(COALESCE(estoque_qtd, 0)) "
+    "WHEN 'Estoque em Trânsito' THEN SUM(COALESCE(estoque_transito_qtd, 0)) "
+    "WHEN 'ISV (%)' THEN 100.0 * SUM(COALESCE(item_sem_venda, 0)) / NULLIF(SUM(COALESCE(osa_itens_ativos, 0)), 0) "
+    "WHEN 'OSA (%)' THEN 100.0 * (1 - SUM(COALESCE(osa_problemas, 0)) / NULLIF(SUM(COALESCE(osa_itens_ativos, 0)), 0)) "
+    "WHEN 'Perda OSA vol.' THEN SUM(COALESCE(perda_osa_qtd, 0)) "
+    "WHEN 'Perda OSA R$' THEN SUM(COALESCE(perda_osa_qtd, 0)) * AVG(NULLIF(preco_referencia, 0)) "
+    "WHEN 'Preço médio (R$)' THEN SUM(COALESCE(venda_valor, 0)) / NULLIF(SUM(COALESCE(venda_qtd, 0)), 0) "
+    "ELSE SUM(COALESCE(venda_qtd, 0)) END",
+)
+
+
+def semantic_sql(source_table: str) -> str:
+    values = ",\n    ".join(f"('{value}')" for value in INDICATORS)
+    return f"""
+SELECT
+    source.*,
+    selector.indicador
+FROM gold.{source_table} source
+CROSS JOIN (
+    VALUES
+    {values}
+) AS selector(indicador)
+""".strip()
 
 
 def pivot_params(dataset, rows, *, daily: bool):
@@ -58,26 +100,42 @@ def export_filters(dataset_id: int, *, daily: bool):
     if daily:
         definitions.append(("dia", "Dia", ["mes"]))
 
-    ids = {column: f"NATIVE_FILTER-export-{'dia' if daily else 'mes'}-{column}" for column, _, _ in definitions}
-    return [{
-        "id": ids[column],
-        "controlValues": {
-            "enableEmptyFilter": False,
-            "defaultToFirstItem": False,
-            "creatable": False,
-            "multiSelect": True,
-            "searchAllOptions": True,
-            "inverseSelection": False,
-        },
-        "name": label,
-        "filterType": "filter_select",
-        "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
-        "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
-        "cascadeParentIds": [ids[parent] for parent in parents],
-        "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
-        "type": "NATIVE_FILTER",
-        "description": "",
-    } for column, label, parents in definitions]
+    ids = {
+        column: f"NATIVE_FILTER-export-{'dia' if daily else 'mes'}-{column}"
+        for column, _, _ in definitions
+    }
+    result = []
+    for column, label, parents in definitions:
+        is_single = column in {"indicador", "ano", "mes", "dia"}
+        default_mask = {"extraFormData": {}, "filterState": {}, "ownState": {}}
+        if column == "indicador":
+            default_mask = {
+                "extraFormData": {
+                    "filters": [{"col": "indicador", "op": "IN", "val": ["Venda"]}]
+                },
+                "filterState": {"label": "Venda", "value": ["Venda"]},
+                "ownState": {},
+            }
+        result.append({
+            "id": ids[column],
+            "controlValues": {
+                "enableEmptyFilter": False,
+                "defaultToFirstItem": False,
+                "creatable": False,
+                "multiSelect": not is_single,
+                "searchAllOptions": True,
+                "inverseSelection": False,
+            },
+            "name": label,
+            "filterType": "filter_select",
+            "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
+            "defaultDataMask": default_mask,
+            "cascadeParentIds": [ids[parent] for parent in parents],
+            "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
+            "type": "NATIVE_FILTER",
+            "description": "",
+        })
+    return result
 
 
 def add_markdown(layout: Layout, text: str, height: int = 5):
@@ -136,9 +194,9 @@ def build_export_dashboard(
     layout = Layout()
     add_markdown(
         layout,
-        "É possível exportar até **150.000 registros por vez**. Use os filtros para reduzir o volume quando necessário.\n\n"
-        "Para exportar, use o menu do visual e escolha **Download CSV**.",
-        height=7,
+        "É possível exportar até **150.000 registros por vez**. Utilize filtros para reduzir o volume de dados, se necessário.\n\n"
+        "Para exportar, posicione o cursor do mouse sobre a tabela e clique no botão **'...'** no canto superior direito; depois escolha **Download CSV**.",
+        height=11,
     )
     layout.tabs(
         "GRID_ID",
@@ -150,7 +208,7 @@ def build_export_dashboard(
             ("Geral", [[charts["geral"]]]),
             ("Resumo", [[charts["resumo"]]]),
         ],
-        height=72,
+        height=74,
     )
 
     dashboard = session.query(Dashboard).filter(
@@ -165,7 +223,8 @@ def build_export_dashboard(
     dashboard.css = (
         ".dashboard-content { background: #e7f0f5 !important; } "
         ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
-        ".dashboard-component-tabs { background: #fff; border-radius: 8px; }"
+        ".dashboard-component-tabs { background: #fff; border-radius: 8px; } "
+        ".dashboard-component-markdown { overflow: visible !important; }"
     )
     dashboard.json_metadata = json.dumps({
         "timed_refresh_immune_slices": [],
@@ -196,15 +255,15 @@ def main():
             db.session,
             SqlaTable,
             database,
-            "nr_export_daily",
-            table_name="nr_export_daily",
+            "nr_export_daily_semantic",
+            sql=semantic_sql("nr_export_daily"),
         )
         monthly = upsert_dataset(
             db.session,
             SqlaTable,
             database,
-            "nr_export_monthly",
-            table_name="nr_export_monthly",
+            "nr_export_monthly_semantic",
+            sql=semantic_sql("nr_export_monthly"),
         )
 
         daily_dashboard, daily_charts = build_export_dashboard(
@@ -228,6 +287,7 @@ def main():
                 "dataset": monthly.id,
                 "charts": {key: chart.id for key, chart in monthly_charts.items()},
             },
+            "indicators": list(INDICATORS),
         }, ensure_ascii=False))
 
 
