@@ -9,7 +9,7 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import HISTORY_SQL, M, metric, native_filters, upsert_dataset
+from bootstrap_overview import HISTORY_SQL, M, OVERVIEW_M, metric, native_filters, upsert_dataset
 from bootstrap_panorama import Layout, custom_params, table_params, upsert_chart
 
 
@@ -48,6 +48,13 @@ JOIN (
 
 LOSS_VALUE = metric("Perda R$ OSA", "SUM(COALESCE(qtd_perda_osa * NULLIF(preco_medio, 0), 0))")
 LOSS_PERCENT = metric("% Perda", "100.0 * SUM(qtd_perda_osa) * AVG(avg_sales_price) / NULLIF(CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END, 0)")
+LOSS_PERCENT_SUMMARY = metric(
+    "% Perda",
+    "100.0 * SUM(osa_loss_qty_sum) * "
+    "(SUM(avg_sales_price_sum) / NULLIF(SUM(avg_sales_price_count), 0)) / "
+    "NULLIF(CASE WHEN SUM(faturamento_sum) > 0 "
+    "THEN SUM(faturamento_sum) ELSE SUM(fallback_sellout_sum) END, 0)",
+)
 PROBLEM_COUNT = metric("Qtd Problema OSA", "SUM(qtd_problemas_osa)")
 CAUSE_OSA = metric("% OSA Numérico", "100.0 * (1 - SUM(qtd_problemas_osa) / NULLIF(SUM(qtd_itens_ativos), 0))")
 
@@ -69,7 +76,7 @@ def main():
         from superset.models.slice import Slice
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
-        history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
+        summary = upsert_dataset(db.session, SqlaTable, database, "nr_overview_summary", table_name="nr_overview_summary")
         causes = upsert_dataset(db.session, SqlaTable, database, "nr_osa_industry_causes", table_name="nr_osa_industry_causes")
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
 
@@ -77,10 +84,26 @@ def main():
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
             charts[key] = upsert_chart(db.session, Slice, dataset, f"[OSA Indústria] {title}", params, viz)
 
-        top_metrics = [M["osa"], M["sellout"], M["osa_loss"], LOSS_PERCENT]
-        top = custom_params(history, "Visão geral mensal", top_metrics, grain="P1M", styles="line|bar|hidden|line", formats="percent|currency|currency|percent")
-        top.update({"summary_count": "3", "metric_labels": "%OSA|Sell Out Venda|Perda R$ OSA|% Perda", "row_limit": 10000})
-        add("overview", history, "Visão geral mensal — Valor", top)
+        top_metrics = [
+            OVERVIEW_M["osa"],
+            OVERVIEW_M["sellout"],
+            OVERVIEW_M["osa_loss"],
+            LOSS_PERCENT_SUMMARY,
+        ]
+        top = custom_params(
+            summary,
+            "Visão geral mensal",
+            top_metrics,
+            grain="P1M",
+            styles="line|bar|hidden|line",
+            formats="percent|currency|currency|percent",
+        )
+        top.update({
+            "summary_count": "3",
+            "metric_labels": "%OSA|Sell Out Venda|Perda R$ OSA|% Perda",
+            "row_limit": 10000,
+        })
+        add("overview", summary, "Visão geral mensal — Valor", top)
 
         motive_metrics = [motive_percent(label) for label in ("Estoque Virtual", "Falta de Exposição", "Falta de Performance", "Ruptura na loja")]
         stacked = custom_params(causes, "Perdas por motivo", motive_metrics, grain="P1M", styles="bar|bar|bar|bar", formats="percent|percent|percent|percent", variant="stacked")
@@ -111,10 +134,10 @@ def main():
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
         dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; }"
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(summary.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "causes": causes.id, "latest": latest.id}, "charts": {key: chart.id for key, chart in charts.items()}}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"summary": summary.id, "causes": causes.id, "latest": latest.id}, "charts": {key: chart.id for key, chart in charts.items()}}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
