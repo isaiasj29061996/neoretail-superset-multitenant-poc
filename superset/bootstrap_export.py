@@ -100,9 +100,10 @@ def build_export_dashboard(
     *,
     daily: bool,
 ):
+    period_key = "dia" if daily else "mes"
     period_label = "dia" if daily else "mês"
     title = f"NeoRetail V9 — Exportação — Histórico {period_label}"
-    slug = f"neoretail-v9-exportacao-historico-{period_label}"
+    slug = f"neoretail-v9-exportacao-historico-{period_key}"
 
     definitions = {
         "varejo": ("Varejo", ["rede"]),
