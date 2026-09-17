@@ -49,7 +49,11 @@ AMBEV_EXPORT_DAILY_COLUMNS = [
     "volume_unidades",
     "faturamento",
     "estoque_unidades",
+    "estoque_transito",
     "qtd_perda_osa",
+    "qtd_problemas_osa",
+    "qtd_item_ativo_osa",
+    "preco_medio_ref",
     "rup",
     "est_virtual",
 ]
