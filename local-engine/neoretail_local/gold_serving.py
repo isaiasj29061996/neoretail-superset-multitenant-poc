@@ -35,6 +35,30 @@ AMBEV_LAKE_ONLY = {
     "fato_preco",
 }
 
+# A fato diaria completa continua somente no lake. Para a tela de exportacao,
+# publicamos no PostgreSQL apenas uma janela recente e somente as colunas
+# necessarias ao grid/export CSV.
+AMBEV_EXPORT_DAILY_SOURCE = "nr_export_daily_source"
+AMBEV_EXPORT_DAILY_COLUMNS = [
+    "data",
+    "id_customer",
+    "id_location",
+    "id_item",
+    "nivel_atividade",
+    "status_item_geral",
+    "volume_unidades",
+    "faturamento",
+    "estoque_unidades",
+    "qtd_perda_osa",
+    "rup",
+    "est_virtual",
+]
+AMBEV_EXPORT_DAILY_WINDOW = (
+    "data",
+    "LOCAL_SERVING_EXPORT_DAILY_DAYS",
+    62,
+)
+
 # logical_name -> (date column, environment variable, default days)
 AMBEV_SERVING_WINDOWS = {
     "fato_ivd_tvd": ("id_time", "LOCAL_SERVING_TVD_DAYS", 180),
@@ -96,6 +120,41 @@ def purge_postgres_customer(settings: Settings, table: str) -> None:
                 )
 
 
+def _publish_daily_export_source(
+    frame: DataFrame,
+    settings: Settings,
+) -> dict[str, object]:
+    date_column, env_name, default_days = AMBEV_EXPORT_DAILY_WINDOW
+    days = _env_days(env_name, default_days)
+    serving_frame, max_date, cutoff = apply_serving_window(
+        frame,
+        date_column,
+        days,
+    )
+    missing = [
+        column for column in AMBEV_EXPORT_DAILY_COLUMNS
+        if column not in serving_frame.columns
+    ]
+    if missing:
+        raise RuntimeError(
+            f"fato_diaria: colunas ausentes para exportacao: {missing}"
+        )
+    serving_frame = serving_frame.select(*AMBEV_EXPORT_DAILY_COLUMNS)
+    write_postgres_customer_named(
+        serving_frame,
+        settings,
+        "gold",
+        AMBEV_EXPORT_DAILY_SOURCE,
+    )
+    return {
+        "date_column": date_column,
+        "days": days,
+        "max_date": max_date,
+        "cutoff": cutoff,
+        "columns": AMBEV_EXPORT_DAILY_COLUMNS,
+    }
+
+
 def publish(settings: Settings, spark) -> dict[str, object]:
     facts = approved_facts(settings)
     if not facts:
@@ -146,6 +205,18 @@ def publish(settings: Settings, spark) -> dict[str, object]:
             customer_scoped=True,
         )
         published_lake.append(logical)
+
+        if ambev_local_serving and logical == "fato_diaria":
+            # Nao replica a fato diaria completa no PostgreSQL. Publica apenas
+            # a janela/projecao dedicada ao dashboard de exportacao diaria.
+            purge_postgres_customer(settings, logical)
+            windows[AMBEV_EXPORT_DAILY_SOURCE] = _publish_daily_export_source(
+                frame,
+                settings,
+            )
+            published_postgres.append(AMBEV_EXPORT_DAILY_SOURCE)
+            lake_only.append(logical)
+            continue
 
         if ambev_local_serving and logical in AMBEV_LAKE_ONLY:
             purge_postgres_customer(settings, logical)
