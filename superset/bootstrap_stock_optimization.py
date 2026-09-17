@@ -240,12 +240,12 @@ def main():
         add_markdown(
             layout, "GRID_ID", parents,
             f"**Data do último movimento:** {last_date.strftime('%d/%m/%Y')} &nbsp;&nbsp;&nbsp; `VERSÃO BETA`",
-            height=4,
+            height=6,
         )
         layout.row("GRID_ID", parents, [charts["tvd_card"], charts["ivd_card"]], 34)
         add_markdown(
             layout, "GRID_ID", parents,
-            "## Otimização de estoque - Incidências de excesso e pré-ruptura", height=6,
+            "## Otimização de estoque - Incidências de excesso e pré-ruptura", height=8,
         )
         layout.tabs("GRID_ID", parents, "Análise de otimização", [
             ("Pré-ruptura", [[charts["pre_rede"], charts["pre_item"]]]),
@@ -270,7 +270,8 @@ def main():
             ".dashboard-content { background: #e7f0f5 !important; } "
             ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
             ".dashboard-component-chart-holder > .header { display: none !important; } "
-            ".dashboard-component-tabs { background: #fff; border-radius: 8px; }"
+            ".dashboard-component-tabs { background: #fff; border-radius: 8px; } "
+            ".dashboard-component-markdown { overflow: visible !important; }"
         )
         dashboard.json_metadata = json.dumps({
             "timed_refresh_immune_slices": [], "expanded_slices": {},
