@@ -1,8 +1,9 @@
 -- Dedicated serving marts for NeoRetail export dashboards.
 --
--- The export pages intentionally use materialized views so daily/monthly grids
--- do not join Silver dimensions during interactive use. RLS continues to use
--- id_customer at the physical dataset level.
+-- The daily export reads from a narrow, rolling PostgreSQL source published by
+-- the local PySpark serving step. The complete fato_diaria remains in the lake
+-- so the local POC does not replicate hundreds of millions of rows into
+-- PostgreSQL. Monthly export uses the already-windowed fato_historico serving.
 
 BEGIN;
 
@@ -51,7 +52,7 @@ SELECT
     COALESCE(f.qtd_perda_osa, 0)::double precision AS perda_osa_qtd,
     COALESCE(f.rup, 0)::double precision AS ruptura,
     COALESCE(f.est_virtual, 0)::double precision AS item_sem_venda
-FROM gold.fato_diaria f
+FROM gold.nr_export_daily_source f
 LEFT JOIN gold.dim_local l
   ON l.id_customer = f.id_customer
  AND l.id_location = f.id_location
@@ -131,7 +132,7 @@ CREATE INDEX ix_nr_export_monthly_customer_product
     );
 
 COMMENT ON MATERIALIZED VIEW gold.nr_export_daily IS
-'Daily export serving mart for NeoRetail embedded export grids.';
+'Daily export serving mart over a bounded PostgreSQL source; full daily history remains in the lake.';
 COMMENT ON MATERIALIZED VIEW gold.nr_export_monthly IS
 'Monthly export serving mart for NeoRetail embedded export grids.';
 
