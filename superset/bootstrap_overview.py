@@ -160,7 +160,7 @@ def chart_params(dataset, title, variant, metrics, **extra):
         "viz_type": "neoretail-kpi-card",
         "x_axis": "data",
         "time_grain_sqla": "P1M",
-        "time_range": "No filter",
+        "time_range": extra.pop("time_range", "Last 4 months"),
         "metrics": metrics,
         "row_limit": 10000,
         "card_title": title,
