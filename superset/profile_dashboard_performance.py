@@ -90,7 +90,7 @@ def _row_limit(form, fallback):
     return min(configured, ROW_LIMIT_CAP), configured
 
 
-def build_queries(form):
+def build_queries(form, dashboard_default_filters=None):
     """Approximate the persisted visual query shape used by the POC."""
     viz = form.get("viz_type")
     metrics = _dedupe_metrics([
@@ -100,6 +100,7 @@ def build_queries(form):
         form.get("risk_metric"),
     ])
     filters = [{"col": "id_customer", "op": "IN", "val": [CUSTOMER_ID]}]
+    filters.extend(dashboard_default_filters or [])
     where = _sql_where(form)
     extras = {"where": where} if where else {}
 
@@ -183,6 +184,28 @@ def _query_details(result):
             "error": query.get("error"),
         })
     return details
+
+
+def _dashboard_default_filters(dashboard, dataset_id):
+    metadata = json.loads(dashboard.json_metadata or "{}")
+    result = []
+    for native_filter in metadata.get("native_filter_configuration", []):
+        targets = native_filter.get("targets", [])
+        target_ids = {
+            int(target.get("datasetId"))
+            for target in targets
+            if target.get("datasetId") is not None
+        }
+        if target_ids and int(dataset_id) not in target_ids:
+            continue
+        extra = (
+            native_filter.get("defaultDataMask", {})
+            .get("extraFormData", {})
+        )
+        for item in extra.get("filters", []) or []:
+            if item and item not in result:
+                result.append(item)
+    return result
 
 
 def _dataset_columns(dataset):
@@ -283,7 +306,12 @@ def main():
 
             for chart in sorted(dashboard.slices, key=lambda item: item.id):
                 form = json.loads(chart.params)
-                queries, configured_limit = build_queries(form)
+                default_filters = _dashboard_default_filters(
+                    dashboard, chart.datasource_id
+                )
+                queries, configured_limit = build_queries(
+                    form, dashboard_default_filters=default_filters
+                )
                 started = perf_counter()
                 errors = []
                 details = []
