@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 
+from sqlalchemy import text
 from superset.app import create_app
 
 from bootstrap_overview import metric, upsert_dataset
@@ -78,7 +79,7 @@ def pivot_params(dataset, rows, *, daily: bool):
     }
 
 
-def export_filters(dataset_id: int, *, daily: bool):
+def export_filters(dataset_id: int, *, daily: bool, default_date=None):
     definitions = [
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
@@ -108,12 +109,28 @@ def export_filters(dataset_id: int, *, daily: bool):
     for column, label, parents in definitions:
         is_single = column in {"indicador", "ano", "mes", "dia"}
         default_mask = {"extraFormData": {}, "filterState": {}, "ownState": {}}
+        default_value = None
         if column == "indicador":
+            default_value = "Venda"
+        elif default_date is not None and column == "ano":
+            default_value = int(default_date.year)
+        elif default_date is not None and daily and column == "mes":
+            month_names = {
+                1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+                5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+                9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro",
+            }
+            default_value = month_names[int(default_date.month)]
+
+        if default_value is not None:
             default_mask = {
                 "extraFormData": {
-                    "filters": [{"col": "indicador", "op": "IN", "val": ["Venda"]}]
+                    "filters": [{"col": column, "op": "IN", "val": [default_value]}]
                 },
-                "filterState": {"label": "Venda", "value": ["Venda"]},
+                "filterState": {
+                    "label": str(default_value),
+                    "value": [default_value],
+                },
                 "ownState": {},
             }
         result.append({
@@ -157,6 +174,7 @@ def build_export_dashboard(
     dataset,
     *,
     daily: bool,
+    default_date=None,
 ):
     period_key = "dia" if daily else "mes"
     period_label = "dia" if daily else "mês"
@@ -231,7 +249,9 @@ def build_export_dashboard(
         "expanded_slices": {},
         "refresh_frequency": 0,
         "color_scheme": "supersetColors",
-        "native_filter_configuration": export_filters(dataset.id, daily=daily),
+        "native_filter_configuration": export_filters(
+            dataset.id, daily=daily, default_date=default_date
+        ),
         "filter_bar_orientation": "HORIZONTAL",
     }, ensure_ascii=False)
     dashboard.slices = list(charts.values())
@@ -266,11 +286,30 @@ def main():
             sql=semantic_sql("nr_export_monthly"),
         )
 
+        with database.get_sqla_engine() as engine:
+            with engine.connect() as connection:
+                daily_max_date = connection.execute(
+                    text("SELECT MAX(data) FROM gold.nr_export_daily")
+                ).scalar_one()
+                monthly_max_date = connection.execute(
+                    text("SELECT MAX(data) FROM gold.nr_export_monthly")
+                ).scalar_one()
+
         daily_dashboard, daily_charts = build_export_dashboard(
-            db.session, Dashboard, Slice, daily, daily=True
+            db.session,
+            Dashboard,
+            Slice,
+            daily,
+            daily=True,
+            default_date=daily_max_date,
         )
         monthly_dashboard, monthly_charts = build_export_dashboard(
-            db.session, Dashboard, Slice, monthly, daily=False
+            db.session,
+            Dashboard,
+            Slice,
+            monthly,
+            daily=False,
+            default_date=monthly_max_date,
         )
         db.session.commit()
 
