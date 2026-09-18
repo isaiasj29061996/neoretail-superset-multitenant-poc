@@ -65,6 +65,8 @@ LEFT JOIN gold.dim_itens i
 
 CREATE INDEX ix_nr_export_daily_customer_data
     ON gold.nr_export_daily (id_customer, data);
+CREATE INDEX ix_nr_export_daily_customer_period
+    ON gold.nr_export_daily (id_customer, ano, mes, data);
 CREATE INDEX ix_nr_export_daily_customer_retail
     ON gold.nr_export_daily (id_customer, rede, bandeira);
 CREATE INDEX ix_nr_export_daily_customer_place
@@ -128,6 +130,8 @@ LEFT JOIN gold.dim_itens i
 
 CREATE INDEX ix_nr_export_monthly_customer_data
     ON gold.nr_export_monthly (id_customer, data);
+CREATE INDEX ix_nr_export_monthly_customer_period
+    ON gold.nr_export_monthly (id_customer, ano, mes, data);
 CREATE INDEX ix_nr_export_monthly_customer_retail
     ON gold.nr_export_monthly (id_customer, rede, bandeira);
 CREATE INDEX ix_nr_export_monthly_customer_place
