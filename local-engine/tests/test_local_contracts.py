@@ -201,3 +201,22 @@ def test_v9_customer_registry_and_embedded_rls():
         definition["embedded_id"]
         for definition in tenant_config["dashboards"].values()
     }) == 7
+
+
+def test_concurrency_benchmark_uses_real_cache_bypass_and_safe_stats_monitor():
+    benchmark = (ROOT / "superset/concurrent_dashboard_benchmark.py").read_text(
+        encoding="utf-8"
+    )
+    wrapper = (ROOT / "load-test-users.ps1").read_text(encoding="utf-8")
+    monitor = (ROOT / "scripts/monitor-docker-stats.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "force=FORCE" in benchmark
+    assert 'LOAD_TEST_MAX_WORKERS", "12"' in benchmark
+    assert "[int]$MaxWorkers = 12" in wrapper
+    assert "Start-Job" not in wrapper
+    assert "Start-Process" in wrapper
+    assert "WaitForExit" in wrapper
+    assert "System.IO.StreamWriter" in monitor
+    assert "docker stats --no-stream" in monitor

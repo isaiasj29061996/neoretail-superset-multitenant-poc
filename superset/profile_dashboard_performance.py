@@ -182,6 +182,7 @@ def _query_details(result):
         details.append({
             "rows": len(query.get("data", []) or []),
             "db_duration_ms": query.get("duration"),
+            "is_cached": bool(query.get("is_cached", False)),
             "sql": sql[:1500] if isinstance(sql, str) else "",
             "error": query.get("error"),
         })

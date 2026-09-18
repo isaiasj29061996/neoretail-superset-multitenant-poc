@@ -10,7 +10,7 @@ Environment variables:
 - LOAD_TEST_DASHBOARD_SLUGS: comma-separated slugs or "all"
 - LOAD_TEST_CUSTOMER_ID: tenant id used by queries (default: 142)
 - LOAD_TEST_ROW_LIMIT_CAP: maximum chart row limit (default: 20000)
-- LOAD_TEST_MAX_WORKERS: concurrent chart workers (default: 40)
+- LOAD_TEST_MAX_WORKERS: concurrent chart workers (default: 12)
 - LOAD_TEST_ITERATIONS: dashboard openings per user (default: 1)
 - LOAD_TEST_FORCE: bypass Superset result cache when true (default: false)
 - LOAD_TEST_OUTPUT: JSON output path
@@ -34,7 +34,7 @@ import profile_dashboard_performance as profile
 USERS = max(1, int(os.getenv("LOAD_TEST_USERS", "1")))
 CUSTOMER_ID = int(os.getenv("LOAD_TEST_CUSTOMER_ID", "142"))
 ROW_LIMIT_CAP = max(1, int(os.getenv("LOAD_TEST_ROW_LIMIT_CAP", "20000")))
-MAX_WORKERS = max(1, int(os.getenv("LOAD_TEST_MAX_WORKERS", "40")))
+MAX_WORKERS = max(1, int(os.getenv("LOAD_TEST_MAX_WORKERS", "12")))
 ITERATIONS = max(1, int(os.getenv("LOAD_TEST_ITERATIONS", "1")))
 FORCE = os.getenv("LOAD_TEST_FORCE", "false").strip().lower() in {"1", "true", "yes", "on"}
 OUTPUT = Path(os.getenv("LOAD_TEST_OUTPUT", f"/generated/load-tests/users-{USERS}.json"))
@@ -134,6 +134,7 @@ def execute_chart(app, spec, user_id, iteration, suite_started):
                     datasource={"id": spec["datasource_id"], "type": "table"},
                     queries=spec["queries"],
                     form_data={**spec["form"], "force": FORCE},
+                    force=FORCE,
                 )
                 result = ChartDataCommand(context).run()
                 details = profile._query_details(result)
@@ -156,6 +157,7 @@ def execute_chart(app, spec, user_id, iteration, suite_started):
         "finished_offset": round(finished - suite_started, 4),
         "rows": sum(item.get("rows", 0) for item in details),
         "query_count": len(spec["queries"]),
+        "cached_queries": sum(bool(item.get("is_cached")) for item in details),
         "errors": errors,
     }
 
@@ -213,6 +215,8 @@ def main():
     wall_seconds = perf_counter() - suite_started
     chart_latencies = [item["seconds"] for item in results]
     error_tasks = [item for item in results if item["errors"]]
+    total_queries = sum(item["query_count"] for item in results)
+    cached_queries = sum(item["cached_queries"] for item in results)
 
     user_completion = defaultdict(float)
     for item in results:
@@ -248,6 +252,11 @@ def main():
         "errors": len(error_tasks),
         "error_rate_percent": round(
             100.0 * len(error_tasks) / total_tasks if total_tasks else 0.0, 4
+        ),
+        "queries": total_queries,
+        "cached_queries": cached_queries,
+        "cache_hit_rate_percent": round(
+            100.0 * cached_queries / total_queries if total_queries else 0.0, 4
         ),
         "chart_latency_seconds": summarize(chart_latencies),
         "user_page_completion_seconds": summarize(user_completion.values()),
@@ -287,6 +296,10 @@ def main():
     print(
         f'Errors: {payload["errors"]}/{total_tasks} '
         f'({payload["error_rate_percent"]:.2f}%)'
+    )
+    print(
+        f'Cache hits: {payload["cached_queries"]}/{payload["queries"]} '
+        f'({payload["cache_hit_rate_percent"]:.2f}%)'
     )
     print(
         "Throughput: "

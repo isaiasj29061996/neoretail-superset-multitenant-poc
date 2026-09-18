@@ -119,8 +119,9 @@ devem virar tabelas incrementais/particionadas ou materializações equivalentes
   podem continuar mais lentas; precisam de benchmark por combinação frequente.
 - `nr_panorama_opportunities` permanece grande e deve servir principalmente de
   fonte para marts menores.
-- Ainda faltam teste de concorrência (1/5/10 usuários), cold versus warm cache,
-  download CSV completo e benchmark conectado ao DW real.
+- O teste de concorrência de backend/query para 1/5/10 usuários foi concluído;
+  ainda faltam o teste E2E/HTTP, download CSV completo e benchmark conectado ao
+  DW real. Resultados em [`load_testing.md`](load_testing.md).
 - O próximo lote deve medir refresh incremental e as consultas filtradas mais
   frequentes antes de adicionar índices ou compute.
 

@@ -409,7 +409,8 @@ consumo com usuários simultâneos nem substitui um teste de carga.
 
 ## Teste de concorrência
 
-O próximo benchmark deve reproduzir o uso esperado do produto.
+O benchmark de concorrência do backend está disponível em
+[`docs/load_testing.md`](docs/load_testing.md).
 
 Meta atual da POC:
 
@@ -420,7 +421,7 @@ Meta atual da POC:
 15 usuários -> stress test opcional
 ```
 
-Durante o teste devem ser registrados separadamente:
+Durante o teste são registrados separadamente:
 
 - CPU e RAM do Superset;
 - CPU e RAM do PostgreSQL Analytics;
@@ -433,13 +434,21 @@ Durante o teste devem ser registrados separadamente:
 - comportamento de filtros;
 - download de exportação.
 
-Monitoramento rápido:
+Execução reproduzível:
 
 ```powershell
-docker compose stats superset analytics-db redis embedded-app
+.\load-test-users.ps1 -Users 1,5,10 `
+  -Dashboard "neoretail-v9-visao-geral-industria" -ColdCache
 ```
 
-O teste ideal deve simular fluxos reais, por exemplo:
+Na medição local, a configuração válida com até 12 consultas simultâneas teve
+0% de erros para 1, 5 e 10 usuários. A RAM do Superset permaneceu próxima de
+1,04–1,07 GiB, mas o PostgreSQL Analytics atingiu aproximadamente 1.495% de CPU
+e o page p95 chegou a 50,98 s na Visão Geral e 77,34 s no Panorama para dez
+aberturas frias simultâneas. O primeiro gargalo observado foi o serving local e
+o fan-out de charts.
+
+Uma segunda suíte E2E/HTTP ainda deve simular fluxos reais, por exemplo:
 
 ```text
 login
@@ -452,8 +461,9 @@ login
 -> download
 ```
 
-O sizing de Azure ou de qualquer infraestrutura de produção só deve ser fechado
-depois desse benchmark.
+O teste atual executa `QueryContext` internamente e não mede HTTP, Gunicorn,
+Guest Token ou navegador. O sizing de produção só deve ser fechado depois do
+teste E2E e da repetição contra o DW real.
 
 ---
 
@@ -677,5 +687,6 @@ Ela tenta provar que:
 > como camada embedded do NeoRetail com isolamento, paridade funcional,
 > performance aceitável e custo de infraestrutura mensurável.**
 
-A próxima etapa de evidência é o benchmark de concorrência com até
-**10 usuários simultâneos** e, depois, a validação sobre o **DW real**.
+A etapa de backend/query com até **10 usuários simultâneos** foi concluída. A
+próxima evidência é o benchmark **E2E/HTTP** e, depois, a validação sobre o
+**DW real**.
