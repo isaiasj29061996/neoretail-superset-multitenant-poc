@@ -184,6 +184,9 @@ def main():
             formats="currency", variant="headlinearea",
         )
         tvd_card["accent_color"] = "#7C43DF"
+        tvd_card["adhoc_filters"] = [sql_filter(
+            f"data >= DATE '{last_date.isoformat()}' - INTERVAL '4 months'"
+        )]
         add("tvd_card", tvd_daily, "TVD - Pré-ruptura", tvd_card)
 
         ivd_card = custom_params(
@@ -191,6 +194,9 @@ def main():
             formats="currency", variant="headlinearea",
         )
         ivd_card["accent_color"] = "#C91878"
+        ivd_card["adhoc_filters"] = [sql_filter(
+            f"data >= DATE '{last_date.isoformat()}' - INTERVAL '4 months'"
+        )]
         add("ivd_card", ivd_daily, "IVD - Excesso de estoque", ivd_card)
 
         for dimension, label in (("rede", "Redes"), ("item", "Itens")):
