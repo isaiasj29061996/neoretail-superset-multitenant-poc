@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 
+from sqlalchemy import text
 from superset.app import create_app
 
 from bootstrap_overview import (
@@ -115,6 +116,21 @@ def main():
             "nr_overview_history",
             table_name="nr_overview_history",
         )
+        with database.get_sqla_engine() as engine:
+            with engine.connect() as connection:
+                history_max_date = connection.execute(
+                    text("SELECT MAX(data) FROM gold.nr_overview_history")
+                ).scalar_one()
+        recent_history = [{
+            "clause": "WHERE",
+            "comparator": "",
+            "expressionType": "SQL",
+            "filterOptionName": "filter_quantity_recent",
+            "fromFormData": True,
+            "sqlExpression": (
+                f"data >= DATE '{history_max_date.isoformat()}' - INTERVAL '4 months'"
+            ),
+        }] if history_max_date else []
 
         specs = [
             (
@@ -154,6 +170,7 @@ def main():
                     metric_directions="higher|higher",
                     show_tasks=False,
                     help_text="Quantidade de lojas e itens com dados no período selecionado.",
+                    adhoc_filters=recent_history,
                 ),
             ),
             (
