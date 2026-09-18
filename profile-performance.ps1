@@ -25,9 +25,16 @@ if ($ColdCache) {
     }
 }
 
+function Show-ComposeStats {
+    param([string[]]$Services)
+    foreach ($service in $Services) {
+        docker compose stats --no-stream $service
+    }
+}
+
 Write-Host ""
 Write-Host "Snapshot antes do teste:" -ForegroundColor Cyan
-docker compose stats --no-stream superset analytics-db redis embedded-app
+Show-ComposeStats @("superset", "analytics-db", "redis", "embedded-app")
 
 $arguments = @(
     "compose", "exec", "-T",
@@ -51,7 +58,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Snapshot depois do teste:" -ForegroundColor Cyan
-docker compose stats --no-stream superset analytics-db redis embedded-app
+Show-ComposeStats @("superset", "analytics-db", "redis", "embedded-app")
 
 Write-Host ""
 Write-Host "Relatorio salvo em generated/performance_profile.json" -ForegroundColor Green
