@@ -109,10 +109,16 @@ def upsert_chart(session, Slice, dataset, title, params, viz_type="neoretail-kpi
     return chart
 
 
-def custom_params(dataset, title, metrics, *, grain="P1M", styles="bar|bar|line", formats="number", groupby=None, variant="panorama", row_limit=10000):
+def custom_params(dataset, title, metrics, *, grain="P1M", styles="bar|bar|line", formats="number", groupby=None, variant="panorama", row_limit=10000, time_range=None):
+    if time_range is None:
+        time_range = {
+            "P1D": "Last 4 months",
+            "P1W": "Last 12 weeks",
+            "P1M": "Last 12 months",
+        }.get(grain, "Last 12 months")
     return {
         "datasource": f"{dataset.id}__table", "viz_type": "neoretail-kpi-card",
-        "x_axis": "data", "time_grain_sqla": grain, "time_range": "No filter",
+        "x_axis": "data", "time_grain_sqla": grain, "time_range": time_range,
         "metrics": metrics, "row_limit": row_limit, "card_title": title,
         "card_variant": variant, "help_text": title, "metric_labels": "|".join(m["label"] for m in metrics),
         "metric_formats": formats, "metric_directions": "higher", "chart_styles": styles,
