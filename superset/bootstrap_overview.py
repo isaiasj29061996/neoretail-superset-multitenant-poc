@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import uuid
 
+from sqlalchemy import text
 from superset.app import create_app
 
 
@@ -57,6 +58,17 @@ LEFT JOIN (
   ORDER BY id_customer, id_location, id_item, _silver_refreshed_at DESC NULLS LAST
 ) o ON o.id_customer = f.id_customer AND o.id_location = f.id_location AND o.id_item = f.id_item
 """.strip()
+
+
+def sql_filter(expression: str, name: str = "filter_recent_period") -> dict:
+    return {
+        "clause": "WHERE",
+        "comparator": "",
+        "expressionType": "SQL",
+        "filterOptionName": name,
+        "fromFormData": True,
+        "sqlExpression": expression,
+    }
 
 
 def metric(label: str, expression: str) -> dict:
@@ -160,7 +172,7 @@ def chart_params(dataset, title, variant, metrics, **extra):
         "viz_type": "neoretail-kpi-card",
         "x_axis": "data",
         "time_grain_sqla": "P1M",
-        "time_range": extra.pop("time_range", "Last 4 months"),
+        "time_range": extra.pop("time_range", "No filter"),
         "metrics": metrics,
         "row_limit": 10000,
         "card_title": title,
@@ -311,6 +323,23 @@ def main():
         summary = upsert_dataset(
             db.session, SqlaTable, database, "nr_overview_summary", table_name="nr_overview_summary"
         )
+        with database.get_sqla_engine() as engine:
+            with engine.connect() as connection:
+                tvd_max_date = connection.execute(
+                    text("SELECT MAX(data) FROM gold.nr_tvd_daily")
+                ).scalar_one()
+                ivd_max_date = connection.execute(
+                    text("SELECT MAX(data) FROM gold.nr_ivd_daily")
+                ).scalar_one()
+
+        tvd_recent = [sql_filter(
+            f"data >= DATE '{tvd_max_date.isoformat()}' - INTERVAL '4 months'",
+            "filter_tvd_recent",
+        )] if tvd_max_date else []
+        ivd_recent = [sql_filter(
+            f"data >= DATE '{ivd_max_date.isoformat()}' - INTERVAL '4 months'",
+            "filter_ivd_recent",
+        )] if ivd_max_date else []
 
         specs = [
             (tvd_daily, "TVD - Pré-ruptura", chart_params(
@@ -318,12 +347,14 @@ def main():
                 show_tasks=True, critical_metric=TVD_DAILY["critical"], risk_metric=TVD_DAILY["risk"],
                 metric_formats="currency", metric_directions="lower",
                 task_labels="itens críticos|itens com risco", time_grain_sqla="P1D",
+                adhoc_filters=tvd_recent,
             )),
             (ivd_daily, "IVD - Excesso", chart_params(
                 ivd_daily, "IVD - Excesso", "area", [IVD_DAILY["ivd"]],
                 show_tasks=True, critical_metric=IVD_DAILY["critical"], risk_metric=IVD_DAILY["risk"],
                 metric_formats="currency", metric_directions="lower",
                 task_labels="itens críticos|itens com risco", time_grain_sqla="P1D",
+                adhoc_filters=ivd_recent,
             )),
             (summary, "Giro", chart_params(summary, "Giro", "bars", [OVERVIEW_M["giro"]], groupby=["activity_level"], metric_formats="number", metric_directions="lower")),
             (summary, "OSA", chart_params(summary, "OSA", "osa", [OVERVIEW_M["osa"], OVERVIEW_M["osa_loss"]], show_tasks=True, critical_metric=OVERVIEW_M["osa_critical"], risk_metric=OVERVIEW_M["osa_risk"], metric_labels="% Numérico|Perda R$", metric_formats="percent|currency", metric_directions="higher|lower", task_labels="itens críticos|itens em risco")),
