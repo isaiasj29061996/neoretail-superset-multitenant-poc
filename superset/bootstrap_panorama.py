@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import uuid
 
+from sqlalchemy import text
 from superset.app import create_app
 
 from bootstrap_overview import HISTORY_SQL, M, metric, native_filters, upsert_dataset
@@ -109,16 +110,10 @@ def upsert_chart(session, Slice, dataset, title, params, viz_type="neoretail-kpi
     return chart
 
 
-def custom_params(dataset, title, metrics, *, grain="P1M", styles="bar|bar|line", formats="number", groupby=None, variant="panorama", row_limit=10000, time_range=None):
-    if time_range is None:
-        time_range = {
-            "P1D": "Last 4 months",
-            "P1W": "Last 12 weeks",
-            "P1M": "Last 12 months",
-        }.get(grain, "Last 12 months")
+def custom_params(dataset, title, metrics, *, grain="P1M", styles="bar|bar|line", formats="number", groupby=None, variant="panorama", row_limit=10000):
     return {
         "datasource": f"{dataset.id}__table", "viz_type": "neoretail-kpi-card",
-        "x_axis": "data", "time_grain_sqla": grain, "time_range": time_range,
+        "x_axis": "data", "time_grain_sqla": grain, "time_range": "No filter",
         "metrics": metrics, "row_limit": row_limit, "card_title": title,
         "card_variant": variant, "help_text": title, "metric_labels": "|".join(m["label"] for m in metrics),
         "metric_formats": formats, "metric_directions": "higher", "chart_styles": styles,
@@ -212,6 +207,14 @@ def main():
             "nr_panorama_gap_periodic",
             table_name="nr_panorama_gap_periodic",
         )
+        with database.get_sqla_engine() as engine:
+            with engine.connect() as connection:
+                weekly_max_date = connection.execute(
+                    text("SELECT MAX(data) FROM gold.nr_panorama_weekly")
+                ).scalar_one()
+        weekly_recent = [sql_filter(
+            f"data >= DATE '{weekly_max_date.isoformat()}' - INTERVAL '12 weeks'"
+        )] if weekly_max_date else []
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
@@ -223,10 +226,17 @@ def main():
         osa = [P["osa"], P["rup"], P["isv"]]
         periods = (("mensal", history, "P1M"), ("semanal", weekly, "P1W"))
         for period, dataset, grain in periods:
-            add(f"sales_value_{period}", dataset, f"Evolutivo de vendas — Valor {period}", custom_params(dataset, "Evolutivo de vendas", sales, grain=grain, styles="bar|bar|line", formats="currency|currency|percent"))
-            add(f"stock_{period}", dataset, f"Evolutivo de estoque — Estoque {period}", custom_params(dataset, "Evolutivo de estoque", stock, grain=grain, styles="bar|bar", formats="currency|number"))
-            add(f"giro_roi_{period}", dataset, f"Evolutivo de estoque — Giro e ROI {period}", custom_params(dataset, "Evolutivo de estoque", giro_roi, grain=grain, styles="bar|line|line", formats="percent|number|number"))
-            add(f"osa_{period}", dataset, f"Evolutivo de estoque — OSA {period}", custom_params(dataset, "Evolutivo de estoque", osa, grain=grain, styles="line|line|line", formats="percent|percent|percent"))
+            period_filters = weekly_recent if period == "semanal" else []
+            sales_params = custom_params(dataset, "Evolutivo de vendas", sales, grain=grain, styles="bar|bar|line", formats="currency|currency|percent")
+            stock_params = custom_params(dataset, "Evolutivo de estoque", stock, grain=grain, styles="bar|bar", formats="currency|number")
+            giro_params = custom_params(dataset, "Evolutivo de estoque", giro_roi, grain=grain, styles="bar|line|line", formats="percent|number|number")
+            osa_params = custom_params(dataset, "Evolutivo de estoque", osa, grain=grain, styles="line|line|line", formats="percent|percent|percent")
+            for params in (sales_params, stock_params, giro_params, osa_params):
+                params["adhoc_filters"] = list(period_filters)
+            add(f"sales_value_{period}", dataset, f"Evolutivo de vendas — Valor {period}", sales_params)
+            add(f"stock_{period}", dataset, f"Evolutivo de estoque — Estoque {period}", stock_params)
+            add(f"giro_roi_{period}", dataset, f"Evolutivo de estoque — Giro e ROI {period}", giro_params)
+            add(f"osa_{period}", dataset, f"Evolutivo de estoque — OSA {period}", osa_params)
         for period, grain in (("mensal", "P1M"), ("semanal", "P1W")):
             params = custom_params(
                 gap_periodic,
