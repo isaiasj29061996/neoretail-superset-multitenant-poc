@@ -57,9 +57,72 @@ Q_SUM = {
 }
 
 Q_DETAIL = {
-    "stores": metric("Quantidade de lojas", "COUNT(DISTINCT id_location)"),
-    "items": metric("Quantidade de itens", "COUNT(DISTINCT id_item)"),
+    "stores": metric(
+        "Quantidade de lojas",
+        "CASE WHEN MAX(is_summary) = 1 THEN MAX(store_count) "
+        "ELSE COUNT(DISTINCT id_location) END",
+    ),
+    "items": metric(
+        "Quantidade de itens",
+        "CASE WHEN MAX(is_summary) = 1 THEN MAX(item_count) "
+        "ELSE COUNT(DISTINCT id_item) END",
+    ),
 }
+
+DISTINCT_FILTER_COLUMNS = (
+    "rede", "bandeira", "uf", "cidade", "tipo_local", "loja", "regiao",
+    "tp_activity_level", "activity_level", "item", "descricao_marca",
+    "hierarquia_1", "hierarquia_2", "hierarquia_3",
+)
+
+
+def distinct_semantic_sql() -> str:
+    checks = " or ".join(
+        f"get_filters('{column}')" for column in DISTINCT_FILTER_COLUMNS
+    )
+    detail = """
+SELECT
+    id_customer, data, id_location, id_item,
+    rede, bandeira, uf, cidade, tipo_local, loja, regiao,
+    tp_activity_level, activity_level, item, descricao_marca,
+    hierarquia_1, hierarquia_2, hierarquia_3,
+    NULL::bigint AS store_count,
+    NULL::bigint AS item_count,
+    0::integer AS is_summary
+FROM gold.nr_overview_history
+""".strip()
+    summary = """
+SELECT
+    id_customer, data,
+    NULL::text AS id_location,
+    NULL::text AS id_item,
+    NULL::text AS rede,
+    NULL::text AS bandeira,
+    NULL::text AS uf,
+    NULL::text AS cidade,
+    NULL::text AS tipo_local,
+    NULL::text AS loja,
+    NULL::text AS regiao,
+    NULL::text AS tp_activity_level,
+    NULL::text AS activity_level,
+    NULL::text AS item,
+    NULL::text AS descricao_marca,
+    NULL::text AS hierarquia_1,
+    NULL::text AS hierarquia_2,
+    NULL::text AS hierarquia_3,
+    store_count,
+    item_count,
+    1::integer AS is_summary
+FROM gold.nr_overview_distinct_summary
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        f"{summary}\n"
+        "{% endif %}"
+    )
 
 
 def comparison_params(
@@ -113,8 +176,15 @@ def main():
             db.session,
             SqlaTable,
             database,
-            "nr_overview_history",
-            table_name="nr_overview_history",
+            "nr_overview_distinct_interactive",
+            sql=distinct_semantic_sql(),
+        )
+        filter_options = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_filter_options",
+            table_name="nr_filter_options",
         )
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
@@ -261,7 +331,7 @@ def main():
                 "refresh_frequency": 0,
                 "color_scheme": "supersetColors",
                 "native_filter_configuration": overview_native_filters(
-                    [summary.id, history.id]
+                    [summary.id, history.id], filter_options.id
                 ),
                 "filter_bar_orientation": "HORIZONTAL",
             },

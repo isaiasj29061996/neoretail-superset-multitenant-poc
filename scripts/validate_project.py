@@ -175,12 +175,32 @@ def main() -> None:
     )
     assert '"analytics-db\\marts"' in mart_runner
 
+    performance_marts = {
+        "34_native_filter_options.sql": ["nr_filter_options"],
+        "35_stock_headline_performance.sql": [
+            "nr_tvd_daily_summary", "nr_ivd_daily_summary",
+        ],
+        "36_panorama_weekly_summary.sql": ["nr_panorama_weekly_summary"],
+        "37_interactive_p1_summary.sql": [
+            "nr_overview_distinct_summary", "nr_osa_causes_summary",
+        ],
+        "38_export_retail_summary.sql": [
+            "nr_export_daily_retail_summary", "nr_export_monthly_retail_summary",
+        ],
+    }
+    for filename, mart_names in performance_marts.items():
+        sql = (ROOT / "analytics-db/marts" / filename).read_text(encoding="utf-8")
+        for mart_name in mart_names:
+            assert f"CREATE MATERIALIZED VIEW gold.{mart_name}" in sql
+            assert "id_customer" in sql
+
     dashboard_bootstraps = [
         ROOT / "superset/bootstrap_overview.py",
         ROOT / "superset/bootstrap_overview_quantity.py",
         ROOT / "superset/bootstrap_panorama.py",
         ROOT / "superset/bootstrap_osa_industry.py",
         ROOT / "superset/bootstrap_stock_optimization.py",
+        ROOT / "superset/bootstrap_export.py",
         ROOT / "superset/bootstrap_embedded.py",
     ]
     bootstrap_text = "\n".join(
@@ -195,8 +215,9 @@ def main() -> None:
     customers = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
     )["customers"]
-    assert [row["id_customer"] for row in customers] == [259, 609, 16868]
-    assert len({row["source_prefix"] for row in customers}) == 3
+    assert [row["id_customer"] for row in customers] == [142]
+    assert customers[0]["nm_customer"] == "AMBEV"
+    assert len({row["source_prefix"] for row in customers}) == 1
 
     embedded = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in embedded
@@ -211,11 +232,12 @@ def main() -> None:
     )
     assert tenants["default_dashboard"] == "overview"
     assert set(tenants["dashboards"]) == {
-        "overview", "overview_quantity", "panorama", "osa", "tasks"
+        "overview", "overview_quantity", "panorama", "osa", "tasks",
+        "export_daily", "export_monthly",
     }
-    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 5
+    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 7
     assert [item["key"] for item in tenants["navigation"]] == [
-        "overview", "panorama", "tasks"
+        "overview", "panorama", "tasks", "export"
     ]
 
     print("Validacao V9 concluida: clientes, particoes, Gold e RLS aprovados.")

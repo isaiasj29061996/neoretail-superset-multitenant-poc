@@ -194,9 +194,10 @@ def test_v9_customer_registry_and_embedded_rls():
         (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
     )
     assert set(tenant_config["dashboards"]) == {
-        "overview", "panorama", "osa", "tasks"
+        "overview", "overview_quantity", "panorama", "osa", "tasks",
+        "export_daily", "export_monthly",
     }
     assert len({
         definition["embedded_id"]
         for definition in tenant_config["dashboards"].values()
-    }) == 4
+    }) == 7

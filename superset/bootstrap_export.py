@@ -41,31 +41,110 @@ EXPORT_VALUE = metric(
     "ELSE SUM(COALESCE(venda_qtd, 0)) END",
 )
 
+EXPORT_SUMMARY_VALUE = metric(
+    "Valor",
+    "CASE MAX(indicador) "
+    "WHEN 'Venda' THEN SUM(COALESCE(venda_qtd, 0)) "
+    "WHEN 'Cobertura estoque' THEN SUM(COALESCE(estoque_qtd, 0)) / NULLIF(SUM(COALESCE(venda_qtd, 0)) / 4.33, 0) "
+    "WHEN 'Estoque' THEN SUM(COALESCE(estoque_qtd, 0)) "
+    "WHEN 'Estoque em Trânsito' THEN SUM(COALESCE(estoque_transito_qtd, 0)) "
+    "WHEN 'ISV (%)' THEN 100.0 * SUM(COALESCE(item_sem_venda, 0)) / NULLIF(SUM(COALESCE(osa_itens_ativos, 0)), 0) "
+    "WHEN 'OSA (%)' THEN 100.0 * (1 - SUM(COALESCE(osa_problemas, 0)) / NULLIF(SUM(COALESCE(osa_itens_ativos, 0)), 0)) "
+    "WHEN 'Perda OSA vol.' THEN SUM(COALESCE(perda_osa_qtd, 0)) "
+    "WHEN 'Perda OSA R$' THEN SUM(COALESCE(perda_osa_qtd, 0)) * "
+    "SUM(COALESCE(price_reference_sum, 0)) / NULLIF(SUM(COALESCE(price_reference_count, 0)), 0) "
+    "WHEN 'Preço médio (R$)' THEN SUM(COALESCE(venda_valor, 0)) / NULLIF(SUM(COALESCE(venda_qtd, 0)), 0) "
+    "ELSE SUM(COALESCE(venda_qtd, 0)) END",
+)
+
+EXPORT_DETAIL_FILTER_COLUMNS = (
+    "bandeira", "regiao", "uf", "cidade", "tipo_local",
+    "cnpj_formatado", "cod_loja", "loja", "nivel_atividade",
+    "descricao_marca", "hierarquia_1", "hierarquia_2", "hierarquia_3",
+    "item", "unidade_medida",
+)
+
 
 def semantic_sql(source_table: str) -> str:
-    values = ",\n    ".join(f"('{value}')" for value in INDICATORS)
+    allowed = json.dumps(list(INDICATORS), ensure_ascii=False)
     return f"""
+{{% set indicator_filters = get_filters('indicador', remove_filter=True) %}}
+{{% set requested = indicator_filters[0].get('val', ['Venda']) if indicator_filters else ['Venda'] %}}
+{{% set selected = requested[0] if requested and requested[0] in {allowed} else 'Venda' %}}
 SELECT
     source.*,
-    selector.indicador
+    '{{{{ selected | replace("'", "''") }}}}'::text AS indicador
 FROM gold.{source_table} source
-CROSS JOIN (
-    VALUES
-    {values}
-) AS selector(indicador)
 """.strip()
 
 
-def pivot_params(dataset, rows, *, daily: bool):
+def retail_semantic_sql(source_table: str, summary_table: str) -> str:
+    """Use the compact retailer mart until a dimensional filter needs detail."""
+    allowed = json.dumps(list(INDICATORS), ensure_ascii=False)
+    filter_checks = "\n".join(
+        f"{{% if get_filters('{column}') %}}{{% set state.filtered = true %}}{{% endif %}}"
+        for column in EXPORT_DETAIL_FILTER_COLUMNS
+    )
+    day_expression = "source.dia" if "daily" in source_table else "NULL::integer AS dia"
+    return f"""
+{{% set indicator_filters = get_filters('indicador', remove_filter=True) %}}
+{{% set requested = indicator_filters[0].get('val', ['Venda']) if indicator_filters else ['Venda'] %}}
+{{% set selected = requested[0] if requested and requested[0] in {allowed} else 'Venda' %}}
+{{% set state = namespace(filtered=false) %}}
+{filter_checks}
+{{% if state.filtered %}}
+SELECT
+    source.id_customer, source.data, source.ano, source.mes_num, source.mes,
+    {day_expression},
+    source.rede, source.bandeira, source.regiao, source.uf, source.cidade,
+    source.tipo_local, source.cnpj_formatado, source.cod_loja, source.loja,
+    source.nivel_atividade, source.descricao_marca, source.hierarquia_1,
+    source.hierarquia_2, source.hierarquia_3, source.item, source.unidade_medida,
+    source.venda_qtd, source.venda_valor, source.estoque_qtd,
+    source.estoque_transito_qtd, source.perda_osa_qtd, source.osa_problemas,
+    source.osa_itens_ativos, source.ruptura, source.item_sem_venda,
+    CASE WHEN source.preco_referencia <> 0 THEN source.preco_referencia ELSE 0 END::double precision
+        AS price_reference_sum,
+    CASE WHEN source.preco_referencia <> 0 THEN 1 ELSE 0 END::bigint
+        AS price_reference_count,
+    '{{{{ selected | replace("'", "''") }}}}'::text AS indicador
+FROM gold.{source_table} source
+{{% else %}}
+SELECT
+    source.id_customer, source.data, source.ano, source.mes_num, source.mes,
+    source.dia,
+    source.rede, NULL::text AS bandeira, NULL::text AS regiao,
+    NULL::text AS uf, NULL::text AS cidade, NULL::text AS tipo_local,
+    NULL::text AS cnpj_formatado, NULL::text AS cod_loja, NULL::text AS loja,
+    NULL::text AS nivel_atividade, NULL::text AS descricao_marca,
+    NULL::text AS hierarquia_1, NULL::text AS hierarquia_2,
+    NULL::text AS hierarquia_3, NULL::text AS item,
+    NULL::text AS unidade_medida,
+    source.venda_qtd, source.venda_valor, source.estoque_qtd,
+    source.estoque_transito_qtd, source.perda_osa_qtd, source.osa_problemas,
+    source.osa_itens_ativos, source.ruptura, source.item_sem_venda,
+    source.price_reference_sum, source.price_reference_count,
+    '{{{{ selected | replace("'", "''") }}}}'::text AS indicador
+FROM gold.{summary_table} source
+{{% endif %}}
+""".strip()
+
+
+def indicator_sql() -> str:
+    values = ",\n    ".join(f"('{value}')" for value in INDICATORS)
+    return f"SELECT indicador FROM (VALUES\n    {values}\n) AS options(indicador)"
+
+
+def pivot_params(dataset, rows, *, daily: bool, value_metric=EXPORT_VALUE):
     return {
         "datasource": f"{dataset.id}__table",
         "viz_type": "pivot_table_v2",
         "groupbyRows": rows,
         "groupbyColumns": ["data"],
-        "metrics": [EXPORT_VALUE],
+        "metrics": [value_metric],
         "adhoc_filters": [],
         "time_range": "No filter",
-        "row_limit": 150000,
+        "row_limit": 100000,
         "order_desc": False,
         "aggregateFunction": "Sum",
         "rowOrder": "key_a_to_z",
@@ -79,7 +158,14 @@ def pivot_params(dataset, rows, *, daily: bool):
     }
 
 
-def export_filters(dataset_id: int, *, daily: bool, default_date=None):
+def export_filters(
+    dataset_id: int,
+    indicator_dataset_id: int,
+    filter_dataset_id: int,
+    *,
+    daily: bool,
+    default_date=None,
+):
     definitions = [
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
@@ -145,7 +231,14 @@ def export_filters(dataset_id: int, *, daily: bool, default_date=None):
             },
             "name": label,
             "filterType": "filter_select",
-            "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
+            "targets": [{
+                "datasetId": (
+                    indicator_dataset_id if column == "indicador"
+                    else dataset_id if column in {"ano", "mes", "dia"}
+                    else filter_dataset_id
+                ),
+                "column": {"name": column},
+            }],
             "defaultDataMask": default_mask,
             "cascadeParentIds": [ids[parent] for parent in parents],
             "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
@@ -172,6 +265,9 @@ def build_export_dashboard(
     Dashboard,
     Slice,
     dataset,
+    retail_dataset,
+    indicator_dataset_id: int,
+    filter_dataset_id: int,
     *,
     daily: bool,
     default_date=None,
@@ -200,19 +296,25 @@ def build_export_dashboard(
 
     charts = {}
     for key, (label, rows) in definitions.items():
+        chart_dataset = retail_dataset if key == "varejo" else dataset
         charts[key] = upsert_chart(
             session,
             Slice,
-            dataset,
+            chart_dataset,
             f"[Exportação {period_label}] {label}",
-            pivot_params(dataset, rows, daily=daily),
+            pivot_params(
+                chart_dataset,
+                rows,
+                daily=daily,
+                value_metric=EXPORT_SUMMARY_VALUE if key == "varejo" else EXPORT_VALUE,
+            ),
             "pivot_table_v2",
         )
 
     layout = Layout()
     add_markdown(
         layout,
-        "É possível exportar até **150.000 registros por vez**. Utilize filtros para reduzir o volume de dados, se necessário.\n\n"
+        "É possível exportar até **100.000 registros por vez**. Utilize filtros para reduzir o volume de dados, se necessário.\n\n"
         "Para exportar, posicione o cursor do mouse sobre a tabela e clique no botão **'...'** no canto superior direito; depois escolha **Download CSV**.",
         height=11,
     )
@@ -250,7 +352,11 @@ def build_export_dashboard(
         "refresh_frequency": 0,
         "color_scheme": "supersetColors",
         "native_filter_configuration": export_filters(
-            dataset.id, daily=daily, default_date=default_date
+            dataset.id,
+            indicator_dataset_id,
+            filter_dataset_id,
+            daily=daily,
+            default_date=default_date,
         ),
         "filter_bar_orientation": "HORIZONTAL",
     }, ensure_ascii=False)
@@ -285,6 +391,38 @@ def main():
             "nr_export_monthly_semantic",
             sql=semantic_sql("nr_export_monthly"),
         )
+        daily_retail = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_export_daily_retail_interactive",
+            sql=retail_semantic_sql(
+                "nr_export_daily", "nr_export_daily_retail_summary"
+            ),
+        )
+        monthly_retail = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_export_monthly_retail_interactive",
+            sql=retail_semantic_sql(
+                "nr_export_monthly", "nr_export_monthly_retail_summary"
+            ),
+        )
+        indicators = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_export_indicators",
+            sql=indicator_sql(),
+        )
+        filter_options = upsert_dataset(
+            db.session,
+            SqlaTable,
+            database,
+            "nr_filter_options",
+            table_name="nr_filter_options",
+        )
 
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
@@ -300,6 +438,9 @@ def main():
             Dashboard,
             Slice,
             daily,
+            daily_retail,
+            indicators.id,
+            filter_options.id,
             daily=True,
             default_date=daily_max_date,
         )
@@ -308,6 +449,9 @@ def main():
             Dashboard,
             Slice,
             monthly,
+            monthly_retail,
+            indicators.id,
+            filter_options.id,
             daily=False,
             default_date=monthly_max_date,
         )
@@ -318,15 +462,19 @@ def main():
                 "dashboard_id": daily_dashboard.id,
                 "slug": daily_dashboard.slug,
                 "dataset": daily.id,
+                "retail_dataset": daily_retail.id,
                 "charts": {key: chart.id for key, chart in daily_charts.items()},
             },
             "monthly": {
                 "dashboard_id": monthly_dashboard.id,
                 "slug": monthly_dashboard.slug,
                 "dataset": monthly.id,
+                "retail_dataset": monthly_retail.id,
                 "charts": {key: chart.id for key, chart in monthly_charts.items()},
             },
             "indicators": list(INDICATORS),
+            "indicator_dataset": indicators.id,
+            "filter_dataset": filter_options.id,
         }, ensure_ascii=False))
 
 

@@ -215,6 +215,22 @@ serving:
 
 - `gold.nr_export_daily_source`
 
+### Serving interativo e filtros
+
+Os lotes `34` a `37` adicionam caminhos compactos para a interação padrão sem
+remover as marts detalhadas usadas quando há filtros dimensionais:
+
+- `gold.nr_filter_options`: opções de localização, produto, atividade e unidade;
+- `gold.nr_tvd_daily_summary` e `gold.nr_ivd_daily_summary`: totais por tenant/dia;
+- `gold.nr_panorama_weekly_summary`: componentes aditivos por tenant/semana;
+- `gold.nr_overview_distinct_summary`: cardinalidades exatas por tenant/mês;
+- `gold.nr_osa_causes_summary`: perda OSA por tenant/mês/motivo/causa.
+
+Os datasets virtuais escolhem a fonte compacta quando não existe filtro de
+negócio. Ao selecionar rede, loja, produto ou outra dimensão compatível, a
+consulta volta automaticamente à mart detalhada. `id_customer` continua em
+todas as fontes e o RLS/Guest Token permanece independente dessa seleção.
+
 Por padrão, essa fonte usa uma janela recente e somente as colunas necessárias
 à exportação.
 
@@ -263,7 +279,7 @@ Indicadores atualmente disponíveis:
 - Perda OSA R$;
 - Preço médio (R$).
 
-O limite visual de exportação é de **150.000 registros por vez**. O usuário deve
+O limite visual de exportação é de **100.000 registros por vez**. O usuário deve
 usar filtros quando precisar reduzir o volume antes do download.
 
 ---
@@ -342,6 +358,38 @@ Em benchmarks históricos da POC, a substituição de consultas virtuais por mar
 físicos reduziu significativamente o tempo de execução de consultas
 representativas. Esses resultados foram obtidos em ambiente local e não devem
 ser tratados como SLA de produção.
+
+Medição cold-cache local de 18/09/2026, executada pelo mecanismo de consulta do
+Superset para `id_customer = 142`:
+
+| Consulta | Antes | Depois |
+|---|---:|---:|
+| Exportação mês — Produto | 25,31 s | 1,08 s |
+| Exportação mês — Varejo | 10,40 s | 1,19 s |
+| Exportação dia — Produto | 6,80 s | 2,55 s |
+| Exportação dia — Varejo | 14,29 s | 0,39 s |
+| TVD — Visão geral | 25,11 s na rodada de diagnóstico | 0,38 s |
+| IVD — Visão geral | 44,73 s na rodada de diagnóstico | 0,14 s |
+| Panorama vendas semanal | 4,80 s | 0,77 s |
+| Panorama estoque semanal | 2,49 s | 0,15 s |
+| Panorama Giro/ROI semanal | 2,26 s | 0,15 s |
+| Panorama OSA semanal | 2,04 s | 0,13 s |
+| Distribuição e sortimento | 5,48 s | 0,29 s |
+| OSA — Perdas | 2,14 s | 0,61 s |
+
+As listas dos filtros, antes medidas em até 3,10 s sobre marts com cerca de 14
+milhões de linhas, ficaram entre 0,004 s e 0,218 s sobre `nr_filter_options`.
+Os resultados completos, a reconciliação numérica e as limitações estão em
+[`docs/performance_audit.md`](docs/performance_audit.md).
+
+O profiler aceita recorte por dashboard e por trecho do nome do gráfico:
+
+```powershell
+.\profile-performance.ps1 -ColdCache
+.\profile-performance.ps1 -ColdCache `
+  -Dashboard neoretail-v9-panorama-industria `
+  -Chart semanal
+```
 
 ### Snapshot atual do container Superset
 

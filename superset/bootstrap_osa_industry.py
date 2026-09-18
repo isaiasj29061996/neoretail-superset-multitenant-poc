@@ -46,7 +46,7 @@ JOIN (
 ) d ON d.id_customer = h.id_customer AND d.max_data = h.data
 """.strip()
 
-LOSS_VALUE = metric("Perda R$ OSA", "SUM(COALESCE(qtd_perda_osa * NULLIF(preco_medio, 0), 0))")
+LOSS_VALUE = metric("Perda R$ OSA", "SUM(loss_value_sum)")
 LOSS_PERCENT = metric("% Perda", "100.0 * SUM(qtd_perda_osa) * AVG(avg_sales_price) / NULLIF(CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END, 0)")
 LOSS_PERCENT_SUMMARY = metric(
     "% Perda",
@@ -62,8 +62,56 @@ CAUSE_OSA = metric("% OSA Numérico", "100.0 * (1 - SUM(qtd_problemas_osa) / NUL
 def motive_percent(label):
     patterns = {"Estoque Virtual": "%virtual%", "Falta de Exposição": "%exposi%", "Falta de Performance": "%performance%", "Ruptura na loja": "%ruptura%"}
     pattern = patterns[label]
-    value = "COALESCE(qtd_perda_osa * NULLIF(preco_medio, 0), 0)"
+    value = "COALESCE(loss_value_sum, 0)"
     return metric(label, f"100.0 * SUM(CASE WHEN LOWER(COALESCE(motivo_osa, '')) LIKE '{pattern}' THEN {value} ELSE 0 END) / NULLIF(SUM({value}), 0)")
+
+
+CAUSE_FILTER_COLUMNS = (
+    "rede", "bandeira", "uf", "cidade", "tipo_local", "loja", "regiao",
+    "item", "descricao_marca",
+    "hierarquia_1", "hierarquia_2", "hierarquia_3",
+)
+
+
+def causes_semantic_sql() -> str:
+    checks = " or ".join(
+        f"get_filters('{column}')" for column in CAUSE_FILTER_COLUMNS
+    )
+    detail = """
+SELECT
+    id_customer, data, motivo_osa, causa_osa,
+    rede, bandeira, uf, cidade, tipo_local, loja, regiao,
+    item, descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3,
+    COALESCE(qtd_perda_osa * NULLIF(preco_medio, 0), 0)::double precision
+        AS loss_value_sum
+FROM gold.nr_osa_industry_causes
+""".strip()
+    summary = """
+SELECT
+    id_customer, data, motivo_osa, causa_osa,
+    NULL::text AS rede,
+    NULL::text AS bandeira,
+    NULL::text AS uf,
+    NULL::text AS cidade,
+    NULL::text AS tipo_local,
+    NULL::text AS loja,
+    NULL::text AS regiao,
+    NULL::text AS item,
+    NULL::text AS descricao_marca,
+    NULL::text AS hierarquia_1,
+    NULL::text AS hierarquia_2,
+    NULL::text AS hierarquia_3,
+    loss_value_sum
+FROM gold.nr_osa_causes_summary
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        f"{summary}\n"
+        "{% endif %}"
+    )
 
 
 def main():
@@ -77,8 +125,12 @@ def main():
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
         summary = upsert_dataset(db.session, SqlaTable, database, "nr_overview_summary", table_name="nr_overview_summary")
-        causes = upsert_dataset(db.session, SqlaTable, database, "nr_osa_industry_causes", table_name="nr_osa_industry_causes")
+        causes = upsert_dataset(
+            db.session, SqlaTable, database, "nr_osa_causes_interactive",
+            sql=causes_semantic_sql(),
+        )
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
+        filter_options = upsert_dataset(db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options")
 
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
@@ -134,7 +186,7 @@ def main():
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
         dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; }"
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(summary.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(summary.id, filter_options.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
         print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"summary": summary.id, "causes": causes.id, "latest": latest.id}, "charts": {key: chart.id for key, chart in charts.items()}}, ensure_ascii=False))

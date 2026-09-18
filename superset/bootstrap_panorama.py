@@ -84,6 +84,81 @@ P = {
 GAP_TVD = metric("TVD", "SUM(COALESCE(tvd, 0))")
 GAP_IVD = metric("IVD", "SUM(COALESCE(ivd, 0))")
 
+_WEEKLY_SELLOUT = (
+    "CASE WHEN SUM(faturamento_sum) > 0 "
+    "THEN SUM(faturamento_sum) ELSE SUM(fallback_sellout_sum) END"
+)
+WEEKLY_P = {
+    "sellout": metric("Venda sell out", _WEEKLY_SELLOUT),
+    "cost": metric("Venda custo", "SUM(sales_cost_sum)"),
+    "markup": metric(
+        "Markup", f"100.0 * ({_WEEKLY_SELLOUT}) / NULLIF(SUM(sales_cost_sum), 0)"
+    ),
+    "stock_cost": metric("Estoque custo", "SUM(stock_cost_sum)"),
+    "stock_qty": metric("Estoque qtd", "SUM(stock_qty_sum)"),
+    "roi": metric(
+        "ROI",
+        f"100.0 * (({_WEEKLY_SELLOUT}) - SUM(sales_cost_sum)) "
+        "/ NULLIF(SUM(stock_cost_sum), 0)",
+    ),
+    "coverage": metric(
+        "Cobertura de estoque",
+        "SUM(stock_qty_sum) / NULLIF(SUM(sales_qty_sum) / 4.33, 0)",
+    ),
+    "giro": metric(
+        "Giro", "SUM(giro_sum_positive) / NULLIF(SUM(giro_count_positive), 0)"
+    ),
+    "osa": metric(
+        "OSA",
+        "100.0 * (1 - SUM(osa_problem_sum) / NULLIF(SUM(osa_active_sum), 0))",
+    ),
+    "rup": metric(
+        "Ruptura", "100.0 * SUM(rupture_sum) / NULLIF(SUM(osa_active_sum), 0)"
+    ),
+    "isv": metric(
+        "Item sem venda", "100.0 * SUM(isv_sum) / NULLIF(SUM(osa_active_sum), 0)"
+    ),
+}
+
+WEEKLY_FILTER_COLUMNS = (
+    "rede", "bandeira", "uf", "cidade", "tipo_local", "loja", "regiao",
+    "tp_activity_level", "activity_level", "item", "descricao_marca",
+    "hierarquia_1", "hierarquia_2", "hierarquia_3",
+)
+
+
+def weekly_semantic_sql() -> str:
+    checks = " or ".join(
+        f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS
+    )
+    detail = """
+SELECT
+    id_customer, data, tp_activity_level, activity_level,
+    rede, bandeira, uf, cidade, tipo_local, loja, regiao,
+    item, descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3,
+    COALESCE(faturamento, 0)::double precision AS faturamento_sum,
+    (COALESCE(volume_unidades, 0) * COALESCE(avg_sales_price, 0))::double precision AS fallback_sellout_sum,
+    (COALESCE(volume_unidades, 0) * COALESCE(avg_price_cost, 0))::double precision AS sales_cost_sum,
+    COALESCE(volume_unidades, 0)::double precision AS sales_qty_sum,
+    (COALESCE(estoque_medio, 0) * COALESCE(avg_price_cost, 0))::double precision AS stock_cost_sum,
+    COALESCE(estoque_unidades, 0)::double precision AS stock_qty_sum,
+    CASE WHEN COALESCE(giro, 0) > 0 THEN giro ELSE 0 END::double precision AS giro_sum_positive,
+    CASE WHEN COALESCE(giro, 0) > 0 THEN 1 ELSE 0 END::bigint AS giro_count_positive,
+    COALESCE(qtd_problemas_osa, 0)::double precision AS osa_problem_sum,
+    COALESCE(qtd_item_ativo_osa, 0)::double precision AS osa_active_sum,
+    COALESCE(rup, 0)::double precision AS rupture_sum,
+    COALESCE(est_virtual, 0)::double precision AS isv_sum
+FROM gold.nr_panorama_weekly
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        "SELECT * FROM gold.nr_panorama_weekly_summary\n"
+        "{% endif %}"
+    )
+
 
 def sql_filter(expression):
     return {
@@ -195,7 +270,10 @@ def main():
 
         database = db.session.query(Database).filter(Database.database_name == "NeoRetail Gold - PostgreSQL Local").one()
         history = upsert_dataset(db.session, SqlaTable, database, "nr_overview_history", table_name="nr_overview_history")
-        weekly = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_weekly", table_name="nr_panorama_weekly")
+        weekly = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_weekly_interactive",
+            sql=weekly_semantic_sql(),
+        )
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
         mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
         opportunities = mart
@@ -206,6 +284,9 @@ def main():
             database,
             "nr_panorama_gap_periodic",
             table_name="nr_panorama_gap_periodic",
+        )
+        filter_options = upsert_dataset(
+            db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options"
         )
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
@@ -220,12 +301,13 @@ def main():
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
             charts[key] = upsert_chart(db.session, Slice, dataset, f"[Panorama] {title}", params, viz)
 
-        sales = [P["sellout"], P["cost"], P["markup"]]
-        stock = [P["stock_cost"], P["stock_qty"]]
-        giro_roi = [P["roi"], P["coverage"], P["giro"]]
-        osa = [P["osa"], P["rup"], P["isv"]]
         periods = (("mensal", history, "P1M"), ("semanal", weekly, "P1W"))
         for period, dataset, grain in periods:
+            metrics = WEEKLY_P if period == "semanal" else P
+            sales = [metrics["sellout"], metrics["cost"], metrics["markup"]]
+            stock = [metrics["stock_cost"], metrics["stock_qty"]]
+            giro_roi = [metrics["roi"], metrics["coverage"], metrics["giro"]]
+            osa = [metrics["osa"], metrics["rup"], metrics["isv"]]
             period_filters = weekly_recent if period == "semanal" else []
             sales_params = custom_params(dataset, "Evolutivo de vendas", sales, grain=grain, styles="bar|bar|line", formats="currency|currency|percent")
             stock_params = custom_params(dataset, "Evolutivo de estoque", stock, grain=grain, styles="bar|bar", formats="currency|number")
@@ -300,7 +382,7 @@ def main():
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
         dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters(history.id, filter_options.id), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
         print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))

@@ -141,6 +141,28 @@ IVD_DAILY = {
     "risk": metric("Itens risco IVD", "SUM(itens_risco_ivd)"),
 }
 
+HEADLINE_FILTER_COLUMNS = (
+    "rede", "bandeira", "uf", "cidade", "tipo_local", "loja", "regiao",
+    "deposito", "tp_activity_level", "item", "descricao_marca",
+    "hierarquia_1", "hierarquia_2", "hierarquia_3", "hierarquia_4",
+    "unidade_medida",
+)
+
+
+def headline_semantic_sql(detail_table: str, summary_table: str) -> str:
+    """Use daily totals by default and retain detail for dimensional filters."""
+    checks = " or ".join(
+        f"get_filters('{column}')" for column in HEADLINE_FILTER_COLUMNS
+    )
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"SELECT * FROM gold.{detail_table}\n"
+        "{% else %}\n"
+        f"SELECT * FROM gold.{summary_table}\n"
+        "{% endif %}"
+    )
+
 
 def upsert_dataset(session, model, database, name, *, table_name=None, sql=None):
     dataset = session.query(model).filter(model.table_name == name).one_or_none()
@@ -286,19 +308,20 @@ def _native_filters_for_targets(targets_by_column):
     } for column, label, parents in definitions]
 
 
-def native_filters(dataset_id):
+def native_filters(dataset_id, filter_dataset_id=None):
+    target_id = filter_dataset_id or dataset_id
     return _native_filters_for_targets(
-        lambda column: [{"datasetId": dataset_id, "column": {"name": column}}]
+        lambda column: [{"datasetId": target_id, "column": {"name": column}}]
     )
 
 
-def overview_native_filters(dataset_ids):
+def overview_native_filters(dataset_ids, filter_dataset_id=None):
     ids = list(dict.fromkeys(int(dataset_id) for dataset_id in dataset_ids))
     return _native_filters_for_targets(
-        lambda column: [
-            {"datasetId": dataset_id, "column": {"name": column}}
-            for dataset_id in ids
-        ]
+        lambda column: [{
+            "datasetId": filter_dataset_id or ids[0],
+            "column": {"name": column},
+        }]
     )
 
 
@@ -315,13 +338,18 @@ def main():
             Database.database_name == "NeoRetail Gold - PostgreSQL Local"
         ).one()
         tvd_daily = upsert_dataset(
-            db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
+            db.session, SqlaTable, database, "nr_tvd_daily_interactive",
+            sql=headline_semantic_sql("nr_tvd_daily", "nr_tvd_daily_summary"),
         )
         ivd_daily = upsert_dataset(
-            db.session, SqlaTable, database, "nr_ivd_daily", table_name="nr_ivd_daily"
+            db.session, SqlaTable, database, "nr_ivd_daily_interactive",
+            sql=headline_semantic_sql("nr_ivd_daily", "nr_ivd_daily_summary"),
         )
         summary = upsert_dataset(
             db.session, SqlaTable, database, "nr_overview_summary", table_name="nr_overview_summary"
+        )
+        filter_options = upsert_dataset(
+            db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options"
         )
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
@@ -388,7 +416,7 @@ def main():
             "refresh_frequency": 0,
             "color_scheme": "supersetColors",
             "native_filter_configuration": overview_native_filters(
-                [summary.id, tvd_daily.id, ivd_daily.id]
+                [summary.id, tvd_daily.id, ivd_daily.id], filter_options.id
             ),
             "filter_bar_orientation": "HORIZONTAL",
         })

@@ -1,6 +1,7 @@
 param(
     [switch]$ColdCache,
     [string]$Dashboard = "",
+    [string]$Chart = "",
     [int]$RowLimitCap = 20000
 )
 
@@ -42,6 +43,9 @@ $arguments = @(
 )
 if (-not [string]::IsNullOrWhiteSpace($Dashboard)) {
     $arguments += @("-e", "PROFILE_DASHBOARD_SLUG=$Dashboard")
+}
+if (-not [string]::IsNullOrWhiteSpace($Chart)) {
+    $arguments += @("-e", "PROFILE_CHART_MATCH=$Chart")
 }
 $arguments += @(
     "superset",

@@ -10,7 +10,7 @@ import json
 from sqlalchemy import text
 from superset.app import create_app
 
-from bootstrap_overview import metric, upsert_dataset
+from bootstrap_overview import headline_semantic_sql, metric, upsert_dataset
 from bootstrap_panorama import Layout, custom_params, upsert_chart
 
 
@@ -102,7 +102,7 @@ def detail_table_params(dataset, metrics, expression):
     }
 
 
-def task_filters(dataset_id):
+def task_filters(dataset_id, filter_dataset_id=None):
     definitions = [
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
@@ -127,7 +127,10 @@ def task_filters(dataset_id):
             "searchAllOptions": True, "inverseSelection": False,
         },
         "name": label, "filterType": "filter_select",
-        "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
+        "targets": [{
+            "datasetId": filter_dataset_id or dataset_id,
+            "column": {"name": column},
+        }],
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents],
         "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
@@ -163,13 +166,18 @@ def main():
                 )).scalar_one()
 
         tvd_daily = upsert_dataset(
-            db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
+            db.session, SqlaTable, database, "nr_tvd_daily_interactive",
+            sql=headline_semantic_sql("nr_tvd_daily", "nr_tvd_daily_summary"),
         )
         ivd_daily = upsert_dataset(
-            db.session, SqlaTable, database, "nr_ivd_daily", table_name="nr_ivd_daily"
+            db.session, SqlaTable, database, "nr_ivd_daily_interactive",
+            sql=headline_semantic_sql("nr_ivd_daily", "nr_ivd_daily_summary"),
         )
         tasks = upsert_dataset(
             db.session, SqlaTable, database, "nr_stock_tasks", table_name="nr_stock_tasks"
+        )
+        filter_options = upsert_dataset(
+            db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options"
         )
 
         charts = {}
@@ -282,7 +290,7 @@ def main():
         dashboard.json_metadata = json.dumps({
             "timed_refresh_immune_slices": [], "expanded_slices": {},
             "refresh_frequency": 0, "color_scheme": "supersetColors",
-            "native_filter_configuration": task_filters(tasks.id),
+            "native_filter_configuration": task_filters(tasks.id, filter_options.id),
             "filter_bar_orientation": "HORIZONTAL",
         }, ensure_ascii=False)
         dashboard.slices = list(charts.values())

@@ -7,6 +7,7 @@ read-only and is meant for the local AMBEV POC.
 Environment variables:
 - PROFILE_CUSTOMER_ID: tenant used by the benchmark (default: 142)
 - PROFILE_DASHBOARD_SLUG: optional single dashboard slug
+- PROFILE_CHART_MATCH: optional case-insensitive chart-name fragment
 - PROFILE_ROW_LIMIT_CAP: caps chart row_limit during profiling (default: 20000)
 - PROFILE_OUTPUT: JSON output path (default: /generated/performance_profile.json)
 """
@@ -27,6 +28,7 @@ from superset.app import create_app
 
 CUSTOMER_ID = int(os.getenv("PROFILE_CUSTOMER_ID", "142"))
 DASHBOARD_SLUG = os.getenv("PROFILE_DASHBOARD_SLUG", "").strip()
+CHART_MATCH = os.getenv("PROFILE_CHART_MATCH", "").strip().casefold()
 ROW_LIMIT_CAP = max(1, int(os.getenv("PROFILE_ROW_LIMIT_CAP", "20000")))
 OUTPUT = Path(os.getenv("PROFILE_OUTPUT", "/generated/performance_profile.json"))
 
@@ -305,6 +307,8 @@ def main():
                 continue
 
             for chart in sorted(dashboard.slices, key=lambda item: item.id):
+                if CHART_MATCH and CHART_MATCH not in chart.slice_name.casefold():
+                    continue
                 form = json.loads(chart.params)
                 default_filters = _dashboard_default_filters(
                     dashboard, chart.datasource_id
@@ -429,6 +433,7 @@ def main():
             "customer_id": CUSTOMER_ID,
             "row_limit_cap": ROW_LIMIT_CAP,
             "dashboard_filter": DASHBOARD_SLUG or None,
+            "chart_match": CHART_MATCH or None,
             "dashboard_summary": dashboard_summary,
             "slowest_charts": slowest[:20],
             "slowest_filter_probes": slow_filters[:20],
