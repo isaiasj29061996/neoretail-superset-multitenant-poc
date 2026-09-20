@@ -80,12 +80,16 @@ O refresh final de `30_neoretail_serving_marts.sql` levou **899,08 s**. A ordem 
 
 Após o build e o bootstrap, as oito consultas persistidas passaram sem erro. A execução sequencial sem cache aquecido levou **6,127 s** no total: TVD **0,336 s**, IVD **0,110 s**, Giro **1,353 s**, OSA **0,692 s**, Vendas **0,516 s**, Estoque **0,534 s**, ROI **1,235 s** e Markup **1,293 s**. No profiler com cache aquecido, o maior tempo foi TVD com **0,352 s**, seguido de IVD com **0,163 s**.
 
+Depois da criação de `nr_overview_default_summary`, a primeira execução do novo dataset caiu para **1,530 s** no total, redução de **75,0%**. A consulta de Giro por mês e atividade caiu de **457,966 ms** para **0,303 ms** no PostgreSQL. Os 142 grupos compactos reconciliaram sem divergência; com filtro de Rede, o dataset retornou ao mart detalhado e manteve resultados.
+
 ## Arquivos alterados
 
 - `analytics-db/marts/30_neoretail_serving_marts.sql`;
 - `analytics-db/marts/31_overview_performance.sql`;
+- `analytics-db/marts/37_interactive_p1_summary.sql`;
 - `superset/Dockerfile`;
 - `superset/bootstrap_overview.py`;
+- `superset/validate_overview.py`;
 - `superset/frontend-plugin/plugin-chart-neoretail-kpi/src/transformProps.js`;
 - `superset/frontend-plugin/plugin-chart-neoretail-kpi/src/NeoRetailKpi.jsx`;
 - `superset/frontend-plugin/plugin-chart-neoretail-kpi/tests/regression.mjs`;

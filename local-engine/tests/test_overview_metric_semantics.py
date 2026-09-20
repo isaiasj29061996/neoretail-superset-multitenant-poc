@@ -82,3 +82,16 @@ def test_giro_and_osa_use_additive_components_for_u3m():
     assert '"giro_count": metric' in bootstrap
     assert '"osa_problem": metric' in bootstrap
     assert '"osa_active": metric' in bootstrap
+
+
+def test_overview_default_path_is_compact_and_falls_back_for_detail_filters():
+    bootstrap = _read("superset/bootstrap_overview.py")
+    sql = _read("analytics-db/marts/37_interactive_p1_summary.sql")
+
+    assert "def overview_semantic_sql()" in bootstrap
+    assert "SELECT * FROM gold.nr_overview_default_summary" in bootstrap
+    assert "SELECT * FROM gold.nr_overview_summary" in bootstrap
+    assert 'database, "nr_overview_interactive"' in bootstrap
+    assert "CREATE MATERIALIZED VIEW gold.nr_overview_default_summary" in sql
+    assert "GROUP BY data, id_customer, tp_activity_level, activity_level" in sql
+    assert "NULL::text AS rede" in sql

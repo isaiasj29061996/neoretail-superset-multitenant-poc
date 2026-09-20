@@ -8,6 +8,7 @@
 BEGIN;
 
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_default_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily;
 

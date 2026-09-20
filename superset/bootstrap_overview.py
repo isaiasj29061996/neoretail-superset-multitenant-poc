@@ -171,6 +171,22 @@ def headline_semantic_sql(detail_table: str, summary_table: str) -> str:
     )
 
 
+def overview_semantic_sql() -> str:
+    """Use the activity-level summary until a detail dimension is filtered."""
+    checks = " or ".join(
+        f"get_filters('{column}')" for column in HEADLINE_FILTER_COLUMNS
+        if column != "tp_activity_level"
+    )
+    return (
+        f"{{% set has_detail_filter = {checks} %}}\n"
+        "{% if has_detail_filter %}\n"
+        "SELECT * FROM gold.nr_overview_summary\n"
+        "{% else %}\n"
+        "SELECT * FROM gold.nr_overview_default_summary\n"
+        "{% endif %}"
+    )
+
+
 def upsert_dataset(session, model, database, name, *, table_name=None, sql=None):
     dataset = session.query(model).filter(model.table_name == name).one_or_none()
     needs_metadata = dataset is None
@@ -353,7 +369,8 @@ def main():
             sql=headline_semantic_sql("nr_ivd_daily", "nr_ivd_daily_summary"),
         )
         summary = upsert_dataset(
-            db.session, SqlaTable, database, "nr_overview_summary", table_name="nr_overview_summary"
+            db.session, SqlaTable, database, "nr_overview_interactive",
+            sql=overview_semantic_sql(),
         )
         filter_options = upsert_dataset(
             db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options"

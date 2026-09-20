@@ -13,6 +13,7 @@ DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_weekly_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_periodic;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_distinct_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_default_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_causes_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_opportunities_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_latest;

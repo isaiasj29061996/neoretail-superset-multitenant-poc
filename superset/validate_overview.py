@@ -1,5 +1,6 @@
 """Execute every overview chart query through Superset and report timings."""
 import json
+import os
 from time import perf_counter
 
 from flask import g
@@ -8,6 +9,8 @@ from superset.app import create_app
 
 
 CUSTOMER_ID = 142
+FILTER_COLUMN = os.getenv('OVERVIEW_FILTER_COLUMN', '').strip()
+FILTER_VALUE = os.getenv('OVERVIEW_FILTER_VALUE', '').strip()
 app = create_app()
 with app.test_request_context('/'):
     from superset import db, security_manager
@@ -43,9 +46,12 @@ with app.test_request_context('/'):
             'expressionType': 'SQL',
             'isColumnReference': True,
         }
+        filters = [{'col': 'id_customer', 'op': 'IN', 'val': [CUSTOMER_ID]}]
+        if FILTER_COLUMN and FILTER_VALUE:
+            filters.append({'col': FILTER_COLUMN, 'op': 'IN', 'val': [FILTER_VALUE]})
         common = {
             'time_range': 'No filter',
-            'filters': [{'col': 'id_customer', 'op': 'IN', 'val': [CUSTOMER_ID]}],
+            'filters': filters,
             'extras': {'time_grain_sqla': grain},
             'metrics': metrics,
             'orderby': [[axis, True]],
@@ -60,6 +66,11 @@ with app.test_request_context('/'):
 
         started = perf_counter()
         try:
+            # Jinja's get_filters() reads the Chart Data API request payload
+            # (or g.form_data for async/cache execution), not QueryContext alone.
+            # Populate the same shape so this validator exercises semantic
+            # dataset routing exactly as a Native Filter request does.
+            g.form_data = {'queries': [queries[0]]}
             context = factory.create(
                 datasource={'id': chart.datasource_id, 'type': 'table'},
                 queries=queries,
@@ -67,12 +78,24 @@ with app.test_request_context('/'):
             )
             result = ChartDataCommand(context).run()
             counts = [len(item.get('data', [])) for item in result.get('queries', [])]
+            sources = []
+            for item in result.get('queries', []):
+                sql = item.get('query') or item.get('sql') or ''
+                if 'nr_overview_default_summary' in sql:
+                    sources.append('overview_default_summary')
+                elif 'nr_overview_summary' in sql:
+                    sources.append('overview_detail')
+                elif 'daily_summary' in sql:
+                    sources.append('daily_summary')
+                else:
+                    sources.append('detail_or_unknown')
             errors = [
                 item.get('error') for item in result.get('queries', [])
                 if item.get('error')
             ]
         except Exception as error:
             counts = []
+            sources = []
             errors = [f'{type(error).__name__}: {error}']
         elapsed = perf_counter() - started
         payload = {
@@ -80,6 +103,7 @@ with app.test_request_context('/'):
             'dataset_id': chart.datasource_id,
             'seconds': round(elapsed, 4),
             'rows': counts,
+            'sources': sources,
             'errors': errors,
         }
         print(json.dumps(payload, ensure_ascii=False))
@@ -89,6 +113,7 @@ with app.test_request_context('/'):
     print(json.dumps({
         'dashboard': dashboard.slug,
         'customer_id': CUSTOMER_ID,
+        'filter': {FILTER_COLUMN: FILTER_VALUE} if FILTER_COLUMN and FILTER_VALUE else None,
         'total_seconds_sequential': round(perf_counter() - total_started, 4),
         'failures': len(failures),
     }, ensure_ascii=False))

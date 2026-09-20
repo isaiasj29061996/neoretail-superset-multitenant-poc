@@ -48,6 +48,7 @@ Foram adicionadas as seguintes marts:
 | `35_stock_headline_performance.sql` | `nr_tvd_daily_summary` | tenant × dia |
 | `35_stock_headline_performance.sql` | `nr_ivd_daily_summary` | tenant × dia |
 | `36_panorama_weekly_summary.sql` | `nr_panorama_weekly_summary` | tenant × semana |
+| `37_interactive_p1_summary.sql` | `nr_overview_default_summary` | tenant × mês × nível de atividade |
 | `37_interactive_p1_summary.sql` | `nr_overview_distinct_summary` | tenant × mês |
 | `37_interactive_p1_summary.sql` | `nr_osa_causes_summary` | tenant × mês × motivo × causa |
 | `38_export_retail_summary.sql` | `nr_export_daily_retail_summary` | tenant × dia × rede |
@@ -74,6 +75,7 @@ duplicar as marts detalhadas.
 | Panorama OSA semanal | 2,04 s | 0,13 s | 93,5% |
 | Distribuição e sortimento | 5,48 s | 0,29 s | 94,6% |
 | OSA — Perdas | 2,14 s | 0,61 s | 71,7% |
+| Visão Geral — 8 charts sequenciais | 6,127 s | 1,530 s | 75,0% |
 
 `*` TVD/IVD foram repetidos numa rodada fria antes da mudança e variaram acima
 do baseline histórico de 4,49 s/4,58 s. O `EXPLAIN` isolado confirmou o mesmo
@@ -93,8 +95,18 @@ parte ficou abaixo de 0,05 s.
   `1,37e-06` nas somas em ponto flutuante;
 - distribuição/sortimento usa cardinalidades exatas calculadas na mesma fonte;
 - perdas OSA agrega o mesmo componente `qtd_perda_osa × preco_medio`;
+- o resumo padrão da Visão Geral reconciliou 142 de 142 grupos mensais/de
+  atividade sem divergência nos componentes usados pelos seis cards;
 - os fallbacks detalhados foram exercitados com `rede = AKKIATACADO` e retornaram
   dados para TVD, IVD, semanal, distribuição e OSA.
+
+Para a Visão Geral, o fallback também foi exercitado com `rede = ANGELONI`: os
+seis cards escolheram `nr_overview_summary`, enquanto o estado sem filtro usou
+`nr_overview_default_summary`. No `EXPLAIN (ANALYZE, BUFFERS)` da consulta de
+Giro por mês/atividade, o tempo caiu de **457,966 ms** para **0,303 ms** e o
+plano deixou de percorrer aproximadamente 1,88 milhão de linhas. O caminho
+compacto ocupa **88 KiB / 142 linhas**, contra **781 MiB / ~1,89 milhão de
+linhas** no mart detalhado.
 
 Todos os novos objetos preservam `id_customer`. O RLS e o Guest Token continuam
 sendo a fronteira de isolamento; a escolha entre mart compacta e detalhada não
