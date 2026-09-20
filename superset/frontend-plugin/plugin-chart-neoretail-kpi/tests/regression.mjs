@@ -73,6 +73,72 @@ equal([result.critical, result.risk], [7, 9], 'Read task labels from camelCase p
 equal(result.series.map(row => row.value), [20, 15], 'Sort and retain latest month');
 equal([result.title, result.helpText, result.variant], ['Meu TVD', 'Detalhes', 'multi'], 'Read presentation options');
 equal(result.timeGrain, 'P1M', 'Expose time grain to the renderer');
+const monthlySemantic = transform({
+  formData: {
+    ...formData,
+    cardVariant: 'area',
+    timeGrainSqla: 'P1D',
+    semanticPeriod: 'month_last_nonblank',
+  },
+  queriesData: [{ data: [
+    { snapshot: '2026-02-28', TVD: 90, Qtd: 9 },
+    { snapshot: '2026-04-30', TVD: 30, Qtd: 3 },
+    { snapshot: '2026-05-10', TVD: 5, Qtd: 1 },
+    { snapshot: '2026-05-25', TVD: 20, Qtd: 2 },
+  ] }],
+});
+equal(
+  monthlySemantic.timeline.map(row => [row.date.toISOString().slice(0, 10), row.values[0]]),
+  [['2026-02-28', 90], ['2026-04-30', 30], ['2026-05-25', 20]],
+  'Deliver one last-nonblank observation per year/month',
+);
+equal(
+  [monthlySemantic.indicators[0].current, monthlySemantic.indicators[0].previous, monthlySemantic.indicators[0].average],
+  [20, 30, 40],
+  'MTD, M-1 and fixed-denominator U3M match the DAX contract with a missing month',
+);
+equal(monthlySemantic.series.length, 3, 'Monthly area series includes the available month closings');
+equal(monthlySemantic.timeGrain, 'P1M', 'Monthly semantic series exposes year/month grain');
+const weighted = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Giro soma', 'Giro contagem'], metricLabels: 'Giro',
+    metricFormats: 'number', semanticProfile: 'weighted_average', cardVariant: 'bars',
+    groupby: ['activity_level'],
+  },
+  queriesData: [{ data: [
+    { data: '2026-02-01', 'Giro soma': 100, 'Giro contagem': 10 },
+    { data: '2026-03-01', 'Giro soma': 20, 'Giro contagem': 1 },
+    { data: '2026-04-01', 'Giro soma': 30, 'Giro contagem': 3 },
+    { data: '2026-05-01', 'Giro soma': 40, 'Giro contagem': 2 },
+  ] }, { data: [] }],
+});
+equal(weighted.indicators.length, 1, 'Weighted semantic profile exposes one business metric');
+equal(
+  [weighted.indicators[0].current, weighted.indicators[0].previous, weighted.indicators[0].average],
+  [20, 10, 150 / 14],
+  'Giro U3M recalculates sum/count across the full context',
+);
+const osaRatio = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Problemas', 'Ativos'], metricLabels: '% OSA',
+    metricFormats: 'percent', semanticProfile: 'one_minus_ratio', cardVariant: 'osa',
+  },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Problemas: 1, Ativos: 10 },
+    { data: '2026-03-01', Problemas: 9, Ativos: 10 },
+    { data: '2026-04-01', Problemas: 0, Ativos: 80 },
+    { data: '2026-05-01', Problemas: 2, Ativos: 20 },
+  ] }],
+});
+equal(osaRatio.indicators[0].current, 90, 'OSA current month recalculates one minus the ratio');
+equal(osaRatio.indicators[0].average, 90, 'OSA U3M uses totals instead of averaging monthly percentages');
+const osaBlank = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Problemas', 'Ativos'], semanticProfile: 'one_minus_ratio',
+  },
+  queriesData: [{ data: [{ data: '2026-05-01', Problemas: 2, Ativos: 0 }] }],
+});
+equal(osaBlank.indicators[0].current, null, 'OSA preserves BLANK when the active denominator is zero');
 const weeklyResult = transform({
   formData: { ...formData, timeGrainSqla: 'P1W' },
   queriesData: [{ data: rows }],

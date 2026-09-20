@@ -7,6 +7,7 @@
 
 BEGIN;
 
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily;
 
@@ -131,16 +132,7 @@ CREATE INDEX ix_nr_overview_summary_customer_product
     );
 
 CREATE MATERIALIZED VIEW gold.nr_ivd_daily AS
-WITH latest_opportunity AS (
-    SELECT DISTINCT ON (id_customer, id_location, id_item)
-        id_customer,
-        id_location,
-        id_item,
-        regra_critico,
-        ivd AS oportunidade_ivd
-    FROM gold.calculo_oportunidades
-    ORDER BY id_customer, id_location, id_item, _silver_refreshed_at DESC NULLS LAST
-), opportunity_daily AS (
+WITH fact_daily AS (
     SELECT
         f.id_customer,
         f.id_time::date AS data,
@@ -162,16 +154,8 @@ WITH latest_opportunity AS (
         i.hierarquia_4,
         'unidade'::text AS unidade_medida,
         SUM(COALESCE(f.ivd_simplificado, 0)) AS ivd,
-        MAX(CASE
-            WHEN o.regra_critico = 'CRITICO'
-             AND COALESCE(o.oportunidade_ivd, 0) > 0
-            THEN 1 ELSE 0
-        END) AS itens_criticos_ivd,
-        MAX(CASE
-            WHEN o.regra_critico = 'F'
-             AND COALESCE(o.oportunidade_ivd, 0) > 0
-            THEN 1 ELSE 0
-        END) AS itens_risco_ivd
+        0::bigint AS itens_criticos_ivd,
+        0::bigint AS itens_risco_ivd
     FROM gold.fato_ivd_tvd f
     LEFT JOIN gold.dim_local l
       ON l.id_customer = f.id_customer
@@ -179,10 +163,15 @@ WITH latest_opportunity AS (
     LEFT JOIN gold.dim_itens i
       ON i.id_customer = f.id_customer
      AND i.id_item = f.id_item
-    LEFT JOIN latest_opportunity o
-      ON o.id_customer = f.id_customer
-     AND o.id_location = f.id_location
-     AND o.id_item = f.id_item
+    LEFT JOIN gold.dim_catalogo_local catalogo
+      ON catalogo.id_customer = f.id_customer
+     AND catalogo.id_location = f.id_location
+    WHERE UPPER(TRIM(COALESCE(l.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+    )
+      AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+      )
     GROUP BY
         f.id_customer,
         f.id_time::date,
@@ -202,6 +191,66 @@ WITH latest_opportunity AS (
         i.hierarquia_2,
         i.hierarquia_3,
         i.hierarquia_4
+), customer_latest_date AS (
+    SELECT id_customer, MAX(id_time::date) AS data
+    FROM gold.fato_ivd_tvd
+    GROUP BY id_customer
+), task_snapshot AS (
+    SELECT
+        c.id_customer,
+        d.data,
+        CONCAT_WS('|', c.id_customer::text, c.id_location, c.id_item) AS opportunity_key,
+        l.rede,
+        l.bandeira,
+        l.uf,
+        l.cidade,
+        l.tipo_local,
+        l.loja,
+        l.regiao,
+        COALESCE(l.loja, l.nome_da_loja, c.id_location) AS deposito,
+        c.max_tp_activity_level AS tp_activity_level,
+        i.item,
+        i.descricao_marca,
+        i.hierarquia_1,
+        i.hierarquia_2,
+        i.hierarquia_3,
+        i.hierarquia_4,
+        'unidade'::text AS unidade_medida,
+        0::double precision AS ivd,
+        CASE
+            WHEN c.id_item IS NOT NULL
+             AND c.regra_critico = 'CRITICO'
+             AND COALESCE(c.ivd, 0) > 0
+            THEN 1 ELSE 0
+        END::bigint AS itens_criticos_ivd,
+        CASE
+            WHEN c.id_item IS NOT NULL
+             AND c.regra_critico = 'U'
+             AND COALESCE(c.ivd, 0) > 0
+            THEN 1 ELSE 0
+        END::bigint AS itens_risco_ivd
+    FROM gold.calculo_oportunidades c
+    JOIN customer_latest_date d
+      ON d.id_customer = c.id_customer
+    LEFT JOIN gold.dim_local l
+      ON l.id_customer = c.id_customer
+     AND l.id_location = c.id_location
+    LEFT JOIN gold.dim_catalogo_local catalogo
+      ON catalogo.id_customer = c.id_customer
+     AND catalogo.id_location = c.id_location
+    LEFT JOIN gold.dim_itens i
+      ON i.id_customer = c.id_customer
+     AND i.id_item = c.id_item
+    WHERE UPPER(TRIM(COALESCE(l.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+    )
+      AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+      )
+), opportunity_daily AS (
+    SELECT * FROM fact_daily
+    UNION ALL
+    SELECT * FROM task_snapshot
 )
 SELECT
     id_customer,

@@ -9,16 +9,16 @@ WORKDIR /src
 RUN curl -fsSL "https://github.com/apache/superset/archive/refs/tags/${SUPERSET_VERSION}.tar.gz" \
   | tar -xz --strip-components=1
 
-COPY frontend-plugin/plugin-chart-neoretail-kpi \
-  /src/superset-frontend/plugins/plugin-chart-neoretail-kpi
-COPY frontend-plugin/register-plugin.mjs /tmp/register-plugin.mjs
-
 WORKDIR /src/superset-frontend
-RUN node /tmp/register-plugin.mjs
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,id=neoretail-superset-npm,target=/root/.npm \
+    npm ci --no-audit --no-fund
 RUN apt-get update \
  && apt-get install -y --no-install-recommends zstd \
  && rm -rf /var/lib/apt/lists/*
+COPY frontend-plugin/plugin-chart-neoretail-kpi \
+  /src/superset-frontend/plugins/plugin-chart-neoretail-kpi
+COPY frontend-plugin/register-plugin.mjs /tmp/register-plugin.mjs
+RUN node /tmp/register-plugin.mjs
 COPY frontend-extension/setupExtensions.ts \
   /src/superset-frontend/src/setup/setupExtensions.ts
 RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build

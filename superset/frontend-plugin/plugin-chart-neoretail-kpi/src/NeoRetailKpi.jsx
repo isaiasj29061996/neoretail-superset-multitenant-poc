@@ -1,6 +1,7 @@
 import React from 'react';
 
 const formatValue = (value, type) => {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
   const options = type === 'decimal'
     ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
     : type === 'currency'
@@ -11,6 +12,9 @@ const formatValue = (value, type) => {
   return new Intl.NumberFormat('pt-BR', options).format(type === 'percent' ? value / 100 : value);
 };
 const trend = (value, reference, lowerIsBetter) => {
+  if (value === null || value === undefined || reference === null || reference === undefined) {
+    return { symbol: '•', color: '#8A929C' };
+  }
   if (value === reference) return { symbol: '•', color: '#8A929C' };
   const increased = value > reference;
   return { symbol: increased ? '↑' : '↓', color: (lowerIsBetter ? !increased : increased) ? '#4D9669' : '#D0342C' };

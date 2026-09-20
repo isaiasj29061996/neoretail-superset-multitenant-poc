@@ -128,6 +128,13 @@ OVERVIEW_M = {
         "Markup",
         f"100.0 * ({_OVERVIEW_SELLOUT}) / NULLIF(SUM(sales_cost_sum), 0)",
     ),
+    # Additive components retained separately so U3M ratios can be
+    # recalculated over the whole three-month context instead of averaging
+    # already aggregated monthly values in React.
+    "giro_sum": metric("Giro soma positiva", "SUM(giro_sum_positive)"),
+    "giro_count": metric("Giro contagem positiva", "SUM(giro_count_positive)"),
+    "osa_problem": metric("OSA problemas", "SUM(osa_problem_sum)"),
+    "osa_active": metric("OSA ativos", "SUM(osa_active_sum)"),
 }
 
 TVD_DAILY = {
@@ -374,18 +381,31 @@ def main():
                 tvd_daily, "TVD - Pré-ruptura", "area", [TVD_DAILY["tvd"]],
                 show_tasks=True, critical_metric=TVD_DAILY["critical"], risk_metric=TVD_DAILY["risk"],
                 metric_formats="currency", metric_directions="lower",
-                task_labels="itens críticos|itens com risco", time_grain_sqla="P1D",
+                time_grain_sqla="P1D", semantic_period="month_last_nonblank",
+                task_labels="itens críticos|itens com risco",
+                help_text="TVD mensal e tarefas na última data com dado.",
                 adhoc_filters=tvd_recent,
             )),
             (ivd_daily, "IVD - Excesso", chart_params(
                 ivd_daily, "IVD - Excesso", "area", [IVD_DAILY["ivd"]],
                 show_tasks=True, critical_metric=IVD_DAILY["critical"], risk_metric=IVD_DAILY["risk"],
                 metric_formats="currency", metric_directions="lower",
-                task_labels="itens críticos|itens com risco", time_grain_sqla="P1D",
+                time_grain_sqla="P1D", semantic_period="month_last_nonblank",
+                task_labels="itens críticos|itens com risco",
+                help_text="IVD mensal e tarefas na última data com dado.",
                 adhoc_filters=ivd_recent,
             )),
-            (summary, "Giro", chart_params(summary, "Giro", "bars", [OVERVIEW_M["giro"]], groupby=["activity_level"], metric_formats="number", metric_directions="lower")),
-            (summary, "OSA", chart_params(summary, "OSA", "osa", [OVERVIEW_M["osa"], OVERVIEW_M["osa_loss"]], show_tasks=True, critical_metric=OVERVIEW_M["osa_critical"], risk_metric=OVERVIEW_M["osa_risk"], metric_labels="% Numérico|Perda R$", metric_formats="percent|currency", metric_directions="higher|lower", task_labels="itens críticos|itens em risco")),
+            (summary, "Giro", chart_params(
+                summary, "Giro", "bars", [OVERVIEW_M["giro_sum"], OVERVIEW_M["giro_count"]],
+                groupby=["activity_level"], metric_labels="Giro", metric_formats="number",
+                metric_directions="lower", semantic_profile="weighted_average",
+            )),
+            (summary, "OSA", chart_params(
+                summary, "OSA", "osa", [OVERVIEW_M["osa_problem"], OVERVIEW_M["osa_active"]],
+                show_tasks=False, metric_labels="% Numérico", metric_formats="percent",
+                metric_directions="higher", semantic_profile="one_minus_ratio",
+                help_text="OSA recalculado pela razão Problemas/Ativos; perda e alertas aguardam certificação.",
+            )),
             (summary, "Vendas", chart_params(summary, "Vendas", "multi", [OVERVIEW_M["sellout"], OVERVIEW_M["cost"], OVERVIEW_M["sales_qty"]], metric_labels="Venda sell out|Venda custo|Venda qtd", metric_formats="currency|currency|number", metric_directions="higher|lower|higher")),
             (summary, "Estoque", chart_params(summary, "Estoque", "multi", [OVERVIEW_M["stock_cost"], OVERVIEW_M["stock_qty"]], metric_labels="Estoque custo|Estoque qtd", metric_formats="currency|number", metric_directions="lower|lower")),
             (summary, "ROI", chart_params(summary, "ROI", "bars", [OVERVIEW_M["roi"]], groupby=["activity_level"], metric_formats="percent", metric_directions="higher")),

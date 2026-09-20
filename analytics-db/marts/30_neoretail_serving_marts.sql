@@ -6,6 +6,14 @@
 
 BEGIN;
 
+-- These summaries depend on the daily marts and are recreated by
+-- the later numbered scripts in the ordered refresh.
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_tvd_daily_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_weekly_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_periodic;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_distinct_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_causes_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_opportunities_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_stock_tasks;
@@ -228,21 +236,90 @@ CREATE INDEX ix_nr_panorama_opportunities_customer_product
     ON gold.nr_panorama_opportunities (id_customer, descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3, item);
 
 CREATE MATERIALIZED VIEW gold.nr_tvd_daily AS
-WITH opportunity_daily AS (
+WITH fact_daily AS (
     SELECT
-        id_customer, data, opportunity_key, rede, bandeira, uf, cidade,
-        tipo_local, loja, regiao, deposito, tp_activity_level, item,
-        descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3,
-        hierarquia_4, unidade_medida,
-        SUM(COALESCE(tvd_simplificado, 0)) AS tvd,
-        MAX(CASE WHEN regra_critico = 'CRITICO' AND COALESCE(oportunidade_tvd, 0) > 0 THEN 1 ELSE 0 END) AS itens_criticos_tvd,
-        MAX(CASE WHEN regra_critico = 'F' AND COALESCE(oportunidade_tvd, 0) > 0 THEN 1 ELSE 0 END) AS itens_risco_tvd
-    FROM gold.nr_panorama_opportunities
+        o.id_customer, o.data, o.opportunity_key, o.rede, o.bandeira,
+        o.uf, o.cidade, o.tipo_local, o.loja, o.regiao, o.deposito,
+        o.tp_activity_level, o.item, o.descricao_marca, o.hierarquia_1,
+        o.hierarquia_2, o.hierarquia_3, o.hierarquia_4, o.unidade_medida,
+        SUM(COALESCE(o.tvd_simplificado, 0)) AS tvd,
+        0::bigint AS itens_criticos_tvd,
+        0::bigint AS itens_risco_tvd
+    FROM gold.nr_panorama_opportunities o
+    LEFT JOIN gold.dim_catalogo_local catalogo
+      ON catalogo.id_customer = o.id_customer
+     AND catalogo.id_location = o.id_location
+    WHERE UPPER(TRIM(COALESCE(o.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+    )
+      AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+      )
     GROUP BY
-        id_customer, data, opportunity_key, rede, bandeira, uf, cidade,
-        tipo_local, loja, regiao, deposito, tp_activity_level, item,
-        descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3,
-        hierarquia_4, unidade_medida
+        o.id_customer, o.data, o.opportunity_key, o.rede, o.bandeira,
+        o.uf, o.cidade, o.tipo_local, o.loja, o.regiao, o.deposito,
+        o.tp_activity_level, o.item, o.descricao_marca, o.hierarquia_1,
+        o.hierarquia_2, o.hierarquia_3, o.hierarquia_4, o.unidade_medida
+), customer_latest_date AS (
+    SELECT id_customer, MAX(id_time::date) AS data
+    FROM gold.fato_ivd_tvd
+    GROUP BY id_customer
+), task_snapshot AS (
+    SELECT
+        c.id_customer,
+        d.data,
+        CONCAT_WS('|', c.id_customer::text, c.id_location, c.id_item) AS opportunity_key,
+        l.rede,
+        l.bandeira,
+        l.uf,
+        l.cidade,
+        l.tipo_local,
+        l.loja,
+        l.regiao,
+        COALESCE(l.loja, l.nome_da_loja, c.id_location) AS deposito,
+        c.max_tp_activity_level AS tp_activity_level,
+        i.item,
+        i.descricao_marca,
+        i.hierarquia_1,
+        i.hierarquia_2,
+        i.hierarquia_3,
+        i.hierarquia_4,
+        'unidade'::text AS unidade_medida,
+        0::double precision AS tvd,
+        CASE
+            WHEN c.id_item IS NOT NULL
+             AND c.regra_critico = 'CRITICO'
+             AND COALESCE(c.tvd, 0) > 0
+            THEN 1 ELSE 0
+        END::bigint AS itens_criticos_tvd,
+        CASE
+            WHEN c.id_item IS NOT NULL
+             AND c.regra_critico = 'F'
+             AND COALESCE(c.tvd, 0) > 0
+            THEN 1 ELSE 0
+        END::bigint AS itens_risco_tvd
+    FROM gold.calculo_oportunidades c
+    JOIN customer_latest_date d
+      ON d.id_customer = c.id_customer
+    LEFT JOIN gold.dim_local l
+      ON l.id_customer = c.id_customer
+     AND l.id_location = c.id_location
+    LEFT JOIN gold.dim_catalogo_local catalogo
+      ON catalogo.id_customer = c.id_customer
+     AND catalogo.id_location = c.id_location
+    LEFT JOIN gold.dim_itens i
+      ON i.id_customer = c.id_customer
+     AND i.id_item = c.id_item
+    WHERE UPPER(TRIM(COALESCE(l.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+    )
+      AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
+        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+      )
+), opportunity_daily AS (
+    SELECT * FROM fact_daily
+    UNION ALL
+    SELECT * FROM task_snapshot
 )
 SELECT
     id_customer, data, rede, bandeira, uf, cidade, tipo_local, loja,
