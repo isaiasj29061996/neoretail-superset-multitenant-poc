@@ -5,6 +5,7 @@
 BEGIN;
 
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_distinct_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_semantic_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_default_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_causes_summary;
 

@@ -39,13 +39,14 @@ const styles = {
   action: { display: 'block', width: '100%', padding: '7px 12px 9px', border: 0, background: 'transparent', color: '#8A8F96', fontSize: 10, textAlign: 'center', textDecoration: 'none' },
 };
 
-const MetricTriplet = ({ indicator }) => {
+const MetricTriplet = ({ indicator, showAnnual = false }) => {
   const current = trend(indicator.current, indicator.previous, indicator.lowerIsBetter);
   const previous = trend(indicator.previous, indicator.average, indicator.lowerIsBetter);
   return <div style={styles.metrics}>
     <div><span style={styles.label}>MTD</span><span style={styles.value}><b style={{ color: current.color, fontSize: 17 }}>{current.symbol}</b> {formatValue(indicator.current, indicator.format)}</span></div>
     <div><span style={styles.label}>Mês anterior</span><span style={styles.value}><b style={{ color: previous.color, fontSize: 17 }}>{previous.symbol}</b> {formatValue(indicator.previous, indicator.format)}</span></div>
     <div><span style={styles.label}>Média U3M</span><span style={styles.value}>{formatValue(indicator.average, indicator.format)}</span></div>
+    {showAnnual && <div><span style={styles.label}>Anual 12M</span><span style={styles.value}>{formatValue(indicator.annual, indicator.format)}</span></div>}
   </div>;
 };
 const Tasks = ({ critical, risk, labels }) => <>
@@ -206,13 +207,13 @@ const RankBars = ({ items, format }) => {
 };
 
 export default function NeoRetailKpi(props) {
-  const { width, height, title, helpText, variant, accentColor, analysisUrl, showTasks, taskLabels, chartStyles, timeGrain, summaryCount, indicators, critical, risk, series, timeline, bars, rankItems, rankSeries, hasData } = props;
+  const { width, height, title, helpText, variant, accentColor, analysisUrl, showTasks, showAnnual, taskLabels, chartStyles, timeGrain, summaryCount, indicators, critical, risk, series, timeline, bars, rankItems, rankSeries, hasData } = props;
   if (!hasData || !indicators.length) return <div style={{ ...styles.card, display: 'grid', placeItems: 'center', color: '#6C727A' }}>Sem dados para os filtros selecionados.</div>;
   const points = areaPoints(series);
   const maxBar = Math.max(1, ...bars.flatMap(item => [item.current, item.previous]));
   return <div data-neoretail-variant={variant} style={{ ...styles.card, width, height }}>
     <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>
-    {variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} timeGrain={timeGrain} summaryCount={summaryCount} width={width} height={height} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} /></div>) : <MetricTriplet indicator={indicators[0]} />}
+    {variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} timeGrain={timeGrain} summaryCount={summaryCount} width={width} height={height} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} showAnnual={showAnnual} /></div>) : <MetricTriplet indicator={indicators[0]} showAnnual={showAnnual} />}
     {variant === 'area' && <svg viewBox="0 0 300 94" preserveAspectRatio="none" role="img" aria-label={`Evolução de ${title}`} style={{ display: 'block', width: 'calc(100% - 24px)', height: Math.max(65, Math.min(130, height - 225)), margin: '0 12px 7px', borderBottom: '1px solid #D9DDE3' }}><polygon points={points.polygon} fill={accentColor} fillOpacity="0.4" /><polyline points={points.line} fill="none" stroke={accentColor} strokeWidth="1.6" /></svg>}
     {variant === 'bars' && <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-around', gap: 8, height: Math.max(90, height - 190), padding: '5px 18px 0' }}>{bars.map(item => <div key={item.category} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'end' }}><div style={{ height: 'calc(100% - 25px)', display: 'flex', alignItems: 'end', justifyContent: 'center', gap: 2 }}><span style={{ width: 22, height: `${Math.max(2, item.current / maxBar * 100)}%`, background: '#0070A3' }} /><span style={{ width: 22, height: `${Math.max(2, item.previous / maxBar * 100)}%`, background: '#8C8C8C' }} /></div><span style={{ height: 25, color: '#777', fontSize: 9, textAlign: 'center' }}>{item.category}</span></div>)}</div>}
     {(variant === 'area' || variant === 'osa') && showTasks && <Tasks critical={critical} risk={risk} labels={taskLabels} />}

@@ -1,108 +1,112 @@
-# Certificação semântica — Visão Geral
+﻿# Certificação semântica — Visão Geral
 
 ## Critério
 
-Esta auditoria compara fórmula, contexto temporal, filtros fixos, granularidade, `BLANK`, conversão, contagem, dimensões e isolamento por `id_customer`. Os valores do snapshot local não são usados como referência numérica.
+Esta auditoria compara fórmula, contexto temporal, filtros, granularidade, `BLANK`/zero, conversão, contagem, dimensões e isolamento por `id_customer`. Valores absolutos do snapshot local não são referência numérica ao Power BI.
 
-Status: `CERTIFICADA` (implementada e testada), `PARCIAL` (parte comprovada), `DIVERGENTE` (não reproduz o DAX) e `PENDENTE` (não implementada ou sem contrato).
+`CERTIFICADA` exige regra equivalente, teste semântico e filtros/RLS preservados. `PARCIAL` indica dependência original indisponível. `DIVERGENTE` indica regra conhecida ainda diferente. `PENDENTE` indica ausência de contrato ou implementação.
 
 ## Resultado por visual
 
-| Card | Métrica | Regra Power BI | Implementação Superset | Status | Teste / observação |
-|---|---|---|---|---|---|
-| TVD | base | soma `TVD_SIMPLIFICADO` na última data; exclui DEPÓSITO/CD/LOJA VIRTUAL nas duas dimensões | mart filtra ambas as dimensões; último ponto de cada Ano/Mês | CERTIFICADA | último ponto e contrato SQL testados |
-| TVD | MTD | TVD em `M0` | maior mês com dado retornado | PARCIAL | falta definição da flag `M0` |
-| TVD | mês anterior | TVD em `M-1` | mês anterior à âncora | PARCIAL | deslocamento testado; âncora pendente |
-| TVD | U3M | `(M1 + M2 + M3) / 3` | soma três deslocamentos e divide sempre por 3 | PARCIAL | lacuna não muda denominador; âncora pendente |
-| TVD | críticos | `COUNT(ID_ITEM)`, regra `CRITICO`, TVD > 0, locais excluídos | snapshot de oportunidades, uma flag por linha elegível | CERTIFICADA | 494.210 linhas = 494.210 chaves no tenant 142 |
-| TVD | risco | `COUNT(ID_ITEM)`, regra `F`, TVD > 0 | snapshot de oportunidades | CERTIFICADA | referência: 2.743 no snapshot auditado |
-| TVD | série | Ano > Mês, último dado | uma observação por Ano/Mês após filtros | CERTIFICADA | mês parcial e lacuna testados |
-| IVD | base | soma `IVD_SIMPLIFICADO` na última data; mesmas exclusões | mart IVD específico e fechamento mensal | CERTIFICADA | contrato equivalente ao TVD |
-| IVD | MTD / M-1 / U3M | períodos do TVD; denominador fixo 3 | mesma mecânica temporal | PARCIAL | falta contrato `M0…M-3` |
-| IVD | críticos | `COUNT(ID_ITEM)`, regra `CRITICO`, IVD > 0 | snapshot de oportunidades | CERTIFICADA | sem `DISTINCT` |
-| IVD | risco | `COUNT(ID_ITEM)`, regra `U`, IVD > 0 | corrigido de `F` para `U` | CERTIFICADA | referência: 17.598 no snapshot auditado |
-| IVD | série | Ano > Mês | último ponto diário de cada mês | CERTIFICADA | teste compartilhado TVD/IVD |
-| Giro | base | `AVERAGE(GIRO)` onde GIRO > 0 e unidade | `giro_sum_positive / giro_count_positive` | CERTIFICADA | componentes aditivos equivalentes |
-| Giro | MTD / M-1 | medida recalculada no período | razão soma/contagem por mês | PARCIAL | fórmula testada; calendário pendente |
-| Giro | U3M | média das linhas positivas no contexto U3M | soma dos numeradores / soma das contagens | PARCIAL | não usa média de médias; calendário pendente |
-| Giro | barras | atividade, MTD x anterior | query agrupada usa o perfil ponderado | PARCIAL | depende da âncora M0 |
-| OSA | percentual | `BLANK` se inválido; senão `1 - problemas/ativos` | perfil `one_minus_ratio` sobre componentes | CERTIFICADA | ativos=0 retorna `null` |
-| OSA | MTD / M-1 / U3M | razão recalculada em cada contexto | soma problemas e ativos antes da divisão | PARCIAL | razão testada; calendário pendente |
-| OSA | perda R$ | fato mensal de causa × conversão × preço médio | aproximação do fato histórico foi removida do card certificado | DIVERGENTE | requer mart próprio |
-| OSA | críticos | `COUNT(ID_ITEM)` com problemas M0 e dimensão Fast Mover | aproximação por `MAX_TP_ACTIVITY_LEVEL`/distinct foi removida | DIVERGENTE | relação da dimensão não provada |
-| OSA | risco | `COUNT(ID_ITEM)`, problemas M0 e `MAX_TP_ACTIVITY_LEVEL='S'` | aproximação distinta foi removida | DIVERGENTE | snapshot sem distinct pendente |
-| Vendas | sell out | `SUMX` por Região; faturamento ou fallback com fator em volume e preço | fallback global sem seleção de conversão | DIVERGENTE | contrato de medida selecionada pendente |
-| Vendas | custo | soma linha a linha `volume × custo` | `sales_cost_sum` | CERTIFICADA | componente aditivo equivalente |
-| Vendas | quantidade | `Venda Historico` com ramo valor/unidade e conversão | soma direta de volume | DIVERGENTE | depende de AP_CONVERSAO |
-| Vendas | períodos | MTD, M-1 e contexto U3M/3 | deslocamentos e denominador fixo | PARCIAL | custo correto; demais herdam divergências |
-| Estoque | custo | soma `estoque_medio × avg_price_cost` | `stock_cost_sum` | CERTIFICADA | componente aditivo equivalente |
-| Estoque | quantidade | última `MES_ANO`, soma estoque × conversão | soma direta sem conversão | DIVERGENTE | depende de AP_CONVERSAO |
-| Estoque | períodos | MTD, M-1 e contexto U3M/3 | deslocamentos com denominador fixo | PARCIAL | custo correto; quantidade divergente |
-| ROI | atual/anterior | zero se sell out ou custo=0; senão `(sellout-custo)/estoque` | ramificação incompleta e sell out divergente | DIVERGENTE | certificar sell out primeiro |
-| ROI | U3M | ROI recalculado no contexto U3M | cálculo genérico por meses | DIVERGENTE | consulta semântica dedicada pendente |
-| ROI | anual | soma dos ROI por AnoMês em 12 meses | ausente | PENDENTE | janela 12M própria |
-| ROI | barras | atividade, atual x anterior | herda ROI divergente | DIVERGENTE | dependência da base |
-| Markup | MTD / M-1 | sell out / custo com retorno 0 do DAX | ramificação incompleta e sell out divergente | DIVERGENTE | certificar sell out primeiro |
-| Markup | U3M | sell out U3M / custo U3M | cálculo genérico | DIVERGENTE | razão sobre componentes pendente |
-| Markup | barras | atividade, MTD x anterior | herda divergências | DIVERGENTE | dependência da base |
+| Card | Componente | Implementação atual | Status | Evidência |
+|---|---|---|---|---|
+| TVD | base, último ponto, exclusões e tarefas | mart diário, `LASTNONBLANK` por Ano/Mês, exclusão nas duas dimensões e contagem sem `DISTINCT` | CERTIFICADA | testes de fechamento, lacuna, local e alertas |
+| TVD | M0, M-1 e U3M | maior mês com dado, deslocamentos mensais e `(M1+M2+M3)/3` | PARCIAL | falta `0_0_CALENDARIO[M0…M-3/U3M]` |
+| IVD | base, último ponto, exclusões e tarefas | mesma mecânica; risco usa `REGRA_CRITICO='U'` | CERTIFICADA | testes de fechamento, local e risco `U` |
+| IVD | M0, M-1 e U3M | maior mês com dado e denominador fixo 3 | PARCIAL | âncora original ausente |
+| Giro | fórmula e barras | `SUM(giro positivo)/COUNT(giro positivo)`; quatro atividades permitidas | CERTIFICADA | teste ponderado e allowlist ordenada |
+| Giro | âncora temporal | mês máximo disponível | PARCIAL | flags M0/M-1 ausentes |
+| OSA | percentual | `1 - SUM(problemas)/SUM(ativos)`; zero retorna `BLANK` | CERTIFICADA | razão dos totais e divisor zero |
+| OSA | Perda R$ | `gold.fato_mensal_causa_osa`: `SUM(qtd_perda)*MAX(fator)*AVG(preço)` | CERTIFICADA | 27 meses; delta máximo `1,68e-7` |
+| OSA | críticos | `COUNT(id_item)`, problemas M0 > 0 e relação `F → Fast Mover` | CERTIFICADA | relação provada; 3.866 linhas |
+| OSA | risco | `COUNT(id_item)`, problemas M0 > 0 e atividade `S` | CERTIFICADA | 3.279 linhas; sem `DISTINCT` |
+| OSA | períodos | razão recalculada e Perda U3M / 3 | PARCIAL | fórmula certificada; calendário ausente |
+| Vendas | Sell out | decisão faturamento/fallback por região, com fator no volume e preço | CERTIFICADA | recalculado depois dos filtros |
+| Vendas | custo | soma linha a linha `volume × custo` | CERTIFICADA | componente aditivo |
+| Vendas | quantidade | `valor` usa faturamento; demais medidas usam volume × fator | CERTIFICADA | seletor e taxa diferente de 1 |
+| Vendas | períodos | MTD/M-1 e medida U3M / 3 | PARCIAL | fórmula certificada; calendário ausente |
+| Estoque | custo | soma `estoque_medio × avg_price_cost` | CERTIFICADA | componente aditivo |
+| Estoque | quantidade | `MAX(MES_ANO)`, `SUM(estoque) × fator`; U3M reproduz medida / 3 | CERTIFICADA | perfil `stock_bundle` |
+| Estoque | âncora temporal | mês máximo disponível | PARCIAL | flags do calendário ausentes |
+| ROI | atual, anterior e U3M | zero se sell out ou custo é zero; U3M recalcula componentes | CERTIFICADA | testes dos zeros e U3M |
+| ROI | anual 12M | soma dos ROI mensais dos últimos 12 pontos, exibida como `Anual 12M` | PARCIAL | fórmula testada; âncora depende do calendário ausente |
+| ROI | barras | mês atual/anterior; quatro atividades em ordem fixa | CERTIFICADA | teste de perfil e categorias |
+| Markup | atual, anterior e U3M | zero nos ramos DAX; U3M = sell out agregado / custo agregado | CERTIFICADA | não usa média de percentuais |
+| Markup | barras | mês atual/anterior; quatro atividades em ordem fixa | CERTIFICADA | allowlist renderizada |
 
-## Decisões implementadas
+Não há componente com regra conhecida ainda `DIVERGENTE`. As classificações `PARCIAL` restantes decorrem da ausência do contrato original de calendário.
 
-### TVD e IVD
+## Conversão selecionável
 
-A consulta permanece diária para que os filtros nativos sejam aplicados antes de `LASTNONBLANK`. O adaptador então mantém a última observação de cada Ano/Mês. Usar `P1M` diretamente somaria todos os snapshots diários.
+O dashboard publica filtro de seleção única `Medida`, com padrão visual explícito `unidade`. O padrão não está embutido nas fórmulas: o usuário pode selecionar `hectolitro`, `libra`, `litro`, `quilograma`, `tonelada`, `unidade` ou `valor`. Mais de uma seleção ou nenhuma seleção reproduz `SELECTEDVALUE` inválido e retorna `BLANK`/sem linhas nas métricas dependentes.
 
-O DAX fornecido certificou `REGRA_CRITICO`. Os alertas agora vêm de um snapshot independente de `calculo_oportunidades`, contam cada `ID_ITEM` não nulo e preservam dimensões, exclusões e RLS. IVD risco usa `U`.
+Junções usam `id_customer + id_item + nm_measure`. `valor` implementa o ramo de faturamento de Venda Histórico; nenhuma taxa `valor` foi inventada em `dim_conversao`.
 
-### Giro e OSA
+## Serving e filtros
 
-O plugin recebe componentes aditivos e um perfil semântico explícito. Giro agrega soma e contagem antes da divisão. OSA agrega problemas e ativos antes de `1 - problemas/ativos`. Isso substitui a antiga fórmula U3M universal.
+O caminho sem filtro detalhado usa:
 
-Perda OSA e alertas OSA foram retirados do card certificado enquanto suas fontes e relações não forem implementadas de forma equivalente.
+```text
+gold.nr_overview_semantic_default  → 833 linhas / 328 KiB
+gold.nr_osa_semantic_default       → 189 linhas / 56 KiB
+```
 
-### Conversão e calendário
+O primeiro mart mantém os escopos `all`, para cards sem atividade e `SUMX` regional sobre o contexto inteiro, e `activity`, para Giro, ROI e Markup.
 
-`dim_conversao` possui taxas por tenant, item e medida, mas a Visão Geral não publica contrato equivalente a `SELECTEDVALUE(AP_CONVERSAO[nm_measure])`. Métricas dependentes continuam divergentes; não se assume `unidade`.
+Quando Rede, Bandeira, UF, Cidade, Tipo local, Loja, Região, atividade, Marca, hierarquia ou Item é filtrado, o dataset empurra o predicado para a fonte e só então recalcula região, fator, OSA e alertas. RLS permanece em `id_customer`; junções de localização, item, conversão e atividade incluem o tenant.
 
-O material usa `M0`, `M-1`, `M-2`, `M-3`, `U3M` e 12M, mas não define a âncora. A implementação usa o maior mês com dado. A certificação completa depende de `PENDENTE_CALENDARIO_M0`.
+## Categorias das barras
 
-## Filtros, RLS e testes
+Somente estas categorias são retornadas/renderizadas, nesta ordem:
 
-Rede, Bandeira, UF, Cidade, Tipo local, Loja, Nível de atividade, Marca, H1, H2, H3 e Item permanecem publicados. Junções usam `id_customer + id_location` ou `id_customer + id_item`; `id_customer` permanece nos marts, índices, dataset e RLS.
+1. Fast Mover;
+2. Slow Mover;
+3. Ultra Slow Mover;
+4. New Mover.
 
-Os testes controlados cobrem último ponto mensal, mês parcial, lacuna, denominador fixo 3, Giro ponderado, OSA por razão dos totais, OSA com denominador zero, exclusões de local, risco IVD `U`, preservação de filtros e contratos multitenant.
+`Outros`, Non Mover, Não Informado, nulo e classificações adicionais são descartados. Categorias ausentes não são fabricadas.
 
-## Performance medida
+## Calendário ainda parcial
 
-No tenant 142, a consulta TVD detalhada de quatro meses caiu de **5.284 ms** para **3.421 ms**. O resumo sem filtro dimensional executou em **0,541 ms** no PostgreSQL local.
+A busca em `config/`, `docs/`, `local-engine/`, SQLs e arquivos versionados não encontrou TMDL nem definição de:
 
-O refresh final de `30_neoretail_serving_marts.sql` levou **899,08 s**. A ordem de remoção dos resumos 33/35/36/37 foi corrigida e eles foram restaurados. Locks e duração continuam sendo risco operacional.
+```text
+0_0_CALENDARIO[M0]
+0_0_CALENDARIO[M-1]
+0_0_CALENDARIO[M-2]
+0_0_CALENDARIO[M-3]
+0_0_CALENDARIO[U3M]
+```
 
-Após o build e o bootstrap, as oito consultas persistidas passaram sem erro. A execução sequencial sem cache aquecido levou **6,127 s** no total: TVD **0,336 s**, IVD **0,110 s**, Giro **1,353 s**, OSA **0,692 s**, Vendas **0,516 s**, Estoque **0,534 s**, ROI **1,235 s** e Markup **1,293 s**. No profiler com cache aquecido, o maior tempo foi TVD com **0,352 s**, seguido de IVD com **0,163 s**.
+A implementação conserva a âncora no maior mês com dado e registra `PENDENTE_CALENDARIO_M0`. Nenhum período dependente foi declarado totalmente certificado sem essa evidência.
 
-Depois da criação de `nr_overview_default_summary`, a primeira execução do novo dataset caiu para **1,530 s** no total, redução de **75,0%**. A consulta de Giro por mês e atividade caiu de **457,966 ms** para **0,303 ms** no PostgreSQL. Os 142 grupos compactos reconciliaram sem divergência; com filtro de Rede, o dataset retornou ao mart detalhado e manteve resultados.
+## Validação e performance
 
-## Arquivos alterados
+- 12 testes Python específicos da Visão Geral;
+- suíte consolidada de contratos e pipeline;
+- 51 verificações JavaScript do plugin;
+- oito consultas integradas do Superset sem erro;
+- fallback com `Rede=ANGELONI`, medida `unidade` e tenant 142 sem erro;
+- sell out regional: 27 meses, delta máximo `5,96e-8`;
+- Perda OSA: 27 meses, delta máximo `1,68e-7`;
+- alertas OSA: 3.866 críticos e 3.279 em risco, iguais à consulta independente;
+- SQL compacto: `0,465 ms` em `EXPLAIN (ANALYZE, BUFFERS)`;
+- oito charts após bootstrap: `1,768 s` na primeira execução e `0,601 s` com cache aquecido;
+- caminho filtrado exato (`ANGELONI`): `4,425 s` para os oito charts.
 
+O baseline anterior era `1,530 s` na primeira execução registrada. A medição fria atual variou acima dele e a aquecida ficou abaixo. O serving compacto permaneceu submilissegundo; a variação fria está no ciclo de metadata/cache/execução do Superset e deve continuar monitorada.
+
+## Arquivos principais desta rodada
+
+- `analytics-db/marts/39_overview_semantic_certification.sql`;
 - `analytics-db/marts/30_neoretail_serving_marts.sql`;
 - `analytics-db/marts/31_overview_performance.sql`;
-- `analytics-db/marts/37_interactive_p1_summary.sql`;
-- `superset/Dockerfile`;
 - `superset/bootstrap_overview.py`;
 - `superset/validate_overview.py`;
-- `superset/frontend-plugin/plugin-chart-neoretail-kpi/src/transformProps.js`;
-- `superset/frontend-plugin/plugin-chart-neoretail-kpi/src/NeoRetailKpi.jsx`;
-- `superset/frontend-plugin/plugin-chart-neoretail-kpi/tests/regression.mjs`;
-- `local-engine/tests/test_overview_metric_semantics.py`;
+- plugin React e testes;
+- testes Python;
 - este documento.
 
-## Pendências que bloqueiam certificação total
+## Resposta objetiva
 
-1. definição das flags e janelas do calendário;
-2. contrato do seletor AP_CONVERSAO no Superset;
-3. mart de Perda OSA baseado no fato mensal de causas;
-4. relação certificada de DIM_NIVEL_ATIVIDADE para OSA crítico;
-5. `SUMX` regional de sell out com conversão;
-6. consultas de ROI e Markup, incluindo ROI anual 12M.
-
-Enquanto esses itens estiverem abertos, a resposta para “todos os componentes usam a mesma regra do Power BI?” é **não**. TVD, IVD, Giro, OSA percentual, Venda Custo e Estoque Custo têm contratos implementados; os demais estão classificados acima.
+As fórmulas conhecidas dos oito cards agora equivalem às regras fornecidas do Power BI, incluindo conversão, `SUMX` regional, Perda OSA, alertas sem `DISTINCT`, ROI, Markup e barras por atividade. A equivalência temporal completa ainda não pode ser afirmada para componentes M0/M-1/U3M/12M porque a definição original das flags de calendário não está disponível no projeto.

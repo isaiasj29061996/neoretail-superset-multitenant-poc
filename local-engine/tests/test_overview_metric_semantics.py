@@ -69,15 +69,15 @@ def test_remaining_uncertified_metrics_are_recorded():
     certification = _read("docs/metric_certification_overview.md")
 
     assert "PENDENTE_CALENDARIO_M0" in certification
-    assert "COUNT(ID_ITEM)" in certification
-    assert "COUNT DISTINCT" not in certification
+    assert "COUNT(id_item)" in certification
+    assert "COUNT DISTINCT" not in certification.upper()
 
 
 def test_giro_and_osa_use_additive_components_for_u3m():
     bootstrap = _read("superset/bootstrap_overview.py")
 
     assert 'semantic_profile="weighted_average"' in bootstrap
-    assert 'semantic_profile="one_minus_ratio"' in bootstrap
+    assert 'semantic_profile="osa_bundle"' in bootstrap
     assert '"giro_sum": metric' in bootstrap
     assert '"giro_count": metric' in bootstrap
     assert '"osa_problem": metric' in bootstrap
@@ -89,9 +89,77 @@ def test_overview_default_path_is_compact_and_falls_back_for_detail_filters():
     sql = _read("analytics-db/marts/37_interactive_p1_summary.sql")
 
     assert "def overview_semantic_sql()" in bootstrap
-    assert "SELECT * FROM gold.nr_overview_default_summary" in bootstrap
-    assert "SELECT * FROM gold.nr_overview_summary" in bootstrap
+    assert "SELECT * FROM gold.nr_overview_semantic_default" in bootstrap
+    assert "history_filtered" in bootstrap
     assert 'database, "nr_overview_interactive"' in bootstrap
     assert "CREATE MATERIALIZED VIEW gold.nr_overview_default_summary" in sql
     assert "GROUP BY data, id_customer, tp_activity_level, activity_level" in sql
     assert "NULL::text AS rede" in sql
+
+
+def test_conversion_selector_and_regional_sellout_are_explicit():
+    sql = _read("analytics-db/marts/39_overview_semantic_certification.sql")
+    bootstrap = _read("superset/bootstrap_overview.py")
+
+    assert "gold.nr_conversion_options" in sql
+    assert "c.id_customer = h.id_customer" in sql
+    assert "c.id_item::text = h.id_item" in sql
+    assert "MAX(c.conversion_rate)" in sql
+    assert "WHEN faturamento_sum > 0 THEN faturamento_sum" in sql
+    assert "GROUP BY data, id_customer, regiao, nm_measure" in sql
+    assert '("nm_measure", "Medida", [])' in bootstrap
+    assert '"multiSelect": column != "nm_measure"' in bootstrap
+    assert "conversion_filters|length != 1" in bootstrap
+    assert "conversion_filters[0].get('val')|length != 1" in bootstrap
+
+
+def test_quantity_stock_and_ratio_profiles_match_dax_shapes():
+    sql = _read("analytics-db/marts/39_overview_semantic_certification.sql")
+    bootstrap = _read("superset/bootstrap_overview.py")
+    transform = _read("superset/frontend-plugin/plugin-chart-neoretail-kpi/src/transformProps.js")
+
+    assert "WHEN nm_measure = 'valor' THEN SUM(faturamento_sum)" in sql
+    assert "SUM(stock_units_sum) * MAX(conversion_rate)" in sql
+    assert 'semantic_profile="stock_bundle"' in bootstrap
+    assert "profile === 'roi'" in transform
+    assert "profile === 'markup'" in transform
+    assert "profile === 'osa_bundle'" in transform
+    assert "if (!profile) return null" in transform
+
+
+def test_osa_uses_monthly_cause_source_and_non_distinct_alert_counts():
+    sql = _read("analytics-db/marts/39_overview_semantic_certification.sql")
+    bootstrap = _read("superset/bootstrap_overview.py")
+
+    assert "FROM gold.fato_mensal_causa_osa f" in sql
+    assert "b.loss_qty_sum * f.conversion_rate * (b.price_sum / b.price_count)" in sql
+    assert "COUNT(o.id_item) FILTER" in sql
+    assert "a.nm_activity_level = 'Fast Mover'" in sql
+    assert "o.max_tp_activity_level = 'S'" in sql
+    assert "COUNT(DISTINCT" not in sql
+    assert "show_tasks=True" in bootstrap
+    assert 'semantic_profile="osa_bundle"' in bootstrap
+
+
+def test_activity_bars_are_allowlisted_and_ordered():
+    transform = _read("superset/frontend-plugin/plugin-chart-neoretail-kpi/src/transformProps.js")
+    expected = ["Fast Mover", "Slow Mover", "Ultra Slow Mover", "New Mover"]
+
+    positions = [transform.index(f"'{level}'", transform.index("ALLOWED_ACTIVITY_LEVELS")) for level in expected]
+    assert positions == sorted(positions)
+    assert "ALLOWED_ACTIVITY_LEVELS.includes(row.category)" in transform
+    assert ".filter(category => categories.has(category))" in transform
+
+
+def test_calendar_anchor_remains_explicitly_partial_without_source_contract():
+    certification = _read("docs/metric_certification_overview.md")
+    repository_text = "\n".join(
+        _read(path) for path in (
+            "config/power_query_contracts.yaml",
+            "docs/power_query_parity.md",
+            "superset/bootstrap_overview.py",
+        )
+    )
+
+    assert "0_0_CALENDARIO[M0]" not in repository_text
+    assert "PENDENTE_CALENDARIO_M0" in certification

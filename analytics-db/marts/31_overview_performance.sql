@@ -8,6 +8,7 @@
 BEGIN;
 
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_semantic_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_default_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily;
@@ -30,7 +31,7 @@ SELECT
     CASE f.tp_activity_level
         WHEN 'F' THEN 'Fast Mover'
         WHEN 'S' THEN 'Slow Mover'
-        WHEN 'US' THEN 'Ultra Slow Mover'
+        WHEN 'U' THEN 'Ultra Slow Mover'
         WHEN 'N' THEN 'New Mover'
         ELSE COALESCE(f.tp_activity_level, 'Outros')
     END AS activity_level,

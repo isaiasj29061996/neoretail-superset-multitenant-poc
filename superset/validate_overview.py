@@ -11,6 +11,7 @@ from superset.app import create_app
 CUSTOMER_ID = 142
 FILTER_COLUMN = os.getenv('OVERVIEW_FILTER_COLUMN', '').strip()
 FILTER_VALUE = os.getenv('OVERVIEW_FILTER_VALUE', '').strip()
+CONVERSION_MEASURE = os.getenv('OVERVIEW_CONVERSION_MEASURE', 'unidade').strip()
 app = create_app()
 with app.test_request_context('/'):
     from superset import db, security_manager
@@ -47,6 +48,9 @@ with app.test_request_context('/'):
             'isColumnReference': True,
         }
         filters = [{'col': 'id_customer', 'op': 'IN', 'val': [CUSTOMER_ID]}]
+        datasource_columns = {column.column_name for column in chart.table.columns}
+        if CONVERSION_MEASURE and 'nm_measure' in datasource_columns:
+            filters.append({'col': 'nm_measure', 'op': 'IN', 'val': [CONVERSION_MEASURE]})
         if FILTER_COLUMN and FILTER_VALUE:
             filters.append({'col': FILTER_COLUMN, 'op': 'IN', 'val': [FILTER_VALUE]})
         common = {
@@ -81,10 +85,12 @@ with app.test_request_context('/'):
             sources = []
             for item in result.get('queries', []):
                 sql = item.get('query') or item.get('sql') or ''
-                if 'nr_overview_default_summary' in sql:
-                    sources.append('overview_default_summary')
-                elif 'nr_overview_summary' in sql:
+                if 'nr_overview_semantic_default' in sql:
+                    sources.append('overview_semantic_default')
+                elif 'history_filtered' in sql:
                     sources.append('overview_detail')
+                elif 'nr_osa_semantic_default' in sql:
+                    sources.append('osa_semantic_default')
                 elif 'daily_summary' in sql:
                     sources.append('daily_summary')
                 else:
@@ -114,6 +120,7 @@ with app.test_request_context('/'):
         'dashboard': dashboard.slug,
         'customer_id': CUSTOMER_ID,
         'filter': {FILTER_COLUMN: FILTER_VALUE} if FILTER_COLUMN and FILTER_VALUE else None,
+        'conversion_measure': CONVERSION_MEASURE,
         'total_seconds_sequential': round(perf_counter() - total_started, 4),
         'failures': len(failures),
     }, ensure_ascii=False))

@@ -55,7 +55,7 @@ equal(missingAxisRejected, true, 'Reject a missing temporal axis');
 const transform = load('transformProps', {
   getMetricLabel: metric => typeof metric === 'string' ? metric : metric.label,
 });
-const formData = { xAxis: 'snapshot', metrics: [{ label: 'TVD' }, 'Qtd'], criticalMetric: 'Criticos', riskMetric: 'Risco', cardTitle: 'Meu TVD', helpText: 'Detalhes', cardVariant: 'multi', metricLabels: 'Valor|Quantidade', metricFormats: 'currency|number', metricDirections: 'lower|higher', showTasks: false, accentColor: '#123abc', analysisUrl: ' /tvd ' };
+const formData = { xAxis: 'snapshot', metrics: [{ label: 'TVD' }, 'Qtd'], criticalMetric: 'Criticos', riskMetric: 'Risco', cardTitle: 'Meu TVD', helpText: 'Detalhes', cardVariant: 'multi', metricLabels: 'Valor|Quantidade', metricFormats: 'currency|number', metricDirections: 'lower|higher', semanticProfile: 'direct_average', showTasks: false, accentColor: '#123abc', analysisUrl: ' /tvd ' };
 const rows = [
   { snapshot: '2026-08-02', TVD: '15', Qtd: 8, Criticos: '7', Risco: '9' },
   { snapshot: '2026-05-31', TVD: 30, Qtd: 2 },
@@ -139,6 +139,71 @@ const osaBlank = transform({
   queriesData: [{ data: [{ data: '2026-05-01', Problemas: 2, Ativos: 0 }] }],
 });
 equal(osaBlank.indicators[0].current, null, 'OSA preserves BLANK when the active denominator is zero');
+const osaBundle = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Problemas', 'Ativos', 'Perda'],
+    metricLabels: '% OSA|Perda OSA', metricFormats: 'percent|currency',
+    semanticProfile: 'osa_bundle', cardVariant: 'osa',
+  },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Problemas: 1, Ativos: 10, Perda: 30 },
+    { data: '2026-03-01', Problemas: 9, Ativos: 10, Perda: 60 },
+    { data: '2026-04-01', Problemas: 0, Ativos: 80, Perda: 90 },
+    { data: '2026-05-01', Problemas: 2, Ativos: 20, Perda: 120 },
+  ] }],
+});
+equal(osaBundle.indicators.map(item => item.current), [90, 120], 'OSA bundle restores percentage and loss');
+equal(osaBundle.indicators[1].average, 60, 'OSA loss U3M divides the full measure by three');
+const roi = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Sellout', 'Custo', 'Estoque'], metricLabels: 'ROI',
+    metricFormats: 'percent', semanticProfile: 'roi', showAnnual: true, cardVariant: 'bars', groupby: ['activity_level'],
+  },
+  queriesData: [{ data: [
+    { data: '2025-06-01', Sellout: 150, Custo: 100, Estoque: 100 },
+    { data: '2025-07-01', Sellout: 0, Custo: 100, Estoque: 100 },
+    { data: '2025-08-01', Sellout: 100, Custo: 0, Estoque: 100 },
+    { data: '2026-03-01', Sellout: 200, Custo: 100, Estoque: 100 },
+    { data: '2026-04-01', Sellout: 300, Custo: 200, Estoque: 200 },
+    { data: '2026-05-01', Sellout: 400, Custo: 200, Estoque: 200 },
+  ] }, { data: [] }],
+});
+equal(roi.timeline.slice(1, 3).map(row => row.values[0]), [0, 0], 'ROI returns zero for zero sellout or zero cost');
+equal(roi.indicators[0].average, 100 * (500 - 300) / 300, 'ROI U3M is recalculated over U3M components');
+equal(roi.indicators[0].annual, 300, 'ROI annual sums monthly ROI values instead of averaging');
+equal(roi.showAnnual, true, 'ROI exposes its annual 12M summary to the renderer');
+const markup = transform({
+  formData: { xAxis: 'data', metrics: ['Sellout', 'Custo'], metricLabels: 'Markup', semanticProfile: 'markup' },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Sellout: 100, Custo: 50 },
+    { data: '2026-03-01', Sellout: 200, Custo: 100 },
+    { data: '2026-04-01', Sellout: 0, Custo: 100 },
+    { data: '2026-05-01', Sellout: 300, Custo: 150 },
+  ] }],
+});
+equal(markup.indicators[0].average, 100 * 300 / 250, 'Markup U3M divides aggregated sellout by aggregated cost');
+const stock = transform({
+  formData: { xAxis: 'data', metrics: ['Custo', 'Qtd'], metricLabels: 'Custo|Qtd', semanticProfile: 'stock_bundle' },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Custo: 30, Qtd: 300 },
+    { data: '2026-03-01', Custo: 60, Qtd: 600 },
+    { data: '2026-04-01', Custo: 90, Qtd: 900 },
+    { data: '2026-05-01', Custo: 120, Qtd: 1200 },
+  ] }],
+});
+equal(stock.indicators.map(item => item.average), [60, 300], 'Stock U3M uses cost/3 and latest MES_ANO quantity/3');
+const activityBars = transform({
+  formData: { xAxis: 'data', metrics: ['Soma', 'Contagem'], metricLabels: 'Giro', semanticProfile: 'weighted_average', cardVariant: 'bars', groupby: ['activity_level'] },
+  queriesData: [{ data: [{ data: '2026-05-01', Soma: 10, Contagem: 2 }] }, { data: [
+    { data: '2026-05-01', activity_level: 'Outros', Soma: 99, Contagem: 1 },
+    { data: '2026-05-01', activity_level: 'New Mover', Soma: 4, Contagem: 2 },
+    { data: '2026-05-01', activity_level: 'Fast Mover', Soma: 8, Contagem: 2 },
+    { data: '2026-05-01', activity_level: 'Ultra Slow Mover', Soma: 6, Contagem: 2 },
+    { data: '2026-05-01', activity_level: 'Slow Mover', Soma: 10, Contagem: 2 },
+    { data: '2026-05-01', activity_level: 'Non Mover', Soma: 99, Contagem: 1 },
+  ] }],
+});
+equal(activityBars.bars.map(item => item.category), ['Fast Mover', 'Slow Mover', 'Ultra Slow Mover', 'New Mover'], 'Activity bars enforce the certified category order');
 const weeklyResult = transform({
   formData: { ...formData, timeGrainSqla: 'P1W' },
   queriesData: [{ data: rows }],
