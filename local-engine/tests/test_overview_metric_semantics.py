@@ -19,7 +19,9 @@ def test_tvd_serving_excludes_power_bi_location_types_in_both_dimensions():
     assert "COALESCE(catalogo.tipo_local, '')" in sql
     assert sql.count("'LOJA VIRTUAL'") >= 2
     assert sql.count("'CD'") >= 2
-    assert sql.count("'DEPÓSITO'") >= 2
+    # Keep the accented literal ASCII-safe because PowerShell 5 pipelines can
+    # otherwise publish it to psql as question marks.
+    assert sql.count("U&'DEP\\00D3SITO'") >= 2
 
 
 def test_ivd_serving_uses_ultra_slow_risk_and_both_location_dimensions():
@@ -31,6 +33,7 @@ def test_ivd_serving_uses_ultra_slow_risk_and_both_location_dimensions():
     assert "c.regra_critico = 'U'" in sql
     assert "COALESCE(c.ivd, 0) > 0" in sql
     assert "c.id_item IS NOT NULL" in sql
+    assert sql.count("U&'DEP\\00D3SITO'") >= 2
 
 
 def test_overview_uses_daily_query_for_filtered_last_nonblank_and_monthly_visual():
@@ -63,6 +66,23 @@ def test_overview_keeps_native_filter_and_rls_contracts():
     assert "o.id_customer" in sql
     assert "ix_nr_tvd_daily_customer_data" in sql
     assert "ON gold.nr_tvd_daily (id_customer, data)" in sql
+
+
+def test_critical_reconciliation_is_three_way_and_sql_publish_is_utf8_safe():
+    validator = _read("superset/validate_stock_headlines.py")
+    publisher = _read("create-superset-kpi-views.ps1")
+    serving = _read("analytics-db/marts/30_neoretail_serving_marts.sql")
+
+    assert "def independent_counts" in validator
+    assert "def mart_counts" in validator
+    assert "def latest_chart_counts" in validator
+    assert '"source_rows is inventory, not a critical-item count"' in validator
+    assert "Reconciliação divergente" in validator
+    assert "$OutputEncoding = [System.Text.UTF8Encoding]::new($false)" in publisher
+    assert "Get-Content -Raw -Encoding UTF8" in publisher
+    assert serving.index("DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_semantic_default") < serving.index(
+        "DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_default_summary"
+    )
 
 
 def test_remaining_uncertified_metrics_are_recorded():

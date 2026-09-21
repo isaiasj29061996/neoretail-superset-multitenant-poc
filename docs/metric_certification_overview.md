@@ -10,9 +10,13 @@ Esta auditoria compara fórmula, contexto temporal, filtros, granularidade, `BLA
 
 | Card | Componente | Implementação atual | Status | Evidência |
 |---|---|---|---|---|
-| TVD | base, último ponto, exclusões e tarefas | mart diário, `LASTNONBLANK` por Ano/Mês, exclusão nas duas dimensões e contagem sem `DISTINCT` | CERTIFICADA | testes de fechamento, lacuna, local e alertas |
+| TVD | base, último ponto e exclusões | mart diário, `LASTNONBLANK` por Ano/Mês e exclusão nas duas dimensões de local | CERTIFICADA | fonte, mart e Superset usam 16/09/2026; publicação UTF-8 reconciliada |
+| TVD | críticos | `COUNT(id_item)`, `REGRA_CRITICO='CRITICO'`, TVD > 0 e exclusões de local | CERTIFICADA | independente = mart = Superset = `0`; o snapshot não contém o código `CRITICO` |
+| TVD | risco | `COUNT(id_item)`, `REGRA_CRITICO='F'`, TVD > 0 e exclusões de local | CERTIFICADA | independente = mart = Superset = `2.596` |
 | TVD | M0, M-1 e U3M | maior mês com dado, deslocamentos mensais e `(M1+M2+M3)/3` | PARCIAL | falta `0_0_CALENDARIO[M0…M-3/U3M]` |
-| IVD | base, último ponto, exclusões e tarefas | mesma mecânica; risco usa `REGRA_CRITICO='U'` | CERTIFICADA | testes de fechamento, local e risco `U` |
+| IVD | base, último ponto e exclusões | mesma mecânica diária e as duas exclusões de local | CERTIFICADA | fonte, mart e Superset usam 16/09/2026; publicação UTF-8 reconciliada |
+| IVD | críticos | `COUNT(id_item)`, `REGRA_CRITICO='CRITICO'`, IVD > 0 e exclusões de local | CERTIFICADA | independente = mart = Superset = `0`; o snapshot não contém o código `CRITICO` |
+| IVD | risco | `COUNT(id_item)`, `REGRA_CRITICO='U'`, IVD > 0 e exclusões de local | CERTIFICADA | independente = mart = Superset = `17.142` |
 | IVD | M0, M-1 e U3M | maior mês com dado e denominador fixo 3 | PARCIAL | âncora original ausente |
 | Giro | fórmula e barras | `SUM(giro positivo)/COUNT(giro positivo)`; quatro atividades permitidas | CERTIFICADA | teste ponderado e allowlist ordenada |
 | Giro | âncora temporal | mês máximo disponível | PARCIAL | flags M0/M-1 ausentes |
@@ -35,6 +39,28 @@ Esta auditoria compara fórmula, contexto temporal, filtros, granularidade, `BLA
 | Markup | barras | mês atual/anterior; quatro atividades em ordem fixa | CERTIFICADA | allowlist renderizada |
 
 Não há componente com regra conhecida ainda `DIVERGENTE`. As classificações `PARCIAL` restantes decorrem da ausência do contrato original de calendário.
+
+## Reconciliação TVD/IVD crítico — tenant 142
+
+O snapshot de `gold.calculo_oportunidades` contém **494.210 linhas** com o mesmo `_silver_refreshed_at` (`17/09/2026 18:24:19.944535`). Esse número é o inventário completo da fonte e não uma contagem de críticos. O domínio observado de `REGRA_CRITICO` é:
+
+```text
+F, I, N, S, U, W
+```
+
+Não existe linha com o literal `CRITICO` neste snapshot. Como o DAX fornecido define TVD e IVD crítico por `REGRA_CRITICO = "CRITICO"`, a contagem correta para esta base é zero. A regra não foi remapeada para outro código por inferência.
+
+O snapshot de tarefas não possui uma data de negócio própria. O serving o ancora em `MAX(gold.fato_ivd_tvd.id_time)`, que nesta carga é `16/09/2026`. A mesma data foi retornada pelos marts compactos e pelos charts publicados.
+
+| Caminho | TVD crítico | TVD risco (`F`) | IVD crítico | IVD risco (`U`) | Data |
+|---|---:|---:|---:|---:|---|
+| Contagem independente em `calculo_oportunidades` | 0 | 2.596 | 0 | 17.142 | 16/09/2026 |
+| `nr_tvd_daily_summary` / `nr_ivd_daily_summary` | 0 | 2.596 | 0 | 17.142 | 16/09/2026 |
+| Resultado efetivo do Superset | 0 | 2.596 | 0 | 17.142 | 16/09/2026 |
+
+A auditoria encontrou que uma publicação anterior havia transformado `DEPÓSITO` em `DEP??SITO` dentro do PostgreSQL. Com isso, `CD` e `LOJA VIRTUAL` eram excluídos, mas depósitos acentuados permaneciam. Os SQLs agora usam a literal ASCII-safe `U&'DEP\00D3SITO'`; o publicador força UTF-8 ao enviar os arquivos ao `psql`. A reconstrução integral reduziu TVD risco de 2.743 para 2.596 e IVD risco de 17.598 para 17.142. Os críticos continuaram em zero porque não há `REGRA_CRITICO='CRITICO'` na fonte.
+
+`superset/validate_stock_headlines.py` executa essa reconciliação e falha se data, críticos ou risco divergirem entre fonte independente, mart e Superset.
 
 ## Conversão selecionável
 
@@ -90,8 +116,11 @@ A implementação conserva a âncora no maior mês com dado e registra `PENDENTE
 - sell out regional: 27 meses, delta máximo `5,96e-8`;
 - Perda OSA: 27 meses, delta máximo `1,68e-7`;
 - alertas OSA: 3.866 críticos e 3.279 em risco, iguais à consulta independente;
+- inventário de oportunidades: 494.210 linhas, zero com literal `REGRA_CRITICO='CRITICO'`;
+- TVD: crítico `0` e risco `2.596` nos caminhos independente, mart e Superset;
+- IVD: crítico `0` e risco `17.142` nos caminhos independente, mart e Superset;
 - SQL compacto: `0,465 ms` em `EXPLAIN (ANALYZE, BUFFERS)`;
-- oito charts após bootstrap: `1,768 s` na primeira execução e `0,601 s` com cache aquecido;
+- oito charts após a reconstrução reconciliada: `2,131 s` na primeira execução e `0,547 s` com cache aquecido;
 - caminho filtrado exato (`ANGELONI`): `4,425 s` para os oito charts.
 
 O baseline anterior era `1,530 s` na primeira execução registrada. A medição fria atual variou acima dele e a aquecida ficou abaixo. O serving compacto permaneceu submilissegundo; a variação fria está no ciclo de metadata/cache/execução do Superset e deve continuar monitorada.

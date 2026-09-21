@@ -8,6 +8,10 @@ BEGIN;
 
 -- These summaries depend on the daily marts and are recreated by
 -- the later numbered scripts in the ordered refresh.
+-- Drop semantic marts first because they depend on the compact summaries.
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_semantic_default;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_semantic_default;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_conversion_options;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_tvd_daily_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_weekly_summary;
@@ -15,9 +19,6 @@ DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_periodic;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_distinct_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_default_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_causes_summary;
-DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_semantic_default;
-DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_semantic_default;
-DROP MATERIALIZED VIEW IF EXISTS gold.nr_conversion_options;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_opportunities_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_latest;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_stock_tasks;
@@ -254,10 +255,10 @@ WITH fact_daily AS (
       ON catalogo.id_customer = o.id_customer
      AND catalogo.id_location = o.id_location
     WHERE UPPER(TRIM(COALESCE(o.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
     )
       AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
       )
     GROUP BY
         o.id_customer, o.data, o.opportunity_key, o.rede, o.bandeira,
@@ -315,10 +316,10 @@ WITH fact_daily AS (
       ON i.id_customer = c.id_customer
      AND i.id_item = c.id_item
     WHERE UPPER(TRIM(COALESCE(l.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
     )
       AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
       )
 ), opportunity_daily AS (
     SELECT * FROM fact_daily

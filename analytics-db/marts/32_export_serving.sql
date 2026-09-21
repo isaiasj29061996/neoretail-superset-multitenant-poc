@@ -7,6 +7,10 @@
 
 BEGIN;
 
+-- Retail summaries are recreated by 38_export_retail_summary.sql and depend
+-- on the detailed export marts below.
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_export_daily_retail_summary;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_export_monthly_retail_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_export_daily;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_export_monthly;
 

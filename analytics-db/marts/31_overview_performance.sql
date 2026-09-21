@@ -169,10 +169,10 @@ WITH fact_daily AS (
       ON catalogo.id_customer = f.id_customer
      AND catalogo.id_location = f.id_location
     WHERE UPPER(TRIM(COALESCE(l.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
     )
       AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
       )
     GROUP BY
         f.id_customer,
@@ -244,10 +244,10 @@ WITH fact_daily AS (
       ON i.id_customer = c.id_customer
      AND i.id_item = c.id_item
     WHERE UPPER(TRIM(COALESCE(l.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
     )
       AND UPPER(TRIM(COALESCE(catalogo.tipo_local, ''))) NOT IN (
-        'DEPÓSITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
+        U&'DEP\00D3SITO', 'DEPOSITO', 'CD', 'LOJA VIRTUAL'
       )
 ), opportunity_daily AS (
     SELECT * FROM fact_daily

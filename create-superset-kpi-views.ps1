@@ -6,6 +6,12 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 Set-Location $PSScriptRoot
 
+# Windows PowerShell 5 otherwise encodes text piped to native commands with
+# the active console code page. Force UTF-8 so SQL literals and comments reach
+# psql unchanged.
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $OutputEncoding
+
 $sqlPaths = @(
     Join-Path $PSScriptRoot "analytics-db\views"
     Join-Path $PSScriptRoot "analytics-db\marts"
@@ -36,7 +42,7 @@ foreach ($sqlFile in $sqlFiles) {
     Write-Host "Aplicando $($sqlFile.Name)..." -ForegroundColor Cyan
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
 
-    Get-Content -Raw $sqlFile.FullName |
+    Get-Content -Raw -Encoding UTF8 $sqlFile.FullName |
         docker compose exec -T analytics-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 
     $watch.Stop()
