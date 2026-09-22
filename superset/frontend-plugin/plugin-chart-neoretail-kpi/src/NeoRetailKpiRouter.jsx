@@ -87,19 +87,41 @@ function ValuesTriplet({ indicator, values, showTrends }) {
   </div>;
 }
 
-function priorYearValues(timeline, metricIndex) {
+function aggregateSemantic(profile, rows, metricIndex) {
+  if (profile === 'direct_average') {
+    return rows.reduce((sum, row) => sum + (row?.values[metricIndex] ?? 0), 0) / 3;
+  }
+  if (profile === 'direct_sum') {
+    return rows.reduce((sum, row) => sum + (row?.values[metricIndex] ?? 0), 0);
+  }
+  if (profile === 'distribution_bundle') {
+    const latest = rows.filter(Boolean).sort((left, right) => left.date - right.date).at(-1);
+    return latest?.components?.[metricIndex + 2] ?? 0;
+  }
+  const components = [];
+  rows.forEach(row => row?.components?.forEach((value, index) => {
+    components[index] = (components[index] || 0) + (value ?? 0);
+  }));
+  const numerator = components[0];
+  const denominator = components[1];
+  if (!denominator) return 0;
+  if (profile === 'one_minus_ratio') return 100 * (1 - numerator / denominator);
+  if (profile === 'ratio_percent') return 100 * numerator / denominator;
+  if (profile === 'ratio' || profile === 'weighted_average') return numerator / denominator;
+  return rows.reduce((sum, row) => sum + (row?.values[metricIndex] ?? 0), 0) / Math.max(rows.length, 1);
+}
+
+function priorYearValues(timeline, metricIndex, semanticProfile) {
   const valid = (timeline || []).filter(row => row?.date instanceof Date && !Number.isNaN(row.date.getTime()));
   const latest = valid[valid.length - 1];
   if (!latest) return { current: 0, previous: 0, average: 0 };
   const byMonth = new Map();
-  valid.forEach(row => byMonth.set(monthKey(row.date), Number(row.values?.[metricIndex]) || 0));
+  valid.forEach(row => byMonth.set(monthKey(row.date), row));
   const valueAt = offset => byMonth.get(shiftMonth(latest.date, offset));
-  const current = valueAt(-12) ?? 0;
-  const previous = valueAt(-13) ?? 0;
-  const averagePoints = [-13, -14, -15].map(valueAt).filter(value => value !== undefined);
-  const average = averagePoints.length
-    ? averagePoints.reduce((sum, value) => sum + value, 0) / averagePoints.length
-    : 0;
+  const current = valueAt(-12)?.values?.[metricIndex] ?? 0;
+  const previous = valueAt(-13)?.values?.[metricIndex] ?? 0;
+  const averagePoints = [-13, -14, -15].map(valueAt);
+  const average = aggregateSemantic(semanticProfile, averagePoints, metricIndex);
   return { current, previous, average };
 }
 
@@ -123,15 +145,20 @@ function QuantityComparison(props) {
     </div>;
   }
   const showTrends = variant !== 'quantitycompareplain';
-  const lastYear = priorYearValues(timeline, 0);
+  const comparisons = indicators.map((entry, index) => ({
+    indicator: entry,
+    lastYear: priorYearValues(timeline, index, props.semanticProfile),
+  }));
   return <div data-neoretail-variant={variant} style={{ ...styles.card, width, height }}>
     <header style={styles.header}>
       <strong>{title}</strong><span style={styles.info} title={helpText}>i</span>
     </header>
-    <span style={styles.section}>Ano atual</span>
-    <ValuesTriplet indicator={indicator} values={indicator} showTrends={showTrends} />
-    <span style={styles.section}>Ano anterior</span>
-    <ValuesTriplet indicator={indicator} values={lastYear} showTrends={showTrends} />
+    {comparisons.map(({ indicator: entry, lastYear }) => <React.Fragment key={entry.label}>
+      <span style={styles.section}>{indicators.length > 1 ? `${entry.label} — ano atual` : 'Ano atual'}</span>
+      <ValuesTriplet indicator={entry} values={entry} showTrends={showTrends} />
+      <span style={styles.section}>{indicators.length > 1 ? `${entry.label} — ano anterior` : 'Ano anterior'}</span>
+      <ValuesTriplet indicator={entry} values={lastYear} showTrends={showTrends} />
+    </React.Fragment>)}
     {showTasks && <Tasks critical={critical} risk={risk} labels={taskLabels} />}
     {showTasks && (analysisUrl
       ? <a href={analysisUrl} target="_top" rel="noreferrer" style={styles.action}>Ir para análise ›</a>
