@@ -11,8 +11,6 @@ BEGIN;
 -- Drop semantic marts first because they depend on the compact summaries.
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_osa_semantic_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_semantic_default;
-DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_quantity_default;
-DROP MATERIALIZED VIEW IF EXISTS gold.nr_overview_quantity_detail;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_conversion_options;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_tvd_daily_summary;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_ivd_daily_summary;

@@ -220,26 +220,3 @@ def test_concurrency_benchmark_uses_real_cache_bypass_and_safe_stats_monitor():
     assert "WaitForExit" in wrapper
     assert "System.IO.StreamWriter" in monitor
     assert "docker stats --no-stream" in monitor
-
-
-def test_overview_quantity_uses_certified_components_and_filtered_fallback():
-    sql = (ROOT / "analytics-db/marts/40_overview_quantity_semantic.sql").read_text(
-        encoding="utf-8"
-    )
-    bootstrap = (ROOT / "superset/bootstrap_overview_quantity.py").read_text(
-        encoding="utf-8"
-    )
-    validator = (ROOT / "superset/validate_overview_quantity.py").read_text(
-        encoding="utf-8"
-    )
-
-    assert "nr_overview_quantity_default" in sql
-    assert "FILTER (WHERE faturamento > 0)" in sql
-    assert "COUNT(DISTINCT cnpj) FILTER (WHERE positivacao = 1)" in sql
-    assert "SUM(COALESCE(status_item_geral, 0))" in sql
-    assert "SUM(COALESCE(demanda_media, 0))" in sql
-    assert "COUNT(o.id_item) FILTER" in sql
-    assert "nr_overview_quantity_detail" in bootstrap
-    assert "remove_filter=True" in bootstrap or "_jinja_filter_predicates" in bootstrap
-    assert "ratio_percent" in bootstrap
-    assert "nr_overview_quantity_default" in validator

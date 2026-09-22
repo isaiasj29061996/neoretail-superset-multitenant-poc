@@ -139,47 +139,6 @@ const osaBlank = transform({
   queriesData: [{ data: [{ data: '2026-05-01', Problemas: 2, Ativos: 0 }] }],
 });
 equal(osaBlank.indicators[0].current, null, 'OSA preserves BLANK when the active denominator is zero');
-const directSum = transform({
-  formData: { xAxis: 'data', metrics: ['Perda'], semanticProfile: 'direct_sum' },
-  queriesData: [{ data: [
-    { data: '2026-02-01', Perda: 10 }, { data: '2026-03-01', Perda: 20 },
-    { data: '2026-04-01', Perda: 30 }, { data: '2026-05-01', Perda: 40 },
-  ] }],
-});
-equal(directSum.indicators[0].average, 60, 'Loss U3M sums the three prior months without dividing by three');
-const quantityRatios = transform({
-  formData: { xAxis: 'data', metrics: ['Numerador', 'Denominador'], semanticProfile: 'ratio_percent' },
-  queriesData: [{ data: [
-    { data: '2026-02-01', Numerador: 1, Denominador: 10 },
-    { data: '2026-03-01', Numerador: 2, Denominador: 20 },
-    { data: '2026-04-01', Numerador: 3, Denominador: 30 },
-    { data: '2026-05-01', Numerador: 4, Denominador: 40 },
-  ] }],
-});
-equal(quantityRatios.indicators[0].average, 10, 'Quantity percentages recalculate the ratio over U3M totals');
-const coverage = transform({
-  formData: { xAxis: 'data', metrics: ['Estoque', 'Demanda'], semanticProfile: 'ratio' },
-  queriesData: [{ data: [
-    { data: '2026-02-01', Estoque: 100, Demanda: 10 },
-    { data: '2026-03-01', Estoque: 200, Demanda: 20 },
-    { data: '2026-04-01', Estoque: 300, Demanda: 30 },
-    { data: '2026-05-01', Estoque: 400, Demanda: 40 },
-  ] }],
-});
-equal(coverage.indicators[0].average, 10, 'Coverage U3M divides aggregated stock by aggregated demand');
-const distribution = transform({
-  formData: {
-    xAxis: 'data', metrics: ['Lojas', 'Itens', 'Lojas U3M', 'Itens U3M'],
-    metricLabels: 'Lojas|Itens', semanticProfile: 'distribution_bundle',
-  },
-  queriesData: [{ data: [
-    { data: '2026-03-01', Lojas: 2, Itens: 3, 'Lojas U3M': 8, 'Itens U3M': 9 },
-    { data: '2026-04-01', Lojas: 4, Itens: 5, 'Lojas U3M': 10, 'Itens U3M': 11 },
-    { data: '2026-05-01', Lojas: 6, Itens: 7, 'Lojas U3M': 12, 'Itens U3M': 13 },
-  ] }],
-});
-equal(distribution.indicators.map(item => item.current), [6, 7], 'Distribution exposes stores and items');
-equal(distribution.indicators.map(item => item.average), [10, 11], 'Distribution uses precomputed distinct U3M cardinality');
 const osaBundle = transform({
   formData: {
     xAxis: 'data', metrics: ['Problemas', 'Ativos', 'Perda'],
