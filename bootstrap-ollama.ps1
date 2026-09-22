@@ -5,11 +5,12 @@ Set-StrictMode -Version Latest
 Set-Location $PSScriptRoot
 
 $model = if ($env:OLLAMA_MODEL) { $env:OLLAMA_MODEL } else { "llama3.1:8b" }
+$composeFiles = @("-f", "docker-compose.yml", "-f", "docker-compose.assistant.yml")
 
-& docker compose --profile assistant up -d ollama
+& docker compose @composeFiles --profile assistant up -d ollama
 if ($LASTEXITCODE -ne 0) { throw "Não foi possível iniciar o Ollama." }
 
-$available = & docker compose exec -T ollama ollama list
+$available = & docker compose @composeFiles exec -T ollama ollama list
 if ($LASTEXITCODE -ne 0) { throw "Não foi possível consultar os modelos do Ollama." }
 
 if ($available -match [regex]::Escape($model)) {
@@ -23,6 +24,6 @@ if (-not $PullModel) {
     exit 2
 }
 
-& docker compose --profile assistant --profile assistant-model run --rm ollama-model-init
+& docker compose @composeFiles --profile assistant --profile assistant-model run --rm ollama-model-init
 if ($LASTEXITCODE -ne 0) { throw "Download do modelo $model falhou." }
 Write-Host "Modelo $model instalado." -ForegroundColor Green
