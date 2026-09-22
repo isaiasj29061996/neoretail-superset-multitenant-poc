@@ -43,17 +43,24 @@ provider pode implementar a mesma interface futuramente.
 
 ## Catálogo e ferramentas
 
-O catálogo versionado está em `config/assistant_metrics.yaml`. A baseline da
-`main` ainda registra as métricas como `discovery`/`pending`; o assistente expõe
-esses estados e não os promove.
+O catálogo versionado está em `config/assistant_metrics.yaml`. Nesta branch ele
+é alinhado às evidências herdadas das PRs #3 e #4, sem promover aprovação de
+negócio ou certificação temporal. `RECONCILED` significa que a fórmula base foi
+reconciliada tecnicamente; `CERTIFICADA` em TVD/IVD se restringe ao caminho
+técnico fonte → mart → Superset documentado. Todas permanecem com aprovação de
+negócio pendente e com `PARCIAL_CALENDARIO`.
 
-Métricas iniciais:
+| Métrica | Padrão sem filtro | Com filtros | Estado técnico | Evidência |
+|---|---|---|---|---|
+| Vendas (unidade) | `gold.nr_overview_quantity_default` | `gold.nr_overview_quantity_detail` | `RECONCILED` | `validate_overview_quantity.py` |
+| % OSA | `gold.nr_overview_quantity_default` | `gold.nr_overview_quantity_detail` | `RECONCILED` | `validate_overview_quantity.py` |
+| Estoque (quantidade) | `gold.nr_overview_quantity_default` | `gold.nr_overview_quantity_detail` | `RECONCILED` | `validate_overview_quantity.py` |
+| TVD | `gold.nr_tvd_daily_summary` | `gold.nr_tvd_daily` | `CERTIFICADA` técnica | `validate_stock_headlines.py` |
+| IVD | `gold.nr_ivd_daily_summary` | `gold.nr_ivd_daily` | `CERTIFICADA` técnica | `validate_stock_headlines.py` |
 
-- Vendas;
-- % OSA;
-- TVD;
-- IVD;
-- Estoque.
+O campo `source` da evidência de cada resposta registra o mart realmente
+consultado. `defaultSource`, `filteredSource`, `validator`, `contract`, versão da
+fórmula e estados também são devolvidos, permitindo auditar o caminho numérico.
 
 Ferramentas:
 
@@ -70,10 +77,25 @@ As consultas são constantes no backend. Tenant e filtros entram apenas como
 parâmetros PostgreSQL. O limite de rankings é dez linhas. A conexão executa cada
 consulta dentro de `BEGIN READ ONLY`, com `statement_timeout`.
 
-`MTD`, `M-1` e `U3M` seguem o comportamento temporal atual do plugin: último
-período disponível, período imediatamente anterior e média dos três períodos
-anteriores. O status continua `PARCIAL_CALENDARIO`; essas convenções não
-substituem as flags DAX originais.
+`MTD`, `M-1` e `U3M` seguem o contrato implementado pela Visão Geral Quantidade:
+último mês disponível, deslocamento exato de um mês e meses exatos M-1/M-2/M-3.
+Para medidas aditivas, U3M divide a soma pelo divisor fixo três. Para % OSA, o
+assistente soma problemas e ativos dos meses do período e só então recompõe a
+razão; não calcula média de percentuais. Denominador zero preserva `BLANK`.
+
+Essas regras comprovam consistência com o contrato implementado, mas não
+substituem as flags DAX M0/M-1/U3M/LY ausentes. O estado continua
+`PARCIAL_CALENDARIO`; Vendas e OSA também mantêm `PENDENTE_VARIANCE_DAX`.
+
+O caminho filtrado de Vendas usa SQL fixo allowlisted para reproduzir
+`SUM(volume_unidades) * MAX(fator)` na medida `unidade`. O usuário não fornece
+SQL, nome de mart, fórmula nem tenant.
+
+Para TVD/IVD filtrados, o mart resumo seleciona as datas de fechamento mensais
+e o mart detalhado agrega somente essas datas. No snapshot AMBEV local, com o
+filtro `uf=SP`, essa mudança reduziu TVD de aproximadamente 10,37 s para 258 ms
+e IVD de 9,11 s para 193 ms, mantendo os mesmos valores. São medições locais e
+não constituem SLA de produção.
 
 ## APIs
 
@@ -138,4 +160,9 @@ OLLAMA_MODEL=llama3.1:8b
 - o frontend ainda não extrai automaticamente filtros internos do iframe;
 - o histórico é curto e mantido apenas no navegador;
 - não há Text-to-SQL, escrita, agente autônomo nem ações administrativas;
-- métricas continuam com os status da baseline, sem certificação automática.
+- aprovação de negócio continua pendente para todas as métricas;
+- calendário permanece parcial enquanto as flags DAX originais não existirem;
+- o assistente não expõe Distribuição, Ruptura, ISV, Cobertura, Preço Médio ou
+  variações/setas como métricas consultáveis nesta versão, pois há pendências de
+  dados, negócio ou contrato semântico;
+- nenhum status é promovido automaticamente pelo LLM.
