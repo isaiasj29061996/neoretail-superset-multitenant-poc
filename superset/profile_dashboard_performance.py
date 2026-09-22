@@ -34,7 +34,6 @@ OUTPUT = Path(os.getenv("PROFILE_OUTPUT", "/generated/performance_profile.json")
 
 DASHBOARDS = (
     "neoretail-v9-visao-geral-industria",
-    "neoretail-v9-visao-geral-quantidade",
     "neoretail-v9-panorama-industria",
     "neoretail-v9-osa-industria",
     "neoretail-v9-tarefas-otimizacao-estoque",
