@@ -336,6 +336,10 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 Os scripts são idempotentes: podem ser executados novamente para atualizar
 datasets, charts e layouts existentes.
 
+A auditoria da pagina de quantidade, com formulas, reconciliacao numerica e
+pendencias de dados/calendario, esta em
+[docs/metric_certification_overview_quantity.md](docs/metric_certification_overview_quantity.md).
+
 ---
 
 ## Performance
