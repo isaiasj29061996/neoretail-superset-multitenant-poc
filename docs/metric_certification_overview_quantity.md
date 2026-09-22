@@ -10,16 +10,16 @@ A certificação usa o tenant AMBEV (`id_customer = 142`) e o snapshot mensal ma
 
 | Card | Fórmula base | Períodos/LY | Tarefas | Status |
 |---|---|---|---|---|
-| Vendas | reconciliada com seletor real e ramo `valor` | U3M implementado; flags de calendário ausentes | n/a | PARCIAL_CALENDARIO |
-| Perda de vendas OSA | reconciliada; U3M é soma, sem `/3` | flags de calendário ausentes | n/a | PARCIAL_CALENDARIO |
-| Preço médio | média apenas de linhas com faturamento e fator aplicado | definição DAX específica de LY não localizada | n/a | PARCIAL_LY |
-| Distribuição e sortimento | regra `positivacao=1` e distintos CNPJ/EAN implementada | U3M distinto implementado | n/a | PENDENTE_DADOS |
-| % OSA | razão dos totais e `BLANK` no divisor zero | flags de calendário ausentes | crítico/risco certificados | PARCIAL_CALENDARIO |
-| Ruptura | razão `rup/status_item_geral` reconciliada | flags de calendário ausentes | crítico/risco certificados | PARCIAL_CALENDARIO; PENDENTE_NEGOCIO |
-| Item sem venda | razão `est_virtual/status_item_geral` reconciliada | flags de calendário ausentes | crítico/risco certificados | PARCIAL_CALENDARIO |
-| Cobertura de estoque | razão estoque/demanda reconciliada | flags de calendário ausentes | n/a | PARCIAL_CALENDARIO |
+| Vendas | reconciliada com seletor real e ramo `valor` | U3M implementado; flags de calendário ausentes | n/a | PARCIAL_CALENDARIO; PENDENTE_VARIANCE_DAX |
+| Perda de vendas OSA | reconciliada; U3M é soma, sem `/3` | flags de calendário ausentes | n/a | PARCIAL_CALENDARIO; PENDENTE_VARIANCE_DAX |
+| Preço médio | média apenas de linhas com faturamento e fator aplicado | definição DAX específica de LY não localizada | n/a | PARCIAL_LY; PENDENTE_VARIANCE_DAX |
+| Distribuição e sortimento | regra `positivacao=1` e distintos CNPJ/EAN implementada | U3M distinto implementado | n/a | PENDENTE_DADOS; PENDENTE_VARIANCE_DAX |
+| % OSA | razão dos totais e `BLANK` no divisor zero | flags de calendário ausentes | crítico/risco certificados | PARCIAL_CALENDARIO; PENDENTE_VARIANCE_DAX |
+| Ruptura | razão `rup/status_item_geral` reconciliada | flags de calendário ausentes | crítico/risco certificados | PARCIAL_CALENDARIO; PENDENTE_NEGOCIO; PENDENTE_VARIANCE_DAX |
+| Item sem venda | razão `est_virtual/status_item_geral` reconciliada | flags de calendário ausentes | crítico/risco certificados | PARCIAL_CALENDARIO; PENDENTE_VARIANCE_DAX |
+| Cobertura de estoque | razão estoque/demanda reconciliada | flags de calendário ausentes | n/a | PARCIAL_CALENDARIO; PENDENTE_VARIANCE_DAX |
 
-Nenhum card recebe `CERTIFICADA` de ponta a ponta porque o calendário original M0/M-1/U3M/LY não está versionado. As fórmulas base, exceto Distribuição, estão tecnicamente certificadas.
+Nenhum card recebe `CERTIFICADA` de ponta a ponta. As fórmulas base, exceto Distribuição, estão tecnicamente reconciliadas, mas faltam as flags originais de calendário e as medidas DAX de variação. Distribuição continua bloqueada pela ausência de `positivacao`, e Ruptura depende de decisão de negócio sobre o resultado literal acima de 100%.
 
 ## Reconciliação do mês atual
 
@@ -90,4 +90,4 @@ As setas foram desativadas nos oito cards (`quantitycompareplain`) e permanecem 
 
 ## Decisão
 
-A página está pronta para revisão técnica com fórmulas base reconciliadas e desempenho adequado no caminho padrão. A conclusão funcional permanece condicionada a três evidências externas: `positivacao` preenchida, calendário DAX original e aceite do percentual de Ruptura acima de 100%. Não se deve promover a página como semanticamente certificada de ponta a ponta antes dessas três resoluções.
+A página está pronta para revisão técnica com fórmulas base reconciliadas e desempenho adequado no caminho padrão. A conclusão funcional permanece condicionada a quatro evidências externas: `positivacao` preenchida, calendário DAX original, aceite do percentual de Ruptura acima de 100% e medidas DAX originais de variação. Não se deve promover a página como semanticamente certificada de ponta a ponta antes dessas quatro resoluções.
