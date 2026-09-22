@@ -159,9 +159,21 @@ services:
       SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
       ANALYTICS_MODE: local_postgres
+      ANALYTICS_DB_HOST: analytics-db
+      ANALYTICS_DB_PORT: 5432
+      ANALYTICS_DB_NAME: ${ANALYTICS_DB_NAME:-analytics}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-analytics}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analytics}
       TENANTS_CONFIG: /app/config/tenants.yaml
       PUBLISHED_DASHBOARDS_CONFIG: /app/generated/neoretail-published-dashboards.json
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-neoretail-demo}
+      ASSISTANT_ENABLED: ${ASSISTANT_ENABLED:-false}
+      ASSISTANT_METRIC_CATALOG: /app/config/assistant_metrics.yaml
+      ASSISTANT_SQL_TIMEOUT_MS: ${ASSISTANT_SQL_TIMEOUT_MS:-8000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-20000}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
     ports: ["3000:3000"]
     volumes:
       - ./config:/app/config:ro
@@ -175,6 +187,29 @@ services:
       retries: 20
       start_period: 10s
     restart: unless-stopped
+
+  ollama:
+    profiles: ["assistant"]
+    image: ollama/ollama:0.11.10
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  ollama-model-init:
+    profiles: ["assistant-model"]
+    image: ollama/ollama:0.11.10
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama: { condition: service_healthy }
+    command: ["pull", "${OLLAMA_MODEL:-llama3.1:8b}"]
+    restart: "no"
 
   blob-profiler:
     profiles: ["blob"]
@@ -199,3 +234,4 @@ volumes:
   analytics_data:
   redis_data:
   local_lake:
+  ollama-data:
