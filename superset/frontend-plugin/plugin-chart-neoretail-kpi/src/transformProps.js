@@ -15,7 +15,7 @@ const monthKey = date => `${date.getUTCFullYear()}-${String(date.getUTCMonth() +
 const shiftMonth = (date, offset) => monthKey(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1)));
 const splitConfig = (value, fallback = []) => String(value || '').split('|').map(item => item.trim()).filter(Boolean).concat(fallback);
 const semanticValue = (profile, components) => {
-  if (!profile || ['direct_average', 'direct_sum', 'stock_bundle'].includes(profile)) return components;
+  if (!profile || profile === 'direct_average' || profile === 'stock_bundle') return components;
   const numerator = components[0];
   const denominator = components[1];
   if (profile === 'roi') {
@@ -36,22 +36,12 @@ const semanticValue = (profile, components) => {
   if (denominator === null || denominator === 0) return [null];
   if (profile === 'weighted_average') return [numerator / denominator];
   if (profile === 'one_minus_ratio') return [100 * (1 - numerator / denominator)];
-  if (profile === 'ratio_percent') return [100 * numerator / denominator];
-  if (profile === 'ratio') return [numerator / denominator];
-  if (profile === 'distribution_bundle') return components.slice(0, 2);
   return components;
 };
 const semanticAggregate = (profile, rows, index) => {
   if (!profile) return null;
   if (profile === 'direct_average') {
     return rows.reduce((sum, row) => sum + (row?.values[index] ?? 0), 0) / 3;
-  }
-  if (profile === 'direct_sum') {
-    return rows.reduce((sum, row) => sum + (row?.values[index] ?? 0), 0);
-  }
-  if (profile === 'distribution_bundle') {
-    const latest = rows.filter(Boolean).sort((left, right) => left.date - right.date).at(-1);
-    return latest?.components[index + 2] ?? null;
   }
   if (profile === 'stock_bundle') {
     if (index === 0) return rows.reduce((sum, row) => sum + (row?.values[index] ?? 0), 0) / 3;
@@ -97,7 +87,7 @@ export default function transformProps(chartProps) {
   const directions = splitConfig(formData.metric_directions, [formData.lower_is_better === false ? 'higher' : 'lower']);
   const criticalLabel = metricLabel(formData.critical_metric);
   const riskLabel = metricLabel(formData.risk_metric);
-  const semanticProfile = ['direct_average', 'direct_sum', 'stock_bundle', 'weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'distribution_bundle', 'osa_bundle', 'roi', 'markup'].includes(formData.semantic_profile)
+  const semanticProfile = ['direct_average', 'stock_bundle', 'weighted_average', 'one_minus_ratio', 'osa_bundle', 'roi', 'markup'].includes(formData.semantic_profile)
     ? formData.semantic_profile
     : null;
   const normalize = (rows, grouped = false) => rows.map(row => ({
@@ -134,8 +124,8 @@ export default function transformProps(chartProps) {
   const currentMonth = latest ? monthKey(latest.date) : null;
   const lastByMonth = new Map();
   semanticTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
-  const outputCount = ['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
-    : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup'].includes(semanticProfile) ? 1
+  const outputCount = semanticProfile === 'osa_bundle' ? 2
+    : ['weighted_average', 'one_minus_ratio', 'roi', 'markup'].includes(semanticProfile) ? 1
       : metricLabels.length;
   const displayMetricLabels = labels.slice(0, outputCount);
   const indicators = displayMetricLabels.map((label, index) => {
@@ -163,7 +153,7 @@ export default function transformProps(chartProps) {
     categories.set(row.category, entry);
   });
   return {
-    width, height, semanticProfile,
+    width, height,
     title: formData.card_title || 'NeoRetail',
     helpText: formData.help_text || '',
     variant,
@@ -182,7 +172,7 @@ export default function transformProps(chartProps) {
       ? semanticTimeline
       : timeline.filter(row => monthKey(row.date) === currentMonth))
       .map(row => ({ date: row.date, value: row.values[0] })),
-    timeline: semanticTimeline.map(row => ({ date: row.date, values: row.values, components: row.components })),
+    timeline: semanticTimeline.map(row => ({ date: row.date, values: row.values })),
     bars: ALLOWED_ACTIVITY_LEVELS
       .filter(category => categories.has(category))
       .map(category => {

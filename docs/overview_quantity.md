@@ -1,44 +1,68 @@
 # Visão geral — Quantidade
 
-A página `NeoRetail V9 — Visão geral quantidade` usa o slug `neoretail-v9-visao-geral-quantidade` e contém oito cards. A implementação publicada é criada por `superset/bootstrap_overview_quantity.py` sobre o dataset virtual `gold.nr_overview_quantity_interactive`.
+## Referência Power BI
 
-## Serving
+Página usada como referência no PBIX `NeoRetail Pocket RF(3).pbix`:
 
-O caminho padrão consulta `gold.nr_overview_quantity_default`, no grão `id_customer + mês + nm_measure`. O mart armazena componentes aditivos para que percentuais e médias sejam recalculados no contexto MTD/U3M/LY. Quando um filtro de Rede, Bandeira, UF, Cidade, Tipo de local, Loja, Região, atividade, Marca, hierarquia ou Item está ativo, o dataset troca para `gold.nr_overview_quantity_detail`, empurra o filtro para a base e refaz as agregações.
+- `Visão geral - visão indústria quantidade`
+- grade 4 x 2 de cards;
+- filtros no topo;
+- comparação `Ano atual` x `Ano anterior` com `MTD`, `Mês anterior` e `Média U3M`;
+- cards de OSA, Ruptura e Item sem venda com `Tarefas do dia`;
+- `Distribuição e sortimento` com Quantidade de lojas e Quantidade de itens.
 
-O filtro `Medida` é de seleção única e inicia em `unidade`. Vendas usa faturamento quando a medida é `valor`; nas demais opções usa volume multiplicado por `MAX(conversion_rate)`. Junções de conversão e dimensões incluem `id_customer`.
+### Medidas referenciadas pelos visuais
 
-## Contratos dos cards
+| Card | Medidas encontradas no report definition |
+| --- | --- |
+| Vendas | `Venda MTD`, `Venda Mes Ant`, `Venda U3M`, `Venda MTD LY`, `Venda Mes Ant LY`, `Venda U3M LY`, `Var Venda Qtd MA-U3M`, `Var Venda MA-U3M LY` |
+| Perda de vendas OSA | `Perda OSA MTD`, `Perda OSA Mes Ant`, `Perda OSA U3M`, equivalentes `LY`, `Var Perda OSA MA-U3M`, `Var Perda OSA MA U3M LY` |
+| Preço médio | `Preço Médio MTD`, `Preço Médio Mes Ant`, `Preço Médio U3M` e equivalentes `LY` |
+| Distribuição e sortimento | `Qtd Lojas MTD`, `Qtd Lojas Mes Ant`, `Qtd Lojas U3M`, `Var Qtd loja MA-U3M`, `Qtd itens MTD`, `Qtd itens Mes Ant`, `Qtd itens U3M`, `Var Qtd item MA-U3M` |
+| % OSA | `% OSA MTD`, `% OSA Mes Ant`, `% OSA U3M` e equivalentes `LY`; `Var OSA % MTD-MA`, `Var OSA % MA-U3M` e equivalentes `LY`; `Itens OSA Criticos`, `Itens OSA Risco` |
+| Ruptura | `Ruptura MTD`, `Ruptura Mes Ant`, `Ruptura U3M` e equivalentes `LY`; `Var Rup MTD-MA`, `Var Rup MA-U3M` e equivalentes `LY`; `Itens Rup Criticos`, `Itens Rup Risco` |
+| Item sem venda | `ISV MTD`, `ISV Mes Ant`, `ISV U3M` e equivalentes `LY`; `Var ISV MTD-MA`, `Var ISV MA-U3M` e equivalentes `LY`; `Itens ISV Criticos`, `Itens ISV Risco` |
+| Cobertura de estoque | `Cobertura de estoque MTD`, `Cobertura de estoque Mes Ant`, `Cobertura de estoque U3M` e equivalentes `LY`; `Var Cobertura Estoque MTD-MA`, `Var Cobertura Estoque MA-U3M` e equivalentes `LY` |
 
-| Card | Regra publicada |
-|---|---|
-| Vendas | `valor → SUM(faturamento)`; demais medidas → `SUM(volume) × MAX(fator)`; U3M divide a soma por 3 |
-| Perda de vendas OSA | `SUM(qtd_perda_osa) × MAX(fator)`; U3M mantém a soma |
-| Preço médio | `AVG(avg_sales_price)` somente onde `faturamento > 0`, multiplicada pelo fator; U3M recalcula soma/contagem |
-| Distribuição e sortimento | `DISTINCTCOUNT(CNPJ/EAN)` onde `positivacao = 1`; U3M usa cardinalidade distinta no intervalo, sem somar meses |
-| % OSA | `1 - SUM(problemas)/SUM(ativos)`; divisor zero retorna vazio |
-| Ruptura | `SUM(rup)/SUM(status_item_geral)` |
-| Item sem venda | `SUM(est_virtual)/SUM(status_item_geral)` |
-| Cobertura de estoque | `SUM(estoque_unidades)/SUM(demanda_media)` |
+A inspeção do report definition permite recuperar com segurança os nomes das medidas usadas pelos visuais. As expressões DAX das medidas não foram recuperadas de forma confiável nesse fluxo de extração; por isso a implementação não inventa fórmulas DAX. Ela reutiliza as fórmulas já validadas na camada Superset/Gold do projeto e mantém a política `no_unproven_business_formula`.
 
-As tarefas usam `COUNT(id_item)`, sem `DISTINCT`, sobre `calculo_oportunidades`. OSA crítico usa a relação com `Fast Mover`; OSA risco usa `S`. Ruptura e Item sem venda usam `F` para crítico e `S` para risco.
+## Implementação Superset
 
-As setas de variação estão ocultas nesta página porque as medidas DAX de variância não foram encontradas. Exibir uma comparação genérica como se fosse a fórmula original criaria uma regra de negócio sem evidência.
+Dashboard:
 
-## Publicação e validação
+- título: `NeoRetail V9 — Visão geral quantidade`
+- slug: `neoretail-v9-visao-geral-quantidade`
+- dataset: `gold.nr_overview_history`
+- bootstrap: `superset/bootstrap_overview_quantity.py`
+- menu embedded: `Visão geral > Visão quantidade`
+
+Métricas usadas na paridade atual:
+
+- Vendas: `SUM(volume_unidades)`
+- Perda de vendas OSA: `SUM(qtd_perda_osa)`
+- Preço médio: `SUM(faturamento) / SUM(volume_unidades)`
+- Quantidade de lojas: `COUNT(DISTINCT id_location)`
+- Quantidade de itens: `COUNT(DISTINCT id_item)`
+- OSA: fórmula já usada no dashboard de Visão geral
+- Ruptura: fórmula já usada no Panorama
+- Item sem venda: fórmula já usada no Panorama
+- Cobertura de estoque: fórmula já usada no Panorama
+
+O componente `NeoRetailKpiRouter.jsx` adiciona a variante de apresentação `quantitycompare`, que mostra Ano atual e Ano anterior no mesmo card. O Ano anterior é calculado por deslocamento mensal sobre a série retornada pelo Superset:
+
+- MTD LY: mês atual - 12 meses;
+- Mês anterior LY: mês atual - 13 meses;
+- Média U3M LY: média dos meses -13, -14 e -15.
+
+## Publicação local
+
+Após atualizar a branch:
 
 ```powershell
-# marts
-Get-Content -Raw analytics-db/marts/40_overview_quantity_semantic.sql |
-  docker compose exec -T analytics-db psql -U analytics -d analytics -v ON_ERROR_STOP=1
+.\start.ps1 -Rebuild
 
-# objetos Superset
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview_quantity.py
-
-# reconciliação e desempenho
-docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_overview_quantity.py
-docker compose exec -T superset env PROFILE_DASHBOARD_SLUG=neoretail-v9-visao-geral-quantidade \
-  /app/.venv/bin/python /app/pythonpath/profile_dashboard_performance.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
 ```
 
-A classificação de cada métrica, as evidências numéricas e as pendências estão em `docs/metric_certification_overview_quantity.md`.
+O `bootstrap_embedded.py` lê `config/tenants.yaml`; como `overview_quantity` usa `section: overview`, o portal o coloca automaticamente no dropdown de `Visão geral`, abaixo de `Indústria`.
