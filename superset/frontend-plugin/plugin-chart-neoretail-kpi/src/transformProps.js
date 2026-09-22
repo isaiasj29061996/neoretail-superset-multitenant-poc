@@ -30,7 +30,9 @@ const semanticValue = (profile, components) => {
     return [100 * numerator / denominator];
   }
   if (profile === 'osa_bundle') {
-    const osa = denominator === null || denominator === 0 ? null : 100 * (1 - numerator / denominator);
+    const osa = numerator == null || denominator == null || denominator === 0
+      ? null
+      : 100 * (1 - numerator / denominator);
     return [osa, components[2] ?? null];
   }
   if (numerator == null || denominator == null || denominator === 0) return [null];

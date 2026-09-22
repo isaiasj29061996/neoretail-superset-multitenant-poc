@@ -248,6 +248,14 @@ const osaBundle = transform({
 });
 equal(osaBundle.indicators.map(item => item.current), [90, 120], 'OSA bundle restores percentage and loss');
 equal(osaBundle.indicators[1].average, 60, 'OSA loss U3M divides the full measure by three');
+const osaBundleBlank = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Problemas', 'Ativos', 'Perda'],
+    metricLabels: '% OSA|Perda OSA', semanticProfile: 'osa_bundle',
+  },
+  queriesData: [{ data: [{ data: '2026-05-01', Problemas: null, Ativos: 10, Perda: null }] }],
+});
+equal(osaBundleBlank.indicators.map(item => item.current), [null, null], 'OSA bundle preserves missing numerators as BLANK');
 const roi = transform({
   formData: {
     xAxis: 'data', metrics: ['Sellout', 'Custo', 'Estoque'], metricLabels: 'ROI',

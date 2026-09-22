@@ -103,7 +103,7 @@ O plugin preserva `null`/`undefined` até a renderização, que apresenta `—`.
 - Tempos pelo motor real do Superset após as correções: 0,1564 s a 0,3297 s por chart; soma sequencial de 1,5169 s; zero erros.
 - O mart detalhado ocupa aproximadamente 1.034 MiB no snapshot local. Esse custo deve ser considerado no refresh; o caminho interativo padrão consulta somente 189 linhas compactas.
 - O build de produção do Superset concluiu com sucesso.
-- A suíte Python completa (45 testes), a validação estrutural e 67 verificações JavaScript passaram.
+- A suíte Python completa (45 testes), a validação estrutural e 68 verificações JavaScript passaram.
 
 ## Evidências versionadas
 
