@@ -10,88 +10,105 @@ policy:
 metrics:
   sales:
     display_name: Vendas
-    formula_version: v9-baseline
-    formula: "CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END"
-    description: Valor de venda sell-out no último período disponível do tenant.
-    source: gold.nr_overview_history
-    periods: [MTD, M-1, U3M]
-    format: currency
-    statuses:
-      technical: discovery
-      business: pending
-      temporal: PARCIAL_CALENDARIO
-    owners: { technical: data_team, business: pending }
-    ai: { query_allowed: true, explain_allowed: true }
-    evidence:
-      validator: superset/validate_overview.py
-
-  percentual_osa:
-    display_name: "% OSA"
-    formula_version: v9-baseline
-    formula: "100 * (1 - SUM(qtd_problemas_osa) / NULLIF(SUM(qtd_item_ativo_osa), 0))"
-    description: Percentual de itens ativos sem problema de OSA no período.
-    source: gold.nr_overview_history
-    periods: [MTD, M-1, U3M]
-    format: percent
-    statuses:
-      technical: discovery
-      business: pending
-      temporal: PARCIAL_CALENDARIO
-    owners: { technical: data_team, business: pending }
-    ai: { query_allowed: true, explain_allowed: true }
-    evidence:
-      validator: superset/validate_overview.py
-
-  tvd:
-    display_name: TVD - Pré-ruptura
-    formula_version: v9-baseline
-    formula: "SUM(tvd)"
-    description: Oportunidade de pré-ruptura no último dia disponível.
-    source: gold.nr_tvd_daily
-    periods: [MTD, M-1, U3M]
-    format: currency
-    statuses:
-      technical: discovery
-      business: pending
-      temporal: PARCIAL_CALENDARIO
-    owners: { technical: data_team, business: pending }
-    ai: { query_allowed: true, explain_allowed: true }
-    evidence:
-      validator: superset/validate_stock_optimization.py
-
-  ivd:
-    display_name: IVD - Excesso de estoque
-    formula_version: v9-baseline
-    formula: "SUM(ivd_simplificado)"
-    description: Oportunidade de excesso de estoque no último dia disponível.
-    source: gold.nr_panorama_opportunities
-    periods: [MTD, M-1, U3M]
-    format: currency
-    statuses:
-      technical: discovery
-      business: pending
-      temporal: PARCIAL_CALENDARIO
-    owners: { technical: data_team, business: pending }
-    ai: { query_allowed: true, explain_allowed: true }
-    evidence:
-      validator: superset/validate_stock_optimization.py
-
-  stock:
-    display_name: Estoque
-    formula_version: v9-baseline
-    formula: "SUM(estoque_unidades)"
-    description: Quantidade de estoque no último período mensal disponível.
-    source: gold.nr_overview_history
+    formula_version: overview-quantity-v1
+    formula: "unidade -> SUM(volume_unidades) * MAX(fator); U3M -> soma dos meses M-1, M-2 e M-3 / 3"
+    description: Quantidade de venda sell-out na medida unidade, conforme o contrato da Visão Geral Quantidade.
+    source: gold.nr_overview_quantity_default
+    filtered_source: gold.nr_overview_quantity_detail
     periods: [MTD, M-1, U3M]
     format: number
     statuses:
-      technical: discovery
+      technical: RECONCILED
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+      additional: [PENDENTE_VARIANCE_DAX]
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_overview_quantity.py
+      contract: docs/metric_certification_overview_quantity.md
+      mart: analytics-db/marts/40_overview_quantity_semantic.sql
+
+  percentual_osa:
+    display_name: "% OSA"
+    formula_version: overview-quantity-v1
+    formula: "100 * (1 - SUM(qtd_problemas_osa) / SUM(qtd_item_ativo_osa)); BLANK quando o denominador é zero"
+    description: Percentual de itens ativos sem problema de OSA no período.
+    source: gold.nr_overview_quantity_default
+    filtered_source: gold.nr_overview_quantity_detail
+    periods: [MTD, M-1, U3M]
+    format: percent
+    statuses:
+      technical: RECONCILED
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+      additional: [PENDENTE_VARIANCE_DAX]
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_overview_quantity.py
+      contract: docs/metric_certification_overview_quantity.md
+      mart: analytics-db/marts/40_overview_quantity_semantic.sql
+
+  tvd:
+    display_name: TVD - Pré-ruptura
+    formula_version: stock-headline-v1
+    formula: "SUM(tvd)"
+    description: Oportunidade de pré-ruptura no último dia disponível.
+    source: gold.nr_tvd_daily_summary
+    filtered_source: gold.nr_tvd_daily
+    periods: [MTD, M-1, U3M]
+    format: currency
+    statuses:
+      technical: CERTIFICADA
       business: pending
       temporal: PARCIAL_CALENDARIO
     owners: { technical: data_team, business: pending }
     ai: { query_allowed: true, explain_allowed: true }
     evidence:
-      validator: superset/validate_overview.py
+      validator: superset/validate_stock_headlines.py
+      contract: docs/metric_certification_overview.md
+      mart: analytics-db/marts/35_stock_headline_performance.sql
+
+  ivd:
+    display_name: IVD - Excesso de estoque
+    formula_version: stock-headline-v1
+    formula: "SUM(ivd)"
+    description: Oportunidade de excesso de estoque no último dia disponível.
+    source: gold.nr_ivd_daily_summary
+    filtered_source: gold.nr_ivd_daily
+    periods: [MTD, M-1, U3M]
+    format: currency
+    statuses:
+      technical: CERTIFICADA
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_stock_headlines.py
+      contract: docs/metric_certification_overview.md
+      mart: analytics-db/marts/35_stock_headline_performance.sql
+
+  stock:
+    display_name: Estoque
+    formula_version: overview-quantity-v1
+    formula: "SUM(estoque_unidades)"
+    description: Quantidade de estoque no último período mensal disponível.
+    source: gold.nr_overview_quantity_default
+    filtered_source: gold.nr_overview_quantity_detail
+    periods: [MTD, M-1, U3M]
+    format: number
+    statuses:
+      technical: RECONCILED
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_overview_quantity.py
+      contract: docs/metric_certification_overview_quantity.md
+      mart: analytics-db/marts/40_overview_quantity_semantic.sql
 
 tools:
   osa_causes:

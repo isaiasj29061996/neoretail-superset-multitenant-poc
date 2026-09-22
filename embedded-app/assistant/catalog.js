@@ -19,15 +19,18 @@ export function metricDefinition(catalog, metricId) {
   return metric;
 }
 
-export function metricGovernance(metricId, metric) {
+export function metricGovernance(metricId, metric, actualSource = null) {
   return {
     metricId,
     displayName: metric.display_name,
-    source: metric.source,
+    source: actualSource || metric.source,
+    defaultSource: metric.source,
+    filteredSource: metric.filtered_source || null,
     formulaVersion: metric.formula_version,
     technicalStatus: metric.statuses?.technical || "unknown",
     businessStatus: metric.statuses?.business || "unknown",
     temporalStatus: metric.statuses?.temporal || null,
+    additionalStatuses: metric.statuses?.additional || [],
     owners: metric.owners || {},
     evidence: metric.evidence || {},
   };
