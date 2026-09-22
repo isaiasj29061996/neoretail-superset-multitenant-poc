@@ -25,6 +25,7 @@ A POC atual está focada na **AMBEV (`id_customer = 142`)** e tem dois objetivos
 | RLS por `id_customer` | implementado |
 | Portal embedded com Guest Token | implementado |
 | Visão Geral — Indústria | implementado |
+| Visão Geral — Quantidade | implementado |
 | Panorama — Indústria | implementado |
 | Panorama — OSA | implementado |
 | Tarefas do dia / Otimização de estoque | implementado |
@@ -140,11 +141,12 @@ Catálogo, módulos e permissões:
 
 ## Dashboards embedded
 
-O catálogo atual publica seis experiências:
+O catálogo atual publica sete experiências:
 
 | Chave | Dashboard | Menu |
 |---|---|---|
 | `overview` | Visão geral — Indústria | Visão geral / Indústria |
+| `overview_quantity` | Visão geral — Quantidade | Visão geral / Visão quantidade |
 | `panorama` | Panorama — Indústria | Panorama / Geral |
 | `osa` | Panorama — OSA | Panorama / OSA |
 | `tasks` | Tarefas do dia — Pré-ruptura / Excesso | Tarefas do dia |
@@ -155,7 +157,8 @@ Navegação do portal:
 
 ```text
 Visão geral
-└── Indústria
+├── Indústria
+└── Visão quantidade
 
 Panorama
 ├── Geral
@@ -322,6 +325,7 @@ docker compose exec -T local-engine python -m neoretail_local.gold_serving --cus
 
 ```powershell
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview_quantity.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
