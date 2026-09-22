@@ -29,7 +29,7 @@ export default class NeoRetailKpiChartPlugin extends ChartPlugin {
     super({
       buildQuery,
       controlPanel,
-      loadChart: () => import('./NeoRetailKpi'),
+      loadChart: () => import('./NeoRetailKpiRouter'),
       metadata,
       transformProps,
     });
