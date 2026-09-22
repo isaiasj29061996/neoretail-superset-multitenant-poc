@@ -14,6 +14,9 @@
       </a>
       <nav id="product-navigation" class="product-navigation" aria-label="Navegação NeoRetail"></nav>
       <div class="product-actions">
+        <button id="assistant-open" class="assistant-trigger" type="button" hidden>
+          <span aria-hidden="true">✦</span> Assistente
+        </button>
         <button class="header-icon" title="Ajuda" aria-label="Ajuda">?</button>
         <button id="active-industry" class="industry-chip" type="button">
           <span>Indústria</span><strong id="tenant-name">—</strong><i>⌄</i>
@@ -60,6 +63,38 @@
         </div>
       </section>
     </div>
+
+    <div id="assistant-backdrop" class="assistant-backdrop" hidden></div>
+    <aside id="assistant-panel" class="assistant-panel" aria-labelledby="assistant-title" aria-hidden="true">
+      <header class="assistant-header">
+        <div>
+          <span class="assistant-kicker">ANÁLISE GOVERNADA</span>
+          <h2 id="assistant-title">NeoRetail Assistant</h2>
+          <p>O PostgreSQL calcula. A governança autoriza. O Llama explica.</p>
+        </div>
+        <button id="assistant-close" class="assistant-close" type="button" aria-label="Fechar assistente">×</button>
+      </header>
+      <div class="assistant-suggestions" aria-label="Perguntas sugeridas">
+        <button type="button">Como está o OSA este mês?</button>
+        <button type="button">Como ele está comparado ao mês anterior?</button>
+        <button type="button">Como estão TVD e IVD?</button>
+        <button type="button">Quais são as maiores causas de perda OSA?</button>
+      </div>
+      <div id="assistant-messages" class="assistant-messages" aria-live="polite">
+        <article class="assistant-message assistant-message-system">
+          <p>Faça perguntas sobre Vendas, OSA, TVD, IVD e Estoque. As respostas usam somente ferramentas e fontes autorizadas para a indústria da sua sessão.</p>
+        </article>
+      </div>
+      <div id="assistant-error" class="assistant-error" role="alert" hidden></div>
+      <form id="assistant-form" class="assistant-form">
+        <label for="assistant-input">Pergunta</label>
+        <div>
+          <textarea id="assistant-input" name="message" rows="2" maxlength="1000" placeholder="Pergunte sobre os indicadores deste tenant" required></textarea>
+          <button id="assistant-send" type="submit" aria-label="Enviar pergunta">➜</button>
+        </div>
+        <button id="assistant-clear" class="assistant-clear" type="button">Limpar conversa</button>
+      </form>
+    </aside>
     <script src="/app.bundle.js"></script>
   </body>
 </html>

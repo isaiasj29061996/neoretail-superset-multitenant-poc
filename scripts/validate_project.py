@@ -48,9 +48,13 @@ def main() -> None:
     assert "analytics-db" in services
     assert "superset-db" in services
     assert "blob-profiler" in services
+    assert services["ollama"]["profiles"] == ["assistant"]
+    assert "ollama" not in services["embedded-app"].get("depends_on", {})
+    assert services["embedded-app"]["environment"]["ASSISTANT_ENABLED"] == "${ASSISTANT_ENABLED:-false}"
     assert not (ROOT / "pbix").exists()
     assert not (ROOT / "pbi-live").exists()
     assert (ROOT / "config/customers.yaml").is_file()
+    assert (ROOT / "config/assistant_metrics.yaml").is_file()
 
     source_catalog = yaml.safe_load((ROOT / "config/source_catalog.yaml").read_text(encoding="utf-8"))
     assert source_catalog["version"] == "9.0"
@@ -203,6 +207,29 @@ def main() -> None:
     assert "dashboardKey" in embedded
     assert "authorizedDashboard(identity, dashboardKey)" in embedded
     assert "tenant_id =" not in embedded
+    assert 'registerAssistantRoutes(app' in embedded
+
+    assistant_catalog = yaml.safe_load(
+        (ROOT / "config/assistant_metrics.yaml").read_text(encoding="utf-8")
+    )
+    assert assistant_catalog["policy"]["tenant_source"] == "authenticated_session"
+    assert assistant_catalog["policy"]["sql_mode"] == "fixed_allowlisted_read_only"
+    assert set(assistant_catalog["metrics"]) == {
+        "sales", "percentual_osa", "tvd", "ivd", "stock"
+    }
+    assert all(
+        metric["statuses"]["technical"] == "discovery"
+        for metric in assistant_catalog["metrics"].values()
+    )
+    assistant_tools = (
+        ROOT / "embedded-app/assistant/metric-tools.js"
+    ).read_text(encoding="utf-8")
+    assert "BEGIN READ ONLY" in (
+        ROOT / "embedded-app/assistant/database.js"
+    ).read_text(encoding="utf-8")
+    assert "req.body" not in assistant_tools
+    assert "LLMProvider" not in assistant_tools
+    assert "id_customer = $1" in assistant_tools
 
     tenants = yaml.safe_load(
         (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
