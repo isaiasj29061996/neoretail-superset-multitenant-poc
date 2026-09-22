@@ -170,6 +170,134 @@ function renderNavigation(catalog, activeKey, selectDashboard) {
   }
 }
 
+function setupAssistant({ getIdentity, getDashboard }) {
+  const trigger = $("#assistant-open");
+  const panel = $("#assistant-panel");
+  const backdrop = $("#assistant-backdrop");
+  const closeButton = $("#assistant-close");
+  const form = $("#assistant-form");
+  const input = $("#assistant-input");
+  const sendButton = $("#assistant-send");
+  const clearButton = $("#assistant-clear");
+  const messagesRoot = $("#assistant-messages");
+  const errorRoot = $("#assistant-error");
+  const suggestions = document.querySelectorAll(".assistant-suggestions button");
+  const initialMessage = messagesRoot.firstElementChild.cloneNode(true);
+  const history = [];
+  let activeMetricId = null;
+
+  function open() {
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+    backdrop.hidden = false;
+    input.focus();
+  }
+
+  function close() {
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+    backdrop.hidden = true;
+  }
+
+  function evidenceNode(evidence) {
+    const root = document.createElement("dl");
+    root.className = "assistant-evidence";
+    const fields = [
+      ["Métrica", evidence.metricId],
+      ["Período", evidence.period],
+      ["Tenant", evidence.tenantName || evidence.tenantId],
+      ["Fonte", evidence.source],
+      ["Status técnico", evidence.technicalStatus],
+      ["Status negócio", evidence.businessStatus],
+      ["Calendário", evidence.temporalStatus],
+      ["Atualização", evidence.snapshot],
+    ];
+    for (const [label, value] of fields) {
+      if (value === null || value === undefined || value === "") continue;
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const description = document.createElement("dd");
+      description.textContent = String(value);
+      root.append(term, description);
+    }
+    return root;
+  }
+
+  function appendMessage(role, content, evidence = []) {
+    const article = document.createElement("article");
+    article.className = `assistant-message assistant-message-${role}`;
+    const text = document.createElement("p");
+    text.textContent = content;
+    article.append(text);
+    for (const item of evidence) article.append(evidenceNode(item));
+    messagesRoot.append(article);
+    messagesRoot.scrollTop = messagesRoot.scrollHeight;
+  }
+
+  function clear() {
+    history.length = 0;
+    activeMetricId = null;
+    messagesRoot.replaceChildren(initialMessage.cloneNode(true));
+    errorRoot.hidden = true;
+    input.focus();
+  }
+
+  async function send(message) {
+    const question = String(message || "").trim();
+    if (!question) return;
+    errorRoot.hidden = true;
+    appendMessage("user", question);
+    history.push({ role: "user", content: question });
+    input.value = "";
+    input.disabled = true;
+    sendButton.disabled = true;
+    const loading = document.createElement("article");
+    loading.className = "assistant-message assistant-message-loading";
+    loading.textContent = "Consultando fontes governadas…";
+    messagesRoot.append(loading);
+    try {
+      const response = await jsonFetch("/api/assistant/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          message: question,
+          history: history.slice(-6, -1),
+          context: { dashboard: getDashboard(), metricId: activeMetricId, filters: {} },
+        }),
+      });
+      loading.remove();
+      appendMessage("assistant", response.answer, response.evidence || []);
+      history.push({ role: "assistant", content: response.answer });
+      if (response.metricId) activeMetricId = response.metricId;
+    } catch (error) {
+      loading.remove();
+      errorRoot.textContent = error.message;
+      errorRoot.hidden = false;
+    } finally {
+      input.disabled = false;
+      sendButton.disabled = false;
+      input.focus();
+    }
+  }
+
+  if (!getIdentity().assistantEnabled) return;
+  trigger.hidden = false;
+  trigger.addEventListener("click", open);
+  closeButton.addEventListener("click", close);
+  backdrop.addEventListener("click", close);
+  clearButton.addEventListener("click", clear);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    send(input.value);
+  });
+  suggestions.forEach(button => button.addEventListener("click", () => {
+    open();
+    send(button.textContent);
+  }));
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && panel.classList.contains("open")) close();
+  });
+}
+
 async function productPage() {
   let identity = await authenticatedSession();
   if (!identity) return;
@@ -182,6 +310,7 @@ async function productPage() {
 
   let activeKey = new URLSearchParams(window.location.search).get("dashboard") || identity.defaultDashboard;
   if (!catalog.dashboards.some((item) => item.key === activeKey)) activeKey = identity.defaultDashboard;
+  setupAssistant({ getIdentity: () => identity, getDashboard: () => activeKey });
 
   async function loadDashboard(key) {
     const dashboard = catalog.dashboards.find((item) => item.key === key);
@@ -190,12 +319,7 @@ async function productPage() {
     history.replaceState({}, "", `/app?dashboard=${encodeURIComponent(key)}`);
     renderNavigation(catalog, key, loadDashboard);
     $("#dashboard-title").textContent = dashboard.title;
-    const sectionLabel = dashboard.section === "tasks"
-      ? "Tarefas do dia"
-      : dashboard.section === "export"
-        ? "Exportação"
-        : "Análises";
-    $("#breadcrumb").textContent = `NeoRetail / ${sectionLabel}`;
+    $("#breadcrumb").textContent = `NeoRetail / ${dashboard.section === "tasks" ? "Tarefas do dia" : "Análises"}`;
     $("#setup-state").hidden = true;
     $("#dashboard-loading").hidden = false;
     const mountPoint = $("#superset-container");
@@ -214,7 +338,7 @@ async function productPage() {
         dashboardUiConfig: {
           hideTitle: true,
           hideTab: true,
-          hideChartControls: dashboard.section !== "export",
+          hideChartControls: true,
           filters: { visible: true, expanded: true },
         },
         referrerPolicy: "strict-origin-when-cross-origin",
