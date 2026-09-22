@@ -80,6 +80,7 @@ contra `DIMENSAO_CUSTOMER` antes de publicar a Silver.
 | `local-engine` | PySpark, pipeline e Jupyter | <http://localhost:8888> |
 | `embedded-app` | Portal multitenant demonstrativo | <http://localhost:3000> |
 | `blob-profiler` | Perfil opcional das fontes no Blob | profile `blob` |
+| `ollama` | Provider local opcional do assistente governado | profile `assistant`, somente interno |
 
 ## Pré-requisitos
 
@@ -142,6 +143,42 @@ versionado.
 | `SPARK_DRIVER_MEMORY` | memória do driver PySpark |
 | `PUBLIC_SUPERSET_URL` | URL usada pelo portal embedded |
 | `DEMO_USER_PASSWORD` | senha do usuário demonstrativo |
+| `ASSISTANT_ENABLED` | habilita o painel e as APIs do assistente; padrão `false` |
+| `LLM_PROVIDER` | `mock` para testes determinísticos ou `ollama` |
+| `OLLAMA_BASE_URL` | endpoint interno do Ollama; padrão `http://ollama:11434` |
+| `OLLAMA_MODEL` | modelo configurável; padrão `llama3.1:8b` |
+
+## Assistente analítico governado (opcional)
+
+O assistente fica desabilitado por padrão. O stack principal continua subindo por
+`start.ps1` sem Ollama, modelo ou dependência adicional em tempo de execução.
+
+Para validar tenant, ferramentas, governança, auditoria e frontend sem baixar um
+modelo, configure:
+
+```text
+ASSISTANT_ENABLED=true
+LLM_PROVIDER=mock
+```
+
+Para usar Ollama, inicie explicitamente o profile e verifique o modelo:
+
+```powershell
+docker compose --profile assistant up -d ollama
+.\bootstrap-ollama.ps1
+```
+
+O script apenas informa se `llama3.1:8b` está ausente. O download, que pode ser
+grande, só ocorre com autorização explícita:
+
+```powershell
+.\bootstrap-ollama.ps1 -PullModel
+```
+
+Depois configure `ASSISTANT_ENABLED=true` e `LLM_PROVIDER=ollama` no `.env` e
+recrie somente o portal. O LLM recebe resultados estruturados; não recebe
+credenciais, não gera SQL e não escolhe tenant. Consulte
+[`docs/governed_analytics_assistant.md`](docs/governed_analytics_assistant.md).
 
 O valor padrão de `LOCAL_LAKE_FORMAT=parquet` evita baixar JARs do Maven.
 O modo `delta` pode exigir acesso externo na primeira inicialização.
