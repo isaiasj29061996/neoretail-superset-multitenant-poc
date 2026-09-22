@@ -23,6 +23,19 @@ def test_local_architecture_has_no_databricks_runtime():
     assert "analytics-db" in compose["services"]
 
 
+def test_governed_assistant_is_optional_and_does_not_gate_core_services():
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    assistant = compose["services"]["ollama"]
+    embedded = compose["services"]["embedded-app"]
+    assert assistant["profiles"] == ["assistant"]
+    assert "ports" not in assistant
+    assert "ollama" not in embedded.get("depends_on", {})
+    assert embedded["environment"]["ASSISTANT_ENABLED"] == "${ASSISTANT_ENABLED:-false}"
+    catalog = yaml.safe_load((ROOT / "config/assistant_metrics.yaml").read_text(encoding="utf-8"))
+    assert catalog["policy"]["tenant_source"] == "authenticated_session"
+    assert catalog["policy"]["sql_mode"] == "fixed_allowlisted_read_only"
+
+
 def test_source_of_truth_remains_blob():
     catalog = yaml.safe_load((ROOT / "config/source_catalog.yaml").read_text(encoding="utf-8"))
     assert catalog["source_of_truth"] == "azure_blob"
