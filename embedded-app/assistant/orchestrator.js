@@ -8,7 +8,7 @@ const METRIC_PATTERNS = [
   ["stock", /\bestoque\b/i],
 ];
 
-const POLICY_ATTACK = /ignore (suas|as) regras|agora (você|voce) é administrador|todos os (clientes|tenants)|(?:tenant|cliente|id_customer)\s*\d+|gere sql|execute (?:sql|direto no banco)|credenciais?|connection string/i;
+const POLICY_ATTACK = /ignore (?:suas|as) regras|ignore a governan[cç]a|agora (?:você|voce) é administrador|todos os (?:clientes|tenants)|(?:tenant|cliente|id_customer)\s*\d+|gere sql|execute (?:sql|direto no banco)|credenciais?|senhas?|connection string|redefin(?:a|ir).*(?:f[oó]rmula|m[eé]trica)|bypass.*(?:cat[aá]logo|governan[cç]a)/i;
 
 function metricFromQuestion(question, context = {}) {
   for (const [metricId, pattern] of METRIC_PATTERNS) if (pattern.test(question)) return metricId;
@@ -88,16 +88,16 @@ export class AnalyticsOrchestrator {
       intent = "top_opportunities";
       toolCalled = "get_top_opportunities";
       result = await this.tools.getTopOpportunities({ tenantId, metricId, filters });
-      evidence = metricGovernance(metricId, this.catalog.metrics[metricId]);
+      evidence = metricGovernance(metricId, this.catalog.metrics[metricId], result.source);
     } else if (/\btvd\b/i.test(message) && /\bivd\b/i.test(message)) {
       intent = "multi_metric";
       toolCalled = "get_metric";
       const items = await Promise.all(["tvd", "ivd"].map(async id => {
         const item = await this.tools.getMetric({ metricId: id, tenantId, filters });
-        return { metricId: id, displayName: item.evidence.displayName, value: item.value, format: item.format, snapshot: item.snapshot };
+        return { metricId: id, displayName: item.evidence.displayName, value: item.value, format: item.format, snapshot: item.snapshot, source: item.evidence.source };
       }));
       result = { items, period: "MTD" };
-      evidence = { source: items.map(item => this.catalog.metrics[item.metricId].source).join(", "), technicalStatus: "discovery", businessStatus: "pending" };
+      evidence = { source: items.map(item => item.source).join(", "), technicalStatus: "mixed", businessStatus: "pending", temporalStatus: "PARCIAL_CALENDARIO" };
     } else {
       if (!metricId || !this.catalog.metrics[metricId]) {
         return {
@@ -154,6 +154,9 @@ export class AnalyticsOrchestrator {
         technicalStatus: evidence?.technicalStatus || null,
         businessStatus: evidence?.businessStatus || null,
         temporalStatus: evidence?.temporalStatus || null,
+        additionalStatuses: evidence?.additionalStatuses || [],
+        validator: evidence?.evidence?.validator || null,
+        contract: evidence?.evidence?.contract || null,
         snapshot: result?.snapshot || null,
       }],
     };
