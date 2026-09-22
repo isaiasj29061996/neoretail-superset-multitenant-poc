@@ -33,7 +33,7 @@ const semanticValue = (profile, components) => {
     const osa = denominator === null || denominator === 0 ? null : 100 * (1 - numerator / denominator);
     return [osa, components[2] ?? null];
   }
-  if (denominator === null || denominator === 0) return [null];
+  if (numerator == null || denominator == null || denominator === 0) return [null];
   if (profile === 'weighted_average') return [numerator / denominator];
   if (profile === 'one_minus_ratio') return [100 * (1 - numerator / denominator)];
   if (profile === 'ratio_percent') return [100 * numerator / denominator];
@@ -44,25 +44,30 @@ const semanticValue = (profile, components) => {
 const semanticAggregate = (profile, rows, index) => {
   if (!profile) return null;
   if (profile === 'direct_average') {
-    return rows.reduce((sum, row) => sum + (row?.values[index] ?? 0), 0) / 3;
+    const values = rows.map(row => row?.values[index]).filter(value => value != null);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / 3 : null;
   }
   if (profile === 'direct_sum') {
-    return rows.reduce((sum, row) => sum + (row?.values[index] ?? 0), 0);
+    const values = rows.map(row => row?.values[index]).filter(value => value != null);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
   }
   if (profile === 'distribution_bundle') {
     const latest = rows.filter(Boolean).sort((left, right) => left.date - right.date).at(-1);
     return latest?.components[index + 2] ?? null;
   }
   if (profile === 'stock_bundle') {
-    if (index === 0) return rows.reduce((sum, row) => sum + (row?.values[index] ?? 0), 0) / 3;
+    if (index === 0) {
+      const values = rows.map(row => row?.values[index]).filter(value => value != null);
+      return values.length ? values.reduce((sum, value) => sum + value, 0) / 3 : null;
+    }
     const latestStock = rows.filter(Boolean).sort((left, right) => left.date - right.date).at(-1);
-    return (latestStock?.values[index] ?? 0) / 3;
+    return latestStock?.values[index] == null ? null : latestStock.values[index] / 3;
   }
-  const components = [0, 0];
+  const components = [];
   rows.forEach(row => row?.components?.forEach((value, componentIndex) => {
-    components[componentIndex] = (components[componentIndex] || 0) + (value ?? 0);
+    if (value != null) components[componentIndex] = (components[componentIndex] ?? 0) + value;
   }));
-  if (profile === 'osa_bundle' && index === 1) return components[2] / 3;
+  if (profile === 'osa_bundle' && index === 1) return components[2] == null ? null : components[2] / 3;
   return semanticValue(profile, components)[index] ?? null;
 };
 
@@ -141,6 +146,10 @@ export default function transformProps(chartProps) {
   const indicators = displayMetricLabels.map((label, index) => {
     const previous = latest ? lastByMonth.get(shiftMonth(latest.date, -1)) : null;
     const prior = latest ? [-1, -2, -3].map(offset => lastByMonth.get(shiftMonth(latest.date, offset))) : [];
+    const priorYearCurrent = latest ? lastByMonth.get(shiftMonth(latest.date, -12)) : null;
+    const priorYearPrevious = latest ? lastByMonth.get(shiftMonth(latest.date, -13)) : null;
+    const priorYear = latest ? [-13, -14, -15].map(offset => lastByMonth.get(shiftMonth(latest.date, offset))) : [];
+    const disableLy = formData.semantic_disable_ly === true;
     return {
       label: labels[index] || label,
       format: formats[index] || formats[0] || 'number',
@@ -150,6 +159,11 @@ export default function transformProps(chartProps) {
       // DAX contract: DIVIDE(M1 + M2 + M3, 3). Missing months do not
       // change the denominator and BLANK participates as zero in the sum.
       average: latest ? semanticAggregate(semanticProfile, prior, index) : null,
+      lastYear: disableLy ? { current: null, previous: null, average: null } : {
+        current: priorYearCurrent?.values[index] ?? null,
+        previous: priorYearPrevious?.values[index] ?? null,
+        average: latest ? semanticAggregate(semanticProfile, priorYear, index) : null,
+      },
       annual: semanticProfile === 'roi' && latest
         ? semanticTimeline.slice(-12).reduce((sum, row) => sum + (row.values[0] ?? 0), 0)
         : null,

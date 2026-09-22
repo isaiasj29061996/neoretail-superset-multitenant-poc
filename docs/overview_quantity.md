@@ -6,6 +6,10 @@ A página `NeoRetail V9 — Visão geral quantidade` usa o slug `neoretail-v9-vi
 
 O caminho padrão consulta `gold.nr_overview_quantity_default`, no grão `id_customer + mês + nm_measure`. O mart armazena componentes aditivos para que percentuais e médias sejam recalculados no contexto MTD/U3M/LY. Quando um filtro de Rede, Bandeira, UF, Cidade, Tipo de local, Loja, Região, atividade, Marca, hierarquia ou Item está ativo, o dataset troca para `gold.nr_overview_quantity_detail`, empurra o filtro para a base e refaz as agregações.
 
+O filtro Medida consulta `gold.nr_conversion_options`, com seleção única e default `unidade`. Os demais filtros consultam `gold.nr_filter_options`. Assim, `valor` e todas as medidas reais de `dim_conversao` ficam disponíveis sem lista hardcoded no bootstrap.
+
+O frontend preserva `BLANK`: razões com denominador zero/ausente, meses inexistentes e Preço médio LY sem DAX original permanecem `null` e são exibidos como `—`. Zero factual continua sendo exibido como zero.
+
 O filtro `Medida` é de seleção única e inicia em `unidade`. Vendas usa faturamento quando a medida é `valor`; nas demais opções usa volume multiplicado por `MAX(conversion_rate)`. Junções de conversão e dimensões incluem `id_customer`.
 
 ## Contratos dos cards

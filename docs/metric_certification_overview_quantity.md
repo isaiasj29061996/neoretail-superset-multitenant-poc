@@ -69,15 +69,41 @@ A busca nos arquivos versionados não encontrou as flags originais de calendári
 
 As setas foram desativadas nos oito cards (`quantitycompareplain`) e permanecem `PENDENTE_VARIANCE_DAX`. Elas só devem voltar após incorporar as fórmulas originais e casos esperados.
 
+O validador também reconcilia, para cada card aplicável, os seis valores finais produzidos pelo contrato atual de deslocamento mensal: MTD, M-1, U3M, MTD LY, M-1 LY e U3M LY. Essa evidência comprova a implementação atual; não substitui as flags DAX originais e mantém `PARCIAL_CALENDARIO`. Preço médio LY permanece `BLANK`, pois sua definição DAX original não foi localizada.
+
+Valores reconciliados para `unidade` no snapshot mais recente:
+
+| Card | MTD | M-1 | U3M | MTD LY | M-1 LY | U3M LY |
+|---|---:|---:|---:|---:|---:|---:|
+| Vendas | 9.786.865,3950 | 17.572.147,1240 | 21.204.207,9406 | 29.894.183,1000 | 26.812.610,8900 | 21.541.545,7633 |
+| Perda OSA | 848.852,1723 | 1.737.802,7551 | 6.496.757,6314 | 1.400.194,3511 | 805.374,3435 | 3.553.383,4278 |
+| Preço médio | 8,747864 | 10,174136 | 10,228150 | BLANK | BLANK | BLANK |
+| Lojas positivadas | 0 | 0 | 0 | 0 | 0 | 0 |
+| Itens positivados | 0 | 0 | 0 | 0 | 0 | 0 |
+| % OSA | 74,126909% | 75,423182% | 72,687374% | 87,332602% | 90,207200% | 82,828654% |
+| Ruptura | 307,713889% | 613,859964% | 576,527200% | 1.749,584404% | 1.110,317460% | 667,301175% |
+| Item sem venda | 49,152028% | 130,404478% | 258,592530% | 1.163,511032% | 529,111327% | 692,597546% |
+| Cobertura | 58,189289 | 43,016086 | 54,503127 | 39,573097 | 49,329109 | 52,733332 |
+
+## Filtro Medida
+
+O filtro `nm_measure` usa exclusivamente o dataset físico `gold.nr_conversion_options`. Os demais filtros continuam em `gold.nr_filter_options`. O Superset confirmou seleção única, default visual `unidade` e as sete opções reais: `hectolitro`, `libra`, `litro`, `quilograma`, `tonelada`, `unidade` e `valor`.
+
+Cada opção foi executada pelo motor do Superset nos cards Vendas, Perda OSA e Preço médio e reconciliada com `nr_overview_quantity_default`. O ramo `valor` preserva Vendas como faturamento e mantém Perda OSA e Preço médio como `BLANK`, conforme o contrato atual.
+
+## Semântica de BLANK
+
+O plugin preserva `null`/`undefined` até a renderização, que apresenta `—`. Denominador zero ou ausente retorna `BLANK` para % OSA, Cobertura e demais razões. Ausência de mês e períodos LY inexistentes também permanecem `BLANK`; um zero numérico real continua sendo formatado como zero. Os testes cobrem separadamente esses casos.
+
 ## Filtros, RLS e performance
 
 - RLS continua em `id_customer`.
 - O caminho filtrado foi executado com `Rede=AKKIATACADO`, tenant 142 e medida `unidade`; retornou seis meses e usou `nr_overview_quantity_detail`.
 - O caminho padrão dos oito charts usou `nr_overview_quantity_default` e retornou 27 meses por chart.
-- Tempos pelo motor real do Superset: 0,129 s a 0,358 s por chart; soma sequencial aproximada de 1,344 s; zero erros.
+- Tempos pelo motor real do Superset após as correções: 0,1564 s a 0,3297 s por chart; soma sequencial de 1,5169 s; zero erros.
 - O mart detalhado ocupa aproximadamente 1.034 MiB no snapshot local. Esse custo deve ser considerado no refresh; o caminho interativo padrão consulta somente 189 linhas compactas.
 - O build de produção do Superset concluiu com sucesso.
-- 21 testes Python (contratos + runtime Power Query) e 56 verificações JavaScript passaram.
+- A suíte Python completa (45 testes), a validação estrutural e 67 verificações JavaScript passaram.
 
 ## Evidências versionadas
 

@@ -142,13 +142,14 @@ LEFT JOIN tasks t ON t.id_customer=e.id_customer
 
 def comparison_params(dataset, title, measures, *, profile, fmt="number", direction="higher",
                       show_tasks=False, critical_metric=None, risk_metric=None, plain=True,
-                      labels=None, help_text=None):
+                      labels=None, help_text=None, **extra):
     return chart_params(
         dataset, title, "quantitycompareplain" if plain else "quantitycompare", measures,
         metric_labels=labels or title, metric_formats=fmt, metric_directions=direction,
         semantic_profile=profile, show_tasks=show_tasks,
         critical_metric=critical_metric, risk_metric=risk_metric,
         task_labels="itens críticos|itens em risco", help_text=help_text or title,
+        **extra,
     )
 
 
@@ -171,11 +172,19 @@ def main():
         filter_options = upsert_dataset(
             db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options"
         )
+        conversion_options = upsert_dataset(
+            db.session, SqlaTable, database, "nr_conversion_options",
+            table_name="nr_conversion_options",
+        )
 
         specs = [
             ("Vendas", comparison_params(semantic, "Vendas", [Q["sales"]], profile="direct_average")),
             ("Perda de vendas OSA", comparison_params(semantic, "Perda de vendas OSA", [Q["loss"]], profile="direct_sum", direction="lower")),
-            ("Preço médio", comparison_params(semantic, "Preço médio", [Q["price_num"], Q["price_count"]], profile="weighted_average", fmt="currency", plain=True)),
+            ("Preço médio", comparison_params(
+                semantic, "Preço médio", [Q["price_num"], Q["price_count"]],
+                profile="weighted_average", fmt="currency", plain=True,
+                semantic_disable_ly=True,
+            )),
             ("Distribuição e sortimento", comparison_params(
                 semantic, "Distribuição e sortimento",
                 [Q["stores"], Q["items"], Q["stores_u3m"], Q["items_u3m"]],
@@ -200,7 +209,13 @@ def main():
         dashboard.json_metadata = json.dumps({
             "timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0,
             "color_scheme": "supersetColors",
-            "native_filter_configuration": overview_native_filters([semantic.id], filter_options.id),
+            "native_filter_configuration": overview_native_filters(
+                [semantic.id],
+                {
+                    "nm_measure": conversion_options.id,
+                    **{column: filter_options.id for column in FILTER_COLUMNS},
+                },
+            ),
             "filter_bar_orientation": "HORIZONTAL",
         }, ensure_ascii=False)
         dashboard.slices = charts

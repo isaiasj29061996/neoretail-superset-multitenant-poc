@@ -1,19 +1,10 @@
 import React from 'react';
 
 import NeoRetailKpi from './NeoRetailKpi';
-
-const formatValue = (value, type) => {
-  const options = type === 'decimal'
-    ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-    : type === 'currency'
-      ? { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 2 }
-      : type === 'percent'
-        ? { style: 'percent', maximumFractionDigits: 2 }
-        : { notation: 'compact', maximumFractionDigits: 2 };
-  return new Intl.NumberFormat('pt-BR', options).format(type === 'percent' ? value / 100 : value);
-};
+import formatValue from './formatValue';
 
 const trend = (value, reference, lowerIsBetter) => {
+  if (value == null || reference == null) return { symbol: '', color: '#8A929C' };
   if (value === reference) return { symbol: '•', color: '#8A929C' };
   const increased = value > reference;
   return {
@@ -21,9 +12,6 @@ const trend = (value, reference, lowerIsBetter) => {
     color: (lowerIsBetter ? !increased : increased) ? '#4D9669' : '#D0342C',
   };
 };
-
-const monthKey = date => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-const shiftMonth = (date, offset) => monthKey(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1)));
 
 const styles = {
   card: {
@@ -87,44 +75,6 @@ function ValuesTriplet({ indicator, values, showTrends }) {
   </div>;
 }
 
-function aggregateSemantic(profile, rows, metricIndex) {
-  if (profile === 'direct_average') {
-    return rows.reduce((sum, row) => sum + (row?.values[metricIndex] ?? 0), 0) / 3;
-  }
-  if (profile === 'direct_sum') {
-    return rows.reduce((sum, row) => sum + (row?.values[metricIndex] ?? 0), 0);
-  }
-  if (profile === 'distribution_bundle') {
-    const latest = rows.filter(Boolean).sort((left, right) => left.date - right.date).at(-1);
-    return latest?.components?.[metricIndex + 2] ?? 0;
-  }
-  const components = [];
-  rows.forEach(row => row?.components?.forEach((value, index) => {
-    components[index] = (components[index] || 0) + (value ?? 0);
-  }));
-  const numerator = components[0];
-  const denominator = components[1];
-  if (!denominator) return 0;
-  if (profile === 'one_minus_ratio') return 100 * (1 - numerator / denominator);
-  if (profile === 'ratio_percent') return 100 * numerator / denominator;
-  if (profile === 'ratio' || profile === 'weighted_average') return numerator / denominator;
-  return rows.reduce((sum, row) => sum + (row?.values[metricIndex] ?? 0), 0) / Math.max(rows.length, 1);
-}
-
-function priorYearValues(timeline, metricIndex, semanticProfile) {
-  const valid = (timeline || []).filter(row => row?.date instanceof Date && !Number.isNaN(row.date.getTime()));
-  const latest = valid[valid.length - 1];
-  if (!latest) return { current: 0, previous: 0, average: 0 };
-  const byMonth = new Map();
-  valid.forEach(row => byMonth.set(monthKey(row.date), row));
-  const valueAt = offset => byMonth.get(shiftMonth(latest.date, offset));
-  const current = valueAt(-12)?.values?.[metricIndex] ?? 0;
-  const previous = valueAt(-13)?.values?.[metricIndex] ?? 0;
-  const averagePoints = [-13, -14, -15].map(valueAt);
-  const average = aggregateSemantic(semanticProfile, averagePoints, metricIndex);
-  return { current, previous, average };
-}
-
 function Tasks({ critical, risk, labels }) {
   return <>
     <span style={styles.taskTitle}>Tarefas do dia</span>
@@ -145,9 +95,9 @@ function QuantityComparison(props) {
     </div>;
   }
   const showTrends = variant !== 'quantitycompareplain';
-  const comparisons = indicators.map((entry, index) => ({
+  const comparisons = indicators.map(entry => ({
     indicator: entry,
-    lastYear: priorYearValues(timeline, index, props.semanticProfile),
+    lastYear: entry.lastYear || { current: null, previous: null, average: null },
   }));
   return <div data-neoretail-variant={variant} style={{ ...styles.card, width, height }}>
     <header style={styles.header}>
