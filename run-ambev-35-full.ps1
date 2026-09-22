@@ -117,7 +117,6 @@ Assert-LastExit "Criacao das views/marts"
 Write-Stage "Dashboards do Superset"
 $bootstraps = @(
     "bootstrap_overview.py",
-    "bootstrap_overview_quantity.py",
     "bootstrap_panorama.py",
     "bootstrap_osa_industry.py",
     "bootstrap_stock_optimization.py",

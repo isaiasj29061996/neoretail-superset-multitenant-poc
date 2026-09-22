@@ -21,12 +21,6 @@ CASES = (
         "nr_panorama_weekly",
     ),
     (
-        "neoretail-v9-visao-geral-quantidade",
-        "[Visão quantidade] Distribuição e sortimento",
-        "nr_overview_distinct_summary",
-        "nr_overview_history",
-    ),
-    (
         "neoretail-v9-osa-industria",
         "[OSA Indústria] Visão geral mensal — Perdas",
         "nr_osa_causes_summary",
