@@ -1,7 +1,7 @@
 """Create the NeoRetail stock-optimization task dashboard in Superset.
 
 Only Superset metadata is changed. The Analytics database is queried through
-physical serving marts; industry 259 is selected by default in the dashboard.
+physical serving marts; tenant isolation is enforced by the embedded RLS layer.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import json
 from sqlalchemy import text
 from superset.app import create_app
 
-from bootstrap_overview import metric, upsert_dataset
+from bootstrap_overview import headline_semantic_sql, metric, upsert_dataset
 from bootstrap_panorama import Layout, custom_params, upsert_chart
 
 
@@ -60,10 +60,25 @@ TVD = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
 IVD = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
 TVD_HISTORY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd_simplificado, 0))")
 TVD_DAILY = metric("TVD - Pré-Ruptura", "SUM(COALESCE(tvd, 0))")
-IVD_HISTORY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd_simplificado, 0))")
-STOCK = metric("Qtde Estoque", "SUM(COALESCE(estoque_unidades, 0))")
-STOCK_MIN = metric("Qtde Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
-STOCK_MAX = metric("Qtde Estoque máximo", "SUM(COALESCE(estoque_max, 0))")
+IVD_DAILY = metric("IVD - Excesso de estoque", "SUM(COALESCE(ivd, 0))")
+STOCK = metric("Qtd Estoque atual", "SUM(COALESCE(estoque_unidades, 0))")
+STOCK_MIN = metric("Qtd Estoque mínimo", "SUM(COALESCE(estoque_min, 0))")
+STOCK_MAX = metric("Qtd Estoque máximo", "SUM(COALESCE(estoque_max, 0))")
+
+# Regras de negócio já definidas para as tabelas de incidência:
+# - excesso = estoque atual - estoque máximo, preservando resultados negativos;
+# - falta = estoque mínimo quando estoque atual <= 0; caso contrário,
+#   estoque mínimo - estoque atual, também sem truncar resultados negativos.
+ITEMS_EXCESS = metric(
+    "Qtd itens em excesso",
+    "SUM(COALESCE(estoque_unidades, 0) - COALESCE(estoque_max, 0))",
+)
+ITEMS_MISSING = metric(
+    "Qtd itens em falta",
+    "SUM(CASE WHEN COALESCE(estoque_unidades, 0) <= 0 "
+    "THEN COALESCE(estoque_min, 0) "
+    "ELSE COALESCE(estoque_min, 0) - COALESCE(estoque_unidades, 0) END)",
+)
 
 
 def sql_filter(expression):
@@ -87,15 +102,16 @@ def detail_table_params(dataset, metrics, expression):
     }
 
 
-def task_filters(dataset_id):
+def task_filters(dataset_id, filter_dataset_id=None):
     definitions = [
         ("rede", "Rede", []),
         ("bandeira", "Bandeira", ["rede"]),
         ("uf", "UF", []),
         ("cidade", "Cidade", ["uf"]),
-        ("deposito", "Depósito", []),
+        ("tipo_local", "Tipo local", []),
+        ("loja", "Loja", ["tipo_local"]),
         ("tp_activity_level", "Nível de atividade", []),
-        ("descricao_marca", "Marca", []),
+        ("descricao_marca", "Descrição marca", []),
         ("hierarquia_1", "Hierarquia 1", ["descricao_marca"]),
         ("hierarquia_2", "Hierarquia 2", ["hierarquia_1"]),
         ("hierarquia_3", "Hierarquia 3", ["hierarquia_2"]),
@@ -111,7 +127,10 @@ def task_filters(dataset_id):
             "searchAllOptions": True, "inverseSelection": False,
         },
         "name": label, "filterType": "filter_select",
-        "targets": [{"datasetId": dataset_id, "column": {"name": column}}],
+        "targets": [{
+            "datasetId": filter_dataset_id or dataset_id,
+            "column": {"name": column},
+        }],
         "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}},
         "cascadeParentIds": [ids[parent] for parent in parents],
         "scope": {"excluded": [], "rootPath": ["ROOT_ID"]},
@@ -146,14 +165,19 @@ def main():
                     "SELECT MAX(id_time)::date FROM gold.fato_ivd_tvd"
                 )).scalar_one()
 
-        history = upsert_dataset(
-            db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities"
-        )
         tvd_daily = upsert_dataset(
-            db.session, SqlaTable, database, "nr_tvd_daily", table_name="nr_tvd_daily"
+            db.session, SqlaTable, database, "nr_tvd_daily_interactive",
+            sql=headline_semantic_sql("nr_tvd_daily", "nr_tvd_daily_summary"),
+        )
+        ivd_daily = upsert_dataset(
+            db.session, SqlaTable, database, "nr_ivd_daily_interactive",
+            sql=headline_semantic_sql("nr_ivd_daily", "nr_ivd_daily_summary"),
         )
         tasks = upsert_dataset(
             db.session, SqlaTable, database, "nr_stock_tasks", table_name="nr_stock_tasks"
+        )
+        filter_options = upsert_dataset(
+            db.session, SqlaTable, database, "nr_filter_options", table_name="nr_filter_options"
         )
 
         charts = {}
@@ -168,14 +192,20 @@ def main():
             formats="currency", variant="headlinearea",
         )
         tvd_card["accent_color"] = "#7C43DF"
+        tvd_card["adhoc_filters"] = [sql_filter(
+            f"data >= DATE '{last_date.isoformat()}' - INTERVAL '4 months'"
+        )]
         add("tvd_card", tvd_daily, "TVD - Pré-ruptura", tvd_card)
 
         ivd_card = custom_params(
-            history, "IVD - Excesso de estoque", [IVD_HISTORY], grain="P1D",
+            ivd_daily, "IVD - Excesso de estoque", [IVD_DAILY], grain="P1D",
             formats="currency", variant="headlinearea",
         )
         ivd_card["accent_color"] = "#C91878"
-        add("ivd_card", history, "IVD - Excesso de estoque", ivd_card)
+        ivd_card["adhoc_filters"] = [sql_filter(
+            f"data >= DATE '{last_date.isoformat()}' - INTERVAL '4 months'"
+        )]
+        add("ivd_card", ivd_daily, "IVD - Excesso de estoque", ivd_card)
 
         for dimension, label in (("rede", "Redes"), ("item", "Itens")):
             pre = custom_params(
@@ -202,12 +232,20 @@ def main():
 
         add(
             "table_excess", tasks, "Incidência de Excesso",
-            detail_table_params(tasks, [IVD, STOCK, STOCK_MAX], "COALESCE(ivd, 0) > 0"),
+            detail_table_params(
+                tasks,
+                [ITEMS_EXCESS, STOCK, STOCK_MAX],
+                "COALESCE(ivd, 0) > 0",
+            ),
             "table",
         )
         add(
             "table_pre", tasks, "Incidência de Pré-ruptura",
-            detail_table_params(tasks, [TVD, STOCK, STOCK_MIN], "COALESCE(tvd, 0) > 0"),
+            detail_table_params(
+                tasks,
+                [ITEMS_MISSING, STOCK, STOCK_MIN],
+                "COALESCE(tvd, 0) > 0",
+            ),
             "table",
         )
 
@@ -215,17 +253,18 @@ def main():
         parents = ["ROOT_ID", "GRID_ID"]
         add_markdown(
             layout, "GRID_ID", parents,
-            f"**Data da última carga:** {last_date.strftime('%d/%m/%Y')}", height=4,
+            f"**Data do último movimento:** {last_date.strftime('%d/%m/%Y')} &nbsp;&nbsp;&nbsp; `VERSÃO BETA`",
+            height=6,
         )
         layout.row("GRID_ID", parents, [charts["tvd_card"], charts["ivd_card"]], 34)
         add_markdown(
             layout, "GRID_ID", parents,
-            "## Otimização de estoque — incidências de excesso e pré-ruptura", height=6,
+            "## Otimização de estoque - Incidências de excesso e pré-ruptura", height=8,
         )
         layout.tabs("GRID_ID", parents, "Análise de otimização", [
             ("Pré-ruptura", [[charts["pre_rede"], charts["pre_item"]]]),
             ("Excesso", [[charts["excess_rede"], charts["excess_item"]]]),
-            ("Otimização do estoque", [[charts["combined_rede"], charts["combined_item"]]]),
+            ("Otimização de estoque", [[charts["combined_rede"], charts["combined_item"]]]),
         ], height=50)
         layout.row("GRID_ID", parents, [charts["table_excess"], charts["table_pre"]], 54)
 
@@ -245,21 +284,21 @@ def main():
             ".dashboard-content { background: #e7f0f5 !important; } "
             ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
             ".dashboard-component-chart-holder > .header { display: none !important; } "
-            ".dashboard-component-tabs { background: #fff; border-radius: 8px; }"
+            ".dashboard-component-tabs { background: #fff; border-radius: 8px; } "
+            ".dashboard-component-markdown { overflow: visible !important; }"
         )
         dashboard.json_metadata = json.dumps({
             "timed_refresh_immune_slices": [], "expanded_slices": {},
             "refresh_frequency": 0, "color_scheme": "supersetColors",
-            "native_filter_configuration": task_filters(history.id),
+            "native_filter_configuration": task_filters(tasks.id, filter_options.id),
             "filter_bar_orientation": "HORIZONTAL",
         }, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
         print(json.dumps({
             "dashboard_id": dashboard.id, "slug": dashboard.slug,
-            "industry": {"id_customer": 259, "label": "3CORACOES"},
             "last_movement": last_date.isoformat(),
-            "datasets": {"history": history.id, "tvd_daily": tvd_daily.id, "tasks": tasks.id},
+            "datasets": {"tvd_daily": tvd_daily.id, "ivd_daily": ivd_daily.id, "tasks": tasks.id},
             "charts": {key: chart.id for key, chart in charts.items()},
         }, ensure_ascii=False))
 

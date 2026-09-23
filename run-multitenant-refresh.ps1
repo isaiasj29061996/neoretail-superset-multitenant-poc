@@ -1,5 +1,5 @@
 param(
-    [int[]]$CustomerIds = @(259, 609, 16868)
+    [int[]]$CustomerIds = @(142)
 )
 
 $ErrorActionPreference = "Stop"

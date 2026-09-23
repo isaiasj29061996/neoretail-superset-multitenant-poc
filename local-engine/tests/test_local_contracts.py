@@ -1,11 +1,14 @@
 from pathlib import Path
+import os
 import re
 import sys
 
 import yaml
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(
+    os.getenv("NEORETAIL_REPO_ROOT", str(Path(__file__).resolve().parents[2]))
+).resolve()
 sys.path.insert(0, str(ROOT / "local-engine"))
 
 from neoretail_local.candidate_rules import candidate_table, classify_file, family_rules
@@ -175,7 +178,11 @@ def test_v9_customer_registry_and_embedded_rls():
     registry = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
     )
-    assert [row["id_customer"] for row in registry["customers"]] == [259, 609, 16868]
+    assert [row["id_customer"] for row in registry["customers"]] == [142]
+    assert registry["default_customer"] == 142
+    assert registry["customers"][0]["nm_customer"] == "AMBEV"
+    assert registry["customers"][0]["source_prefix"] == "FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV"
+    assert registry["customers"][0]["source_layout"] == "partitioned_customer_daily_v1"
     server = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in server
     assert "allowedCustomerIds.includes(idCustomer)" in server
@@ -187,9 +194,37 @@ def test_v9_customer_registry_and_embedded_rls():
         (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
     )
     assert set(tenant_config["dashboards"]) == {
-        "overview", "panorama", "osa", "tasks"
+        "overview", "panorama", "osa", "tasks",
+        "export_daily", "export_monthly",
     }
     assert len({
         definition["embedded_id"]
         for definition in tenant_config["dashboards"].values()
-    }) == 4
+    }) == 6
+
+    smoke = (ROOT / "embedded-app/smoke.mjs").read_text(encoding="utf-8")
+    assert "TENANTS_CONFIG" in smoke
+    assert "assertSameDashboardSet" in smoke
+    assert "missing" in smoke
+    assert "unexpected" in smoke
+    assert re.search(r"dashboards\?\.length\s*!==\s*\d+", smoke) is None
+    assert re.search(r"dashboards:\s*\d+", smoke) is None
+
+
+def test_concurrency_benchmark_uses_real_cache_bypass_and_safe_stats_monitor():
+    benchmark = (ROOT / "superset/concurrent_dashboard_benchmark.py").read_text(
+        encoding="utf-8"
+    )
+    wrapper = (ROOT / "load-test-users.ps1").read_text(encoding="utf-8")
+    monitor = (ROOT / "scripts/monitor-docker-stats.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "force=FORCE" in benchmark
+    assert 'LOAD_TEST_MAX_WORKERS", "12"' in benchmark
+    assert "[int]$MaxWorkers = 12" in wrapper
+    assert "Start-Job" not in wrapper
+    assert "Start-Process" in wrapper
+    assert "WaitForExit" in wrapper
+    assert "System.IO.StreamWriter" in monitor
+    assert "docker stats --no-stream" in monitor

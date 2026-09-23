@@ -1,6 +1,7 @@
 import React from 'react';
 
 const formatValue = (value, type) => {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
   const options = type === 'decimal'
     ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
     : type === 'currency'
@@ -11,6 +12,9 @@ const formatValue = (value, type) => {
   return new Intl.NumberFormat('pt-BR', options).format(type === 'percent' ? value / 100 : value);
 };
 const trend = (value, reference, lowerIsBetter) => {
+  if (value === null || value === undefined || reference === null || reference === undefined) {
+    return { symbol: '•', color: '#8A929C' };
+  }
   if (value === reference) return { symbol: '•', color: '#8A929C' };
   const increased = value > reference;
   return { symbol: increased ? '↑' : '↓', color: (lowerIsBetter ? !increased : increased) ? '#4D9669' : '#D0342C' };
@@ -35,13 +39,14 @@ const styles = {
   action: { display: 'block', width: '100%', padding: '7px 12px 9px', border: 0, background: 'transparent', color: '#8A8F96', fontSize: 10, textAlign: 'center', textDecoration: 'none' },
 };
 
-const MetricTriplet = ({ indicator }) => {
+const MetricTriplet = ({ indicator, showAnnual = false }) => {
   const current = trend(indicator.current, indicator.previous, indicator.lowerIsBetter);
   const previous = trend(indicator.previous, indicator.average, indicator.lowerIsBetter);
   return <div style={styles.metrics}>
     <div><span style={styles.label}>MTD</span><span style={styles.value}><b style={{ color: current.color, fontSize: 17 }}>{current.symbol}</b> {formatValue(indicator.current, indicator.format)}</span></div>
     <div><span style={styles.label}>Mês anterior</span><span style={styles.value}><b style={{ color: previous.color, fontSize: 17 }}>{previous.symbol}</b> {formatValue(indicator.previous, indicator.format)}</span></div>
     <div><span style={styles.label}>Média U3M</span><span style={styles.value}>{formatValue(indicator.average, indicator.format)}</span></div>
+    {showAnnual && <div><span style={styles.label}>Anual 12M</span><span style={styles.value}>{formatValue(indicator.annual, indicator.format)}</span></div>}
   </div>;
 };
 const Tasks = ({ critical, risk, labels }) => <>
@@ -62,27 +67,76 @@ const HeadlineArea = ({ indicator, timeline, accentColor }) => {
   </div>;
 };
 
-const Panorama = ({ indicators, timeline, chartStyles, summaryCount }) => {
+const isoWeek = date => {
+  const current = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  current.setUTCDate(current.getUTCDate() + 4 - (current.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(current.getUTCFullYear(), 0, 1));
+  return Math.ceil((((current - yearStart) / 86400000) + 1) / 7);
+};
+
+const isoWeekYear = date => {
+  const current = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  current.setUTCDate(current.getUTCDate() + 4 - (current.getUTCDay() || 7));
+  return current.getUTCFullYear();
+};
+
+const Panorama = ({ indicators, timeline, chartStyles, summaryCount, width, height, timeGrain }) => {
   const points = timeline.slice(-12);
   const colors = ['#00557C', '#4F86BF', '#858585', '#7C4AD9'];
   const maxima = indicators.map((_, metricIndex) => Math.max(1, ...points.map(point => Math.abs(point.values[metricIndex] || 0))));
-  const pointX = index => 22 + (points.length === 1 ? 390 : index / (points.length - 1) * 780);
-  const pointY = (metricIndex, value) => 190 - Math.abs(value || 0) / maxima[metricIndex] * 145;
+  const containerWidth = Number.isFinite(width) ? width : 840;
+  const containerHeight = Number.isFinite(height) ? height : 290;
+  const summaryWidth = summaryCount ? Math.min(220, Math.max(170, containerWidth * 0.18)) : 0;
+  const viewWidth = Math.max(620, containerWidth - summaryWidth);
+  const viewHeight = Math.max(245, containerHeight - 44);
+  const left = 34;
+  const right = 24;
+  const top = 38;
+  const baseline = viewHeight - 70;
+  const plotHeight = Math.max(150, baseline - top);
+  const slot = (viewWidth - left - right) / Math.max(points.length, 1);
+  const pointX = index => left + slot * (index + 0.5);
+  const pointY = (metricIndex, value) => baseline - Math.abs(value || 0) / maxima[metricIndex] * plotHeight;
+  const barMetricIndexes = indicators.map((_, index) => index).filter(index => chartStyles[index] !== 'hidden' && chartStyles[index] !== 'line');
+  const barWidth = Math.min(36, Math.max(12, slot / Math.max(barMetricIndexes.length + 1, 3)));
+  const barOffset = metricIndex => {
+    const barIndex = barMetricIndexes.indexOf(metricIndex);
+    return (barIndex - (barMetricIndexes.length - 1) / 2) * barWidth;
+  };
+  const weekly = timeGrain === 'P1W';
+  const periodYear = date => weekly ? isoWeekYear(date) : date.getUTCFullYear();
+  const periodLabel = date => weekly
+    ? String(isoWeek(date))
+    : date.toLocaleDateString('pt-BR', { month: 'short', timeZone: 'UTC' }).replace('.', '');
+  const yearGroups = points.reduce((groups, point, index) => {
+    const year = periodYear(point.date);
+    const current = groups[groups.length - 1];
+    if (current?.year === year) current.end = index;
+    else groups.push({ year, start: index, end: index });
+    return groups;
+  }, []);
+  const legendItems = indicators.map((indicator, index) => ({
+    label: indicator.label,
+    color: colors[index],
+    style: chartStyles[index],
+  })).filter(item => item.style !== 'hidden');
+  const legendWidths = legendItems.map(item => Math.max(75, item.label.length * 6.2 + 28));
+  const legendStart = Math.max(left, (viewWidth - legendWidths.reduce((sum, item) => sum + item, 0)) / 2);
   const linePath = metricIndex => points.map((point, index) => {
     const x = pointX(index);
     const y = pointY(metricIndex, point.values[metricIndex]);
     return `${index ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
   }).join(' ');
-  return <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', height: 'calc(100% - 44px)' }}>
-    <div style={{ padding: '10px 16px', borderRight: '1px solid #E2E6EA' }}>{indicators.slice(0, summaryCount).map(indicator => <div key={indicator.label} style={{ marginBottom: 13 }}><b style={{ display: 'block', fontSize: 11 }}>{indicator.label}</b><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: 5 }}><span><small style={styles.label}>MTD</small><strong style={styles.value}>{formatValue(indicator.current, indicator.format)}</strong></span><span><small style={styles.label}>U3M</small><strong style={styles.value}>{formatValue(indicator.average, indicator.format)}</strong></span></div></div>)}</div>
-    <svg viewBox="0 0 840 225" preserveAspectRatio="none" style={{ width: '100%', height: '100%', minHeight: 230 }}>
-      <line x1="20" y1="190" x2="820" y2="190" stroke="#D8DDE2" />
+  return <div style={{ display: 'grid', gridTemplateColumns: summaryCount ? `${summaryWidth}px 1fr` : '1fr', height: 'calc(100% - 44px)', minHeight: 0 }}>
+    {summaryCount > 0 && <div style={{ padding: '10px 16px', borderRight: '1px solid #E2E6EA' }}>{indicators.slice(0, summaryCount).map(indicator => <div key={indicator.label} style={{ marginBottom: 13 }}><b style={{ display: 'block', fontSize: 11 }}>{indicator.label}</b><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: 5 }}><span><small style={styles.label}>MTD</small><strong style={styles.value}>{formatValue(indicator.current, indicator.format)}</strong></span><span><small style={styles.label}>U3M</small><strong style={styles.value}>{formatValue(indicator.average, indicator.format)}</strong></span></div></div>)}</div>}
+    <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: '100%', minHeight: 245 }}>
+      <line x1={left} y1={baseline} x2={viewWidth - right} y2={baseline} stroke="#D8DDE2" />
       {indicators.map((indicator, metricIndex) => chartStyles[metricIndex] === 'hidden' ? null : chartStyles[metricIndex] === 'line'
         ? <g key={indicator.label}>
           <path d={linePath(metricIndex)} fill="none" stroke={colors[metricIndex]} strokeWidth="3" />
           {points.map((point, index) => {
             const x = pointX(index); const y = pointY(metricIndex, point.values[metricIndex]);
-            const labelY = y < 22 ? y + 15 : y - 8;
+            const labelY = y < top - 8 ? y + 16 : y - 9;
             return <g key={`${indicator.label}-point-${index}`}>
               <circle cx={x} cy={y} r="2.7" fill={colors[metricIndex]} />
               <text x={x} y={labelY} textAnchor="middle" fontSize="8" fontWeight="700" fill={colors[metricIndex]} stroke="#FFF" strokeWidth="3" paintOrder="stroke">{formatValue(point.values[metricIndex], indicator.format)}</text>
@@ -90,15 +144,25 @@ const Panorama = ({ indicators, timeline, chartStyles, summaryCount }) => {
           })}
         </g>
         : points.map((point, index) => {
-          const slot = 780 / Math.max(points.length, 1); const barWidth = Math.min(24, slot / (indicators.length + 1));
-          const h = Math.abs(point.values[metricIndex] || 0) / maxima[metricIndex] * 145;
-          const x = 22 + index * slot + metricIndex * barWidth; const y = 190 - h;
+          const h = Math.abs(point.values[metricIndex] || 0) / maxima[metricIndex] * plotHeight;
+          const x = pointX(index) + barOffset(metricIndex) - barWidth / 2; const y = baseline - h;
           return <g key={`${indicator.label}-${index}`}>
-            <rect x={x} y={y} width={barWidth - 2} height={h} fill={colors[metricIndex]} />
-            <text x={x + (barWidth - 2) / 2} y={Math.max(12, y - 5)} textAnchor="middle" fontSize="8" fontWeight="700" fill={colors[metricIndex]} stroke="#FFF" strokeWidth="3" paintOrder="stroke">{formatValue(point.values[metricIndex], indicator.format)}</text>
+            <rect x={x} y={y} width={Math.max(8, barWidth - 3)} height={h} rx="1.5" fill={colors[metricIndex]} />
+            <text x={x + Math.max(8, barWidth - 3) / 2} y={Math.max(14, y - 7)} textAnchor="middle" fontSize="9" fontWeight="700" fill={colors[metricIndex]} stroke="#FFF" strokeWidth="3" paintOrder="stroke">{formatValue(point.values[metricIndex], indicator.format)}</text>
           </g>;
         }))}
-      {points.map((point, index) => <text key={point.date.toISOString()} x={22 + index * (780 / Math.max(points.length, 1))} y="210" fontSize="9" fill="#666">{point.date.toLocaleDateString('pt-BR', { month: 'short', timeZone: 'UTC' })}</text>)}
+      {yearGroups.slice(1).map(group => <line key={`year-separator-${group.year}`} x1={left + slot * group.start} y1={baseline + 5} x2={left + slot * group.start} y2={baseline + 34} stroke="#D8DDE2" strokeDasharray="2 2" />)}
+      {points.map((point, index) => <text key={point.date.toISOString()} x={pointX(index)} y={baseline + 17} textAnchor="middle" fontSize="9" fill="#555">{periodLabel(point.date)}</text>)}
+      {yearGroups.map(group => <text key={`year-${group.year}`} x={(pointX(group.start) + pointX(group.end)) / 2} y={baseline + 34} textAnchor="middle" fontSize="9" fill="#666">{group.year}</text>)}
+      {legendItems.map((item, index) => {
+        const x = legendStart + legendWidths.slice(0, index).reduce((sum, value) => sum + value, 0);
+        return <g key={`legend-${item.label}`} transform={`translate(${x} ${viewHeight - 13})`}>
+          {item.style === 'line'
+            ? <><line x1="0" y1="-3" x2="16" y2="-3" stroke={item.color} strokeWidth="2.5" /><circle cx="8" cy="-3" r="2.3" fill={item.color} /></>
+            : <rect x="0" y="-10" width="11" height="11" fill={item.color} />}
+          <text x="17" y="0" fontSize="9" fill="#555">{item.label}</text>
+        </g>;
+      })}
     </svg>
   </div>;
 };
@@ -143,13 +207,13 @@ const RankBars = ({ items, format }) => {
 };
 
 export default function NeoRetailKpi(props) {
-  const { width, height, title, helpText, variant, accentColor, analysisUrl, showTasks, taskLabels, chartStyles, summaryCount, indicators, critical, risk, series, timeline, bars, rankItems, rankSeries, hasData } = props;
+  const { width, height, title, helpText, variant, accentColor, analysisUrl, showTasks, showAnnual, taskLabels, chartStyles, timeGrain, summaryCount, indicators, critical, risk, series, timeline, bars, rankItems, rankSeries, hasData } = props;
   if (!hasData || !indicators.length) return <div style={{ ...styles.card, display: 'grid', placeItems: 'center', color: '#6C727A' }}>Sem dados para os filtros selecionados.</div>;
   const points = areaPoints(series);
   const maxBar = Math.max(1, ...bars.flatMap(item => [item.current, item.previous]));
   return <div data-neoretail-variant={variant} style={{ ...styles.card, width, height }}>
     <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>
-    {variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} summaryCount={summaryCount} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} /></div>) : <MetricTriplet indicator={indicators[0]} />}
+    {variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} timeGrain={timeGrain} summaryCount={summaryCount} width={width} height={height} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} showAnnual={showAnnual} /></div>) : <MetricTriplet indicator={indicators[0]} showAnnual={showAnnual} />}
     {variant === 'area' && <svg viewBox="0 0 300 94" preserveAspectRatio="none" role="img" aria-label={`Evolução de ${title}`} style={{ display: 'block', width: 'calc(100% - 24px)', height: Math.max(65, Math.min(130, height - 225)), margin: '0 12px 7px', borderBottom: '1px solid #D9DDE3' }}><polygon points={points.polygon} fill={accentColor} fillOpacity="0.4" /><polyline points={points.line} fill="none" stroke={accentColor} strokeWidth="1.6" /></svg>}
     {variant === 'bars' && <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-around', gap: 8, height: Math.max(90, height - 190), padding: '5px 18px 0' }}>{bars.map(item => <div key={item.category} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'end' }}><div style={{ height: 'calc(100% - 25px)', display: 'flex', alignItems: 'end', justifyContent: 'center', gap: 2 }}><span style={{ width: 22, height: `${Math.max(2, item.current / maxBar * 100)}%`, background: '#0070A3' }} /><span style={{ width: 22, height: `${Math.max(2, item.previous / maxBar * 100)}%`, background: '#8C8C8C' }} /></div><span style={{ height: 25, color: '#777', fontSize: 9, textAlign: 'center' }}>{item.category}</span></div>)}</div>}
     {(variant === 'area' || variant === 'osa') && showTasks && <Tasks critical={critical} risk={risk} labels={taskLabels} />}

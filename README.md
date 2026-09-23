@@ -1,26 +1,47 @@
-# NeoRetail V9 — Superset multitenant
+# NeoRetail V9 — Superset Embedded / AMBEV POC
 
-POC local da plataforma analítica NeoRetail com ingestão a partir do Azure Blob,
-pipeline PySpark em camadas, PostgreSQL para serving, Apache Superset 6 com
-visuais próprios e portal embedded com isolamento por indústria.
+POC do NeoRetail usando Apache Superset como camada analítica embedded, com
+isolamento por indústria via `id_customer`, Guest Token e RLS.
 
-O projeto preserva a estrutura funcional da V8.1 e acrescenta o modelo
-multitenant da V9. Toda dimensão e fato publicada na Gold carrega
-`id_customer`, que também é a chave usada pelo RLS do Superset.
+A POC atual está focada na **AMBEV (`id_customer = 142`)** e tem dois objetivos:
 
-## O que está incluído
+1. reproduzir as principais experiências analíticas hoje usadas no produto;
+2. medir se o Superset consegue entregar essas experiências com boa performance,
+   baixo consumo de infraestrutura e integração simples com o NeoRetail.
 
-- descoberta e leitura de Parquets no Azure Blob;
-- lake local em Raw cache, Bronze, Silver e Gold;
-- normalização tolerante a schema drift e rastreabilidade da origem;
-- quality gates para Silver, Gold e prontidão de métricas;
-- PostgreSQL Analytics separado do banco de metadados do Superset;
-- dashboards reproduzíveis de Visão Geral, Panorama e OSA da Indústria;
-- plugin React `NeoRetail KPI Card` integrado ao frontend do Superset;
-- portal embedded com Guest Token e RLS por `id_customer`;
-- scripts de inicialização, atualização, saúde, validação e reset.
+> **Importante:** o PostgreSQL Analytics usado localmente não representa a
+> arquitetura final de produção. Ele funciona como um **simulador do serving
+> layer do DW** para desenvolvimento, validação funcional e benchmark.
 
-## Arquitetura
+---
+
+## Estado atual
+
+| Capacidade | Estado |
+|---|---|
+| Pipeline AMBEV a partir do Azure Blob | em funcionamento na POC |
+| Bronze / Silver / Gold locais | implementado |
+| Serving analítico em PostgreSQL local | implementado |
+| RLS por `id_customer` | implementado |
+| Portal embedded com Guest Token | implementado |
+| Visão Geral — Indústria | implementado |
+| Panorama — Indústria | implementado |
+| Panorama — OSA | implementado |
+| Tarefas do dia / Otimização de estoque | implementado |
+| Exportação — Histórico dia | implementado |
+| Exportação — Histórico mês | implementado |
+| Benchmark de CPU/RAM do Superset | iniciado |
+| Teste de 5–10 usuários simultâneos | pendente |
+| Benchmark com DW real | pendente |
+| Certificação formal das métricas pelo negócio | pendente |
+
+Dashboard renderizado e query executada sem erro não significam que a métrica
+foi certificada pelo negócio. A POC separa **validação técnica** de
+**homologação funcional**.
+
+---
+
+## Arquitetura da POC local
 
 ```mermaid
 flowchart LR
@@ -28,92 +49,478 @@ flowchart LR
     B --> C[Raw cache]
     C --> D[Bronze]
     D --> E[Silver]
-    E --> F[Gold]
-    F --> G[(PostgreSQL Analytics)]
-    G --> H[Datasets Superset]
-    H --> I[Dashboards]
-    J[Portal NeoRetail] --> K[Guest Token + RLS]
-    K --> I
-    L[(PostgreSQL Metadata)] --> H
-    M[(Redis)] --> H
+    E --> F[Gold no lake]
+    F --> G[Serving reduzido<br/>PostgreSQL Analytics]
+    G --> H[Marts físicos]
+    H --> I[Apache Superset]
+    J[Redis] --> I
+    K[(PostgreSQL Metadata)] --> I
+    L[Backend / Portal NeoRetail] --> M[Guest Token + RLS]
+    M --> I
 ```
 
-O Azure Blob continua sendo a fonte de verdade. O lake e o PostgreSQL locais
-são materializações para desenvolvimento e validação. Na arquitetura alvo, o
-Databricks substitui o PySpark e o serving local sem mudar o contrato
-multitenant baseado em `id_customer`.
+O PostgreSQL local recebe somente o necessário para servir os dashboards da
+POC. Fatos muito grandes podem permanecer completos no lake enquanto apenas uma
+janela, projeção ou agregação é publicada no PostgreSQL.
 
-### Isolamento por cliente
+Esse comportamento é intencional: a POC deve testar o **Superset como camada de
+BI**, e não transformar o notebook local em um DW de produção.
 
-1. O usuário entra no portal NeoRetail.
-2. O backend lê os clientes permitidos em `config/tenants.yaml`.
-3. O usuário seleciona uma indústria autorizada.
-4. O backend solicita ao Superset um Guest Token com uma cláusula como
-   `id_customer = 259`.
-5. O Superset aplica o RLS antes de calcular métricas e renderizar os gráficos.
+---
 
-Os filtros visíveis refinam a análise. Eles não substituem o RLS e não devem
-ser usados como fronteira de segurança.
+## Arquitetura alvo
 
-## Clientes iniciais
+Na produção, o trabalho pesado deve ficar no **DW**. O Superset deve consultar
+marts e agregações preparados para uso interativo.
 
-| `id_customer` | Cliente | Prefixo no Blob |
+```mermaid
+flowchart LR
+    A[Azure Blob / fontes corporativas] --> B[ETL / ELT]
+    B --> C[DW]
+    C --> D[Marts de serving]
+    D --> E[Apache Superset]
+    E --> F[Backend NeoRetail]
+    F --> G[Guest Token + RLS]
+    G --> H[Portal embedded]
+```
+
+A responsabilidade esperada fica dividida assim:
+
+```text
+armazenamento e processamento pesado
+    -> DW
+
+agregações e serving analítico
+    -> marts no DW
+
+consultas, visualização e interação
+    -> Superset
+
+identidade, autorização e experiência de produto
+    -> Backend NeoRetail + Embedded
+```
+
+Isso significa que aumentar o volume bruto da AMBEV não implica,
+necessariamente, aumentar na mesma proporção a RAM do Superset. Se o DW entrega
+resultados agregados pequenos, o maior impacto de volume tende a acontecer no
+compute do DW, não na camada de apresentação.
+
+---
+
+## Isolamento por indústria
+
+O isolamento não depende dos filtros visíveis do dashboard.
+
+1. o usuário entra no portal NeoRetail;
+2. o backend identifica as indústrias autorizadas;
+3. o dashboard selecionado é validado pelo catálogo;
+4. o backend gera um Guest Token;
+5. o token recebe uma cláusula RLS como `id_customer = 142`;
+6. o Superset aplica o RLS antes de executar as consultas.
+
+Os filtros nativos refinam a análise, mas **não substituem o RLS**.
+
+---
+
+## Tenant da POC
+
+| `id_customer` | Cliente | Origem principal |
 |---:|---|---|
-| 259 | 3 Corações | `PARTICULAR_3/3CORACOES` |
-| 609 | Baston | `PARTICULAR_3/BASTON` |
-| 16868 | Safira | `PARTICULAR_3/SAFIRA` |
+| 142 | AMBEV | `FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV` |
 
-O cadastro corporativo fica em [`config/customers.yaml`](config/customers.yaml).
-As permissões da POC embedded ficam em
-[`config/tenants.yaml`](config/tenants.yaml). O pipeline valida o nome e o ID
-contra `DIMENSAO_CUSTOMER` antes de publicar a Silver.
+O catálogo embedded atual está configurado somente para AMBEV.
+
+Arquivo de cadastro:
+- `config/customers.yaml`
+
+Catálogo, módulos e permissões:
+- `config/tenants.yaml`
+
+---
+
+## Dashboards embedded
+
+O catálogo atual publica seis experiências:
+
+| Chave | Dashboard | Menu |
+|---|---|---|
+| `overview` | Visão geral — Indústria | Visão geral / Indústria |
+| `panorama` | Panorama — Indústria | Panorama / Geral |
+| `osa` | Panorama — OSA | Panorama / OSA |
+| `tasks` | Tarefas do dia — Pré-ruptura / Excesso | Tarefas do dia |
+| `export_daily` | Exportação — Histórico dia | Exportação / Histórico dia |
+| `export_monthly` | Exportação — Histórico mês | Exportação / Histórico mês |
+
+Navegação do portal:
+
+```text
+Visão geral
+└── Indústria
+
+Panorama
+├── Geral
+└── OSA
+
+Tarefas do dia
+└── Pré-ruptura / Excesso
+
+Exportação
+├── Histórico dia
+└── Histórico mês
+```
+
+---
+
+## Serving marts
+
+Os dashboards não devem fazer joins pesados diretamente durante a interação.
+Por isso, a POC cria marts físicos no PostgreSQL.
+
+### Base de serving
+
+`analytics-db/marts/30_neoretail_serving_marts.sql`
+
+- `gold.nr_overview_history`
+- `gold.nr_panorama_latest`
+- `gold.nr_panorama_weekly`
+- `gold.nr_panorama_opportunities`
+- `gold.nr_tvd_daily`
+- `gold.nr_panorama_opportunities_latest`
+- `gold.nr_osa_industry_causes`
+- `gold.nr_stock_tasks`
+
+### Performance da Visão Geral
+
+`analytics-db/marts/31_overview_performance.sql`
+
+- `gold.nr_overview_summary`
+- `gold.nr_ivd_daily`
+
+Esses marts decompõem métricas pesadas em componentes aditivos e reduzem o
+trabalho executado durante a interação.
+
+### Exportação
+
+`analytics-db/marts/32_export_serving.sql`
+
+- `gold.nr_export_daily`
+- `gold.nr_export_monthly`
+
+A exportação diária não replica a `fato_diaria` inteira no PostgreSQL.
+A tabela completa permanece no lake e uma fonte reduzida é publicada para o
+serving:
+
+- `gold.nr_export_daily_source`
+
+### Serving interativo e filtros
+
+Os lotes `34` a `37` adicionam caminhos compactos para a interação padrão sem
+remover as marts detalhadas usadas quando há filtros dimensionais:
+
+- `gold.nr_filter_options`: opções de localização, produto, atividade e unidade;
+- `gold.nr_tvd_daily_summary` e `gold.nr_ivd_daily_summary`: totais por tenant/dia;
+- `gold.nr_panorama_weekly_summary`: componentes aditivos por tenant/semana;
+- `gold.nr_overview_distinct_summary`: cardinalidades exatas por tenant/mês;
+- `gold.nr_osa_causes_summary`: perda OSA por tenant/mês/motivo/causa.
+
+Os datasets virtuais escolhem a fonte compacta quando não existe filtro de
+negócio. Ao selecionar rede, loja, produto ou outra dimensão compatível, a
+consulta volta automaticamente à mart detalhada. `id_customer` continua em
+todas as fontes e o RLS/Guest Token permanece independente dessa seleção.
+
+Por padrão, essa fonte usa uma janela recente e somente as colunas necessárias
+à exportação.
+
+---
+
+## Exportação
+
+A área de Exportação possui duas páginas:
+
+```text
+Histórico dia
+Histórico mês
+```
+
+Cada uma possui quatro visões:
+
+```text
+Varejo
+Produto
+Geral
+Resumo
+```
+
+Filtros disponíveis incluem:
+
+- Rede e Bandeira;
+- UF e Cidade;
+- Tipo local e Loja;
+- Nível de atividade;
+- Marca;
+- Hierarquias 1, 2 e 3;
+- Item;
+- Unidade de medida;
+- Indicador;
+- Ano, Mês e, no histórico diário, Dia.
+
+Indicadores atualmente disponíveis:
+
+- Venda;
+- Cobertura estoque;
+- Estoque;
+- Estoque em Trânsito;
+- ISV (%);
+- OSA (%);
+- Perda OSA vol.;
+- Perda OSA R$;
+- Preço médio (R$).
+
+O limite visual de exportação é de **100.000 registros por vez**. O usuário deve
+usar filtros quando precisar reduzir o volume antes do download.
+
+---
+
+## Tarefas do dia / Otimização de estoque
+
+A tela de tarefas contém:
+
+```text
+Pré-ruptura
+Excesso
+Otimização de estoque
+```
+
+A página usa marts de serving dedicados para evitar consultas pesadas contra os
+fatos brutos durante a navegação.
+
+Os cards superiores de TVD/IVD, rankings e tabelas de incidência devem ser
+validados separadamente quanto a regra de negócio e performance.
+
+---
+
+## Atualização do serving
+
+Depois de publicar ou atualizar a Gold:
+
+```powershell
+.\create-superset-kpi-views.ps1
+```
+
+Esse comando aplica os SQLs versionados da camada de serving e executa
+`ANALYZE` após a criação dos objetos.
+
+Para atualizar somente a fonte PostgreSQL usada pela exportação diária:
+
+```powershell
+docker compose exec -T local-engine python -m neoretail_local.gold_serving --customer 142 --export-daily-only
+```
+
+---
+
+## Bootstraps do Superset
+
+```powershell
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_export.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
+```
+
+Os scripts são idempotentes: podem ser executados novamente para atualizar
+datasets, charts e layouts existentes.
+
+---
+
+## Performance
+
+A estratégia principal de performance da POC é:
+
+```text
+fato grande
+   ↓
+transformação / agregação no refresh
+   ↓
+mart físico
+   ↓
+consulta pequena no Superset
+```
+
+### Evidências já observadas
+
+Em benchmarks históricos da POC, a substituição de consultas virtuais por marts
+físicos reduziu significativamente o tempo de execução de consultas
+representativas. Esses resultados foram obtidos em ambiente local e não devem
+ser tratados como SLA de produção.
+
+Medição cold-cache local de 18/09/2026, executada pelo mecanismo de consulta do
+Superset para `id_customer = 142`:
+
+| Consulta | Antes | Depois |
+|---|---:|---:|
+| Exportação mês — Produto | 25,31 s | 1,08 s |
+| Exportação mês — Varejo | 10,40 s | 1,19 s |
+| Exportação dia — Produto | 6,80 s | 2,55 s |
+| Exportação dia — Varejo | 14,29 s | 0,39 s |
+| TVD — Visão geral | 25,11 s na rodada de diagnóstico | 0,38 s |
+| IVD — Visão geral | 44,73 s na rodada de diagnóstico | 0,14 s |
+| Panorama vendas semanal | 4,80 s | 0,77 s |
+| Panorama estoque semanal | 2,49 s | 0,15 s |
+| Panorama Giro/ROI semanal | 2,26 s | 0,15 s |
+| Panorama OSA semanal | 2,04 s | 0,13 s |
+| Distribuição e sortimento | 5,48 s | 0,29 s |
+| OSA — Perdas | 2,14 s | 0,61 s |
+
+As listas dos filtros, antes medidas em até 3,10 s sobre marts com cerca de 14
+milhões de linhas, ficaram entre 0,004 s e 0,218 s sobre `nr_filter_options`.
+Os resultados completos, a reconciliação numérica e as limitações estão em
+[`docs/performance_audit.md`](docs/performance_audit.md).
+
+O profiler aceita recorte por dashboard e por trecho do nome do gráfico:
+
+```powershell
+.\profile-performance.ps1 -ColdCache
+.\profile-performance.ps1 -ColdCache `
+  -Dashboard neoretail-v9-panorama-industria `
+  -Chart semanal
+```
+
+### Snapshot atual do container Superset
+
+Medição manual no ambiente local:
+
+```text
+CPU:       3,58%
+RAM:       878,1 MiB
+Limite:    15,47 GiB
+PIDs:      99
+```
+
+Esse número é apenas uma **baseline com carga baixa**. Ele não representa o
+consumo com usuários simultâneos nem substitui um teste de carga.
+
+---
+
+## Teste de concorrência
+
+O benchmark de concorrência do backend está disponível em
+[`docs/load_testing.md`](docs/load_testing.md).
+
+Meta atual da POC:
+
+```text
+1 usuário   -> baseline
+5 usuários  -> carga intermediária
+10 usuários -> cenário de pico esperado
+15 usuários -> stress test opcional
+```
+
+Durante o teste são registrados separadamente:
+
+- CPU e RAM do Superset;
+- CPU e RAM do PostgreSQL Analytics;
+- Redis;
+- embedded-app;
+- tempo médio;
+- p50;
+- p95;
+- taxa de erro;
+- comportamento de filtros;
+- download de exportação.
+
+Execução reproduzível:
+
+```powershell
+.\load-test-users.ps1 -Users 1,5,10 `
+  -Dashboard "neoretail-v9-visao-geral-industria" -ColdCache
+```
+
+Na medição local, a configuração válida com até 12 consultas simultâneas teve
+0% de erros para 1, 5 e 10 usuários. A RAM do Superset permaneceu próxima de
+1,04–1,07 GiB, mas o PostgreSQL Analytics atingiu aproximadamente 1.495% de CPU
+e o page p95 chegou a 50,98 s na Visão Geral e 77,34 s no Panorama para dez
+aberturas frias simultâneas. O primeiro gargalo observado foi o serving local e
+o fan-out de charts.
+
+Uma segunda suíte E2E/HTTP ainda deve simular fluxos reais, por exemplo:
+
+```text
+login
+-> Guest Token
+-> Visão Geral
+-> filtros
+-> Panorama
+-> Tarefas
+-> Exportação
+-> download
+```
+
+O teste atual executa `QueryContext` internamente e não mede HTTP, Gunicorn,
+Guest Token ou navegador. O sizing de produção só deve ser fechado depois do
+teste E2E e da repetição contra o DW real.
+
+---
+
+## Interpretação correta do benchmark
+
+Existem dois custos diferentes:
+
+### 1. Custo da camada Superset
+
+- workers;
+- CPU;
+- RAM;
+- sessões;
+- Guest Token;
+- renderização;
+- concorrência.
+
+### 2. Custo da camada de dados
+
+- volume da AMBEV;
+- scan;
+- joins;
+- agregações;
+- concorrência no DW;
+- cache;
+- warehouse/compute.
+
+O PostgreSQL local ajuda a medir a POC, mas **não substitui o benchmark do DW
+real**. O teste final deve separar esses dois componentes.
+
+---
 
 ## Serviços locais
 
 | Serviço | Finalidade | Acesso padrão |
 |---|---|---|
-| `superset-db` | Metadados, usuários, datasets, charts e dashboards | interno |
-| `analytics-db` | Schemas `bronze`, `silver`, `gold` e `audit` | `localhost:5433` |
-| `redis` | Cache e suporte ao Superset | interno |
-| `superset-init` | Migrações, administrador e conexão Analytics | job one-shot |
-| `superset` | Exploração e dashboards | <http://localhost:8088> |
-| `local-engine` | PySpark, pipeline e Jupyter | <http://localhost:8888> |
-| `embedded-app` | Portal multitenant demonstrativo | <http://localhost:3000> |
-| `blob-profiler` | Perfil opcional das fontes no Blob | profile `blob` |
+| `superset-db` | metadados do Superset | interno |
+| `analytics-db` | serving analítico local | `localhost:5433` |
+| `redis` | cache / suporte ao Superset | interno |
+| `superset-init` | migrações e setup | one-shot |
+| `superset` | dashboards e API | <http://localhost:8088> |
+| `local-engine` | PySpark / pipeline / Jupyter | <http://localhost:8888> |
+| `embedded-app` | portal NeoRetail | <http://localhost:3000> |
+| `blob-profiler` | profiling opcional do Blob | profile `blob` |
 
-## Pré-requisitos
-
-- Docker Desktop com Docker Compose v2;
-- PowerShell 5.1 ou superior no Windows;
-- pelo menos 8 GB de memória disponíveis para o Docker;
-- acesso ao Azure Blob somente para executar o pipeline de dados;
-- Git e Node.js apenas para desenvolvimento fora dos containers.
+---
 
 ## Início rápido
 
-No Windows:
+Windows:
 
 ```powershell
 Copy-Item .env.example .env
 .\start.ps1 -Rebuild
 ```
 
-O parâmetro `-Rebuild` compila as imagens, inclusive o frontend customizado do
-Superset. Nas execuções seguintes, quando o código das imagens não mudou:
+Execuções seguintes, quando não houver mudança de imagem/frontend:
 
 ```powershell
 .\start.ps1
 ```
-
-Em Linux ou macOS:
-
-```bash
-cp .env.example .env
-./start.sh --build
-```
-
-O start funciona sem credencial do Blob. A ingestão permanece bloqueada até
-que `AZURE_STORAGE_CONNECTION_STRING` seja preenchida no `.env`.
 
 Credenciais locais padrão do Superset:
 
@@ -122,260 +529,82 @@ usuário: admin
 senha:   admin
 ```
 
-Troque as credenciais e as chaves antes de usar o ambiente fora do localhost.
+Essas credenciais são apenas para desenvolvimento local.
 
-## Configuração
-
-Copie [`.env.example`](.env.example) para `.env`. O arquivo `.env` não deve ser
-versionado.
-
-| Variável | Uso |
-|---|---|
-| `SUPERSET_SECRET_KEY` | assinatura interna do Superset |
-| `GUEST_TOKEN_JWT_SECRET` | assinatura dos Guest Tokens |
-| `SUPERSET_ADMIN_*` | usuário administrador local |
-| `ANALYTICS_DB_*` | conexão com o PostgreSQL Analytics |
-| `AZURE_STORAGE_CONNECTION_STRING` | acesso à fonte no Blob |
-| `AZURE_STORAGE_CONTAINER` | container do Azure Storage |
-| `NEORETAIL_CUSTOMER` | cliente padrão dos comandos locais |
-| `LOCAL_LAKE_FORMAT` | `parquet` por padrão; `delta` é opcional |
-| `SPARK_DRIVER_MEMORY` | memória do driver PySpark |
-| `PUBLIC_SUPERSET_URL` | URL usada pelo portal embedded |
-| `DEMO_USER_PASSWORD` | senha do usuário demonstrativo |
-
-O valor padrão de `LOCAL_LAKE_FORMAT=parquet` evita baixar JARs do Maven.
-O modo `delta` pode exigir acesso externo na primeira inicialização.
+---
 
 ## Pipeline de dados
 
-O comando principal executa uma etapa para um cliente por vez:
+Exemplo:
 
 ```powershell
-.\run-local-pipeline.ps1 -Step 02A -Customer 259
+.\run-local-pipeline.ps1 -Step 02A -Customer 142
 ```
 
-O parâmetro `-Customer` aceita o ID ou o nome cadastrado. O resumo da execução
-fica em `generated/local_pipeline_summary.json`.
+Etapas principais:
 
 | Etapa | Responsabilidade |
 |---|---|
-| `00` | prepara diretórios, schemas e configuração local |
-| `01` | descobre e inventaria os arquivos do Blob |
-| `02A` | carrega dimensões aprovadas na Bronze |
-| `02B` | materializa fatos candidatos por família e varejista |
-| `03A` | normaliza as dimensões na Silver |
-| `03B` | consolida fatos com tratamento de schema drift |
-| `03C` | estrutura oportunidades a partir do `ETL_CALC_V2` |
-| `03D` | compara Bronze e Silver e grava o quality gate |
-| `04` | verifica as famílias aprovadas para publicação |
-| `05` | publica dimensões Gold no lake e no PostgreSQL |
-| `06` | publica fatos Gold aprovados |
-| `07` | registra a prontidão das métricas |
-| `08` | executa o quality gate final da Gold |
+| `00` | setup local |
+| `01` | descoberta do Blob |
+| `02A` | Bronze de dimensões |
+| `02B` | candidatos de fatos |
+| `03A` | Silver de dimensões |
+| `03B` | Silver de fatos |
+| `03C` | oportunidades |
+| `03D` | validação de paridade |
+| `04` | aprovação de fatos |
+| `05` | Gold de dimensões / PostgreSQL |
+| `06` | Gold de fatos / serving |
+| `07` | prontidão de métricas |
+| `08` | quality gate final |
 
-Fluxo recomendado para o primeiro cliente:
+A Gold lake preserva o dado aprovado. O PostgreSQL pode receber somente o
+recorte necessário para a POC.
 
-```powershell
-.\run-local-pipeline.ps1 -Step 02A -Customer 259
-.\run-local-pipeline.ps1 -Step 02B -Customer 259
-.\run-local-pipeline.ps1 -Step 03A -Customer 259
-.\run-local-pipeline.ps1 -Step 03B -Customer 259
-.\run-local-pipeline.ps1 -Step 03C -Customer 259
-.\run-local-pipeline.ps1 -Step 03D -Customer 259
-.\run-local-pipeline.ps1 -Step 04  -Customer 259
-.\run-local-pipeline.ps1 -Step 05  -Customer 259
-.\run-local-pipeline.ps1 -Step 06  -Customer 259
-.\run-local-pipeline.ps1 -Step 07  -Customer 259
-.\run-local-pipeline.ps1 -Step 08  -Customer 259
-```
-
-Para atualizar os três clientes:
-
-```powershell
-.\run-multitenant-refresh.ps1
-```
-
-`FATO_MERCADO` está fora do pipeline da POC. Mesmo que existam candidatos de
-mercado antigos no lake local, as etapas Silver e de validação não os processam.
-
-As etapas `04` e `06` retornam `blocked` enquanto
-[`config/approved_facts.yaml`](config/approved_facts.yaml) não possuir fatos
-aprovados. Esse resultado é uma proteção e não uma falha técnica.
-
-### Particionamento e idempotência
-
-- lake: `<camada>/<tabela>/id_customer=<ID>`;
-- PostgreSQL: cada carga substitui somente as linhas do cliente processado;
-- joins incluem `id_customer` junto à chave de item, local ou negócio;
-- o cache não baixa novamente um Blob com o mesmo ETag;
-- a Bronze preserva arquivo, varejista, família, status e horário de ingestão;
-- a Gold recebe somente fatos registrados como aprovados.
-
-## Superset e dashboards
-
-O `superset-init` executa migrações, cria o administrador, sincroniza papéis e
-cadastra a conexão `NeoRetail Gold - PostgreSQL Local`. Os dashboards são
-criados por scripts idempotentes, que podem ser executados novamente para
-atualizar charts e layouts existentes.
-
-Se a Gold acabou de ser publicada ou atualizada, execute:
-
-```powershell
-.\create-superset-kpi-views.ps1
-```
-
-Esse comando aplica as views de `analytics-db/views` e recria os marts físicos
-de `analytics-db/marts` no schema Gold. Os marts persistem os joins, recortes de
-último período e janelas usados pelos dashboards e possuem índices iniciados por
-`id_customer`, que também é a chave de RLS. Depois da carga, o comando executa
-`ANALYZE` para o PostgreSQL escolher planos com estatísticas atualizadas.
-
-Os scripts abaixo apontam o Superset para esses objetos físicos e escrevem
-somente datasets, charts e layouts no banco de metadados do Superset.
-
-```powershell
-docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview.py
-docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
-docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
-docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
-docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
-```
-
-Os oito marts compartilhados são:
-
-- `gold.nr_overview_history` e `gold.nr_panorama_latest`;
-- `gold.nr_panorama_weekly`;
-- `gold.nr_panorama_opportunities` e
-  `gold.nr_panorama_opportunities_latest`;
-- `gold.nr_tvd_daily`, pré-agregado para a série diária e alertas de TVD;
-- `gold.nr_osa_industry_causes`;
-- `gold.nr_stock_tasks`.
-
-O refresh multitenant completo já chama `create-superset-kpi-views.ps1` depois
-de atualizar os três clientes. Portanto, a camada física sempre é reconstruída
-com o estado final da Gold:
-
-```powershell
-.\run-multitenant-refresh.ps1
-```
-
-| Dashboard | Slug | Conteúdo principal |
-|---|---|---|
-| NeoRetail V9 — Visão geral da indústria | `neoretail-v9-visao-geral-industria` | TVD, IVD, giro, vendas, estoque, ROI, markup e OSA |
-| NeoRetail V9 — Panorama Indústria | `neoretail-v9-panorama-industria` | evolutivos, comparativos, rankings e análise detalhada |
-| NeoRetail V9 — OSA Indústria | `neoretail-v9-osa-industria` | visão mensal, perdas por motivo/causa e rankings OSA |
-| NeoRetail V9 — Tarefas de Otimização — Estoque | `neoretail-v9-tarefas-otimizacao-estoque` | tendências TVD/IVD, rankings e incidências de estoque |
-
-Exemplo de URL:
-
-```text
-http://localhost:8088/superset/dashboard/neoretail-v9-osa-industria/
-```
-
-O Panorama usa abas do Superset para as alternâncias Mensal/Semanal,
-Valor/Quantidade e Estoque/Giro/OSA/Falta e Excesso. A tela OSA usa as abas
-Valor/Perdas, equivalentes aos bookmarks do Power BI. O cliente inicial desses
-dois dashboards é 3 Corações (`id_customer = 259`).
-
-### Filtros nativos
-
-Os dashboards usam filtros horizontais sobre as dimensões disponíveis:
-
-- indústria;
-- rede e bandeira;
-- UF e cidade;
-- tipo de local e loja;
-- nível de atividade;
-- marca;
-- hierarquias de item;
-- item e período.
-
-As dependências podem ser organizadas em cascata, por exemplo:
-`rede → bandeira → UF → cidade → loja`.
-
-## Plugin NeoRetail KPI Card
-
-O plugin está em
-[`superset/frontend-plugin/plugin-chart-neoretail-kpi`](superset/frontend-plugin/plugin-chart-neoretail-kpi)
-e é registrado no `MainPreset` durante o build da imagem.
-
-Ele suporta:
-
-- área com MTD, mês anterior e média U3M;
-- barras comparativas;
-- cartões com vários indicadores;
-- evolutivos combinando barras e linhas;
-- rankings horizontais;
-- colunas empilhadas;
-- barras verticais por categoria;
-- valores sobre barras e junto aos pontos das linhas;
-- tarefas críticas e itens em risco;
-- miniatura própria no seletor de gráficos.
-
-Os filtros nativos e o RLS entram no `QueryObject` do Superset antes de os
-resultados chegarem ao componente React. Handlebars e Jinja não são usados
-como mecanismo de segurança.
-
-Depois de alterar o frontend do plugin:
-
-```powershell
-docker compose build superset
-docker compose up -d superset
-```
-
-Atualize o navegador com `Ctrl+Shift+R` para descartar o bundle anterior.
+---
 
 ## Portal embedded
 
-O portal em <http://localhost:3000> oferece uma experiência própria do
-NeoRetail. Depois do login, a página **Minhas soluções** abre a seleção entre as
-três indústrias autorizadas. O produto organiza os quatro dashboards em menus
-de Visão geral, Panorama e Tarefas do dia, sem expor a navegação administrativa
-do Superset.
+O portal em <http://localhost:3000> consome `config/tenants.yaml` para montar o
+catálogo de dashboards autorizados.
 
-A REST API do portal mantém a sessão, publica o catálogo autorizado e emite um
-Guest Token específico para a combinação de dashboard e indústria. O token
-aplica `id_customer` como RLS antes de qualquer consulta analítica.
+Fluxo simplificado:
 
-Antes de testar o embedded:
+```text
+usuário
+  ↓
+portal
+  ↓
+catálogo autorizado
+  ↓
+Guest Token
+  ↓
+RLS id_customer
+  ↓
+Superset embedded
+```
 
-1. use `demo.multitenant` / `neoretail-demo` ou defina `DEMO_USER_PASSWORD` no `.env`;
-2. confirme que `PUBLIC_SUPERSET_URL` é acessível pelo navegador;
-3. execute `superset/bootstrap_embedded.py` após os quatro bootstraps de dashboard;
-4. recrie o serviço com `docker compose up -d --build embedded-app`;
-5. teste pelo menos dois clientes e uma tentativa com cliente não autorizado.
+O frontend administrativo do Superset não precisa ser exposto ao usuário final.
 
-O catálogo base em `config/tenants.yaml` define os menus, módulos, slugs e UUIDs
-reproduzíveis da POC. Administradores também podem abrir um dashboard no
-Superset e usar **Publicar no NeoRetail**, ao lado de **Editar dashboard**. A
-ação publica o dashboard, habilita o recurso embedded, remove o filtro visível
-de indústria e grava sua entrada dinâmica em
-`generated/neoretail-published-dashboards.json`. O portal lê esse arquivo a cada
-requisição, portanto a nova tela fica disponível sem editar YAML ou reiniciar o
-produto.
+---
 
 ## Validação
 
-Validação estrutural, de sintaxe e build:
+Estrutura e sintaxe:
 
 ```powershell
 .\validate.ps1
 ```
 
-Smoke test do fluxo PySpark → PostgreSQL Analytics → Superset:
-
-```powershell
-.\test-local.ps1
-```
-
-Saúde dos containers e endpoints:
+Saúde:
 
 ```powershell
 .\health.ps1
 .\status.ps1
 ```
 
-Validação das consultas dos dashboards:
+Validação de dashboards:
 
 ```powershell
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_overview.py
@@ -384,103 +613,76 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_o
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_stock_optimization.py
 ```
 
-Teste de regressão do plugin, quando Node.js estiver instalado no host:
+---
 
-```powershell
-node superset/frontend-plugin/plugin-chart-neoretail-kpi/tests/regression.mjs
-```
+## Princípios da POC
 
-## Operação diária
+1. **não usar o Superset como engine de transformação pesada;**
+2. **não replicar fatos gigantes no PostgreSQL local sem necessidade;**
+3. **materializar cálculos caros antes da interação;**
+4. **manter RLS independente dos filtros visíveis;**
+5. **preservar `id_customer` em todos os objetos de serving;**
+6. **medir antes de dimensionar infraestrutura;**
+7. **não extrapolar benchmark local como sizing de produção;**
+8. **não alterar regra de negócio apenas para facilitar a visualização.**
 
-```powershell
-# Estado e saúde
-.\status.ps1
+---
 
-# Parar sem remover dados
-.\stop.ps1
+## O que ainda falta provar
 
-# Acompanhar logs
-docker compose logs -f superset
-docker compose logs -f local-engine
+Antes de qualquer decisão de produção, ainda é necessário:
 
-# Reconstruir depois de alterar Dockerfile ou frontend
-.\start.ps1 -Rebuild
-```
+- benchmark com 5–10 usuários simultâneos;
+- medição de p50/p95 e erros;
+- teste com volume representativo;
+- benchmark conectado ao DW real;
+- custo por workload / tela;
+- homologação das métricas pelo negócio;
+- observabilidade e alertas;
+- desenho de DEV / HML / PROD;
+- estratégia de backup do metadata database;
+- CI/CD e rollback.
 
-O reset remove os volumes de metadados, Analytics, Redis e lake local:
-
-```powershell
-.\reset.ps1 -Confirm
-```
-
-Use esse comando somente quando a perda do ambiente local for intencional.
-O código, o `.env` e a pasta `generated` são preservados.
+---
 
 ## Estrutura do repositório
 
 ```text
-analytics-db/       inicialização e views do PostgreSQL Analytics
-blob-profiler/      inventário e perfil opcional dos arquivos do Blob
-config/             clientes, tenants, fontes e contratos analíticos
-docs/               arquitetura, runbooks e troubleshooting
-embedded-app/       backend e frontend do portal demonstrativo
-local-engine/       pipeline PySpark, notebooks e testes
-scripts/            validações auxiliares do projeto
-superset/           imagem, configuração, plugin e bootstraps de dashboards
-generated/          relatórios gerados localmente e não versionados
-certs/              certificados corporativos locais e não versionados
+analytics-db/       marts e objetos de serving
+blob-profiler/      profiling das fontes
+config/             clientes, tenants e contratos
+docs/               arquitetura e documentação
+embedded-app/       portal embedded
+local-engine/       pipeline PySpark
+scripts/            validações
+superset/           configuração, plugin e bootstraps
+generated/          artefatos locais
+certs/              certificados locais
 ```
 
-## Adicionar uma indústria
+---
 
-1. confirme `id_customer` e `nm_customer` na dimensão corporativa;
-2. cadastre o cliente em `config/customers.yaml`;
-3. adicione as permissões da POC em `config/tenants.yaml`;
-4. registre os caminhos comprovados em `config/source_catalog.yaml`;
-5. execute descoberta, Bronze, Silver e os quality gates para o cliente;
-6. aprove explicitamente os fatos antes da Gold;
-7. valide o RLS com um usuário autorizado e outro não autorizado.
+## Segurança
 
-Não crie fórmulas de TVD, IVD, OSA, giro ou oportunidades por aproximação. Os
-contratos de métricas em `config/metric_contracts.yaml` exigem definição de
-negócio, expressão, fontes, grão, filtros, política de nulos, exemplos e
-aprovação antes da publicação.
+- não versione `.env`, SAS, senhas ou tokens;
+- Guest Token + RLS é a fronteira de autorização analítica;
+- filtros nativos são apenas filtros de navegação;
+- toda query multitenant deve preservar `id_customer`;
+- mudanças em marts devem ser revisadas antes da aplicação;
+- credenciais padrão são somente para localhost.
 
-## Solução de problemas
+---
 
-- **PowerShell bloqueou scripts:** execute
-  `Set-ExecutionPolicy -Scope Process Bypass`.
-- **Pipeline informa credencial ausente:** preencha
-  `AZURE_STORAGE_CONNECTION_STRING` no `.env`.
-- **Porta 5433 ocupada:** altere `ANALYTICS_DB_PORT` no `.env`.
-- **PySpark sem memória:** mantenha ao menos 8 GB no Docker e aumente
-  `SPARK_DRIVER_MEMORY` gradualmente.
-- **Superset não mostra a Gold:** execute o pipeline até a etapa 08, aplique as
-  views e sincronize o schema `gold`.
-- **Gráfico ainda usa o frontend anterior:** pressione `Ctrl+Shift+R`.
-- **`superset-init` aparece `Exited (0)`:** comportamento correto; ele é um job
-  de inicialização, não um serviço permanente.
+## Resumo da proposta
 
-Veja o guia completo em
-[`docs/troubleshooting.md`](docs/troubleshooting.md).
+A POC não tenta provar que o PostgreSQL local substitui o DW.
 
-## Documentação adicional
+Ela tenta provar que:
 
-- [Arquitetura multitenant V9](docs/v9_multitenant_architecture.md)
-- [Runbook V9](docs/v9_runbook.md)
-- [Pipeline local](docs/local_pipeline.md)
-- [Workflow Blob First](docs/blob_first_workflow.md)
-- [Plugin NeoRetail KPI Card](docs/custom_kpi_plugin.md)
-- [Paridade com Power Query](docs/power_query_parity.md)
-- [Agendamento no GitLab](docs/gitlab_scheduling.md)
-- [Relatório de validação](docs/validation_report.md)
-- [Histórico da POC e plano de evolução para produto](docs/poc_history_and_productization.md)
+> **com uma camada de serving adequada no DW, o Superset consegue funcionar
+> como camada embedded do NeoRetail com isolamento, paridade funcional,
+> performance aceitável e custo de infraestrutura mensurável.**
 
-## Segurança e versionamento
-
-- nunca versione `.env`, SAS, senhas, tokens ou connection strings reais;
-- mantenha certificados locais em `certs/`;
-- use Guest Token com RLS para isolamento e filtros nativos para navegação;
-- revise qualquer alteração em `analytics-db` antes de aplicá-la;
-- os scripts `bootstrap_*.py` alteram somente metadados do Superset e consultam
-  a camada Analytics em modo de leitura.
+A etapa de backend/query com até **10 usuários simultâneos** foi concluída. A
+próxima evidência é o benchmark **E2E/HTTP** e, depois, a validação sobre o
+**DW real**.

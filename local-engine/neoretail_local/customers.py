@@ -15,6 +15,7 @@ class Customer:
     nm_customer: str
     display_name: str
     source_prefix: str
+    source_layout: str
     modules: tuple[str, ...]
     enabled: bool
 
@@ -39,6 +40,7 @@ def _customer(row: dict[str, Any]) -> Customer:
         nm_customer=name,
         display_name=str(row.get("display_name") or name).strip(),
         source_prefix=prefix,
+        source_layout=str(row.get("source_layout", "legacy_fact_families")).strip(),
         modules=tuple(str(value) for value in row.get("modules", [])),
         enabled=bool(row.get("enabled", True)),
     )
@@ -79,4 +81,3 @@ def resolve_customer(path: Path, selector: str | int | None) -> Customer:
     if not customer.enabled:
         raise RuntimeError(f"Cliente desabilitado: {customer.nm_customer}")
     return customer
-

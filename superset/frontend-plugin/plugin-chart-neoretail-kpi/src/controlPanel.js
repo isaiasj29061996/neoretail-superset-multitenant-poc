@@ -174,6 +174,17 @@ export default {
         ],
         [
           {
+            name: 'show_annual',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Mostrar anual 12M'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
             name: 'accent_color',
             config: {
               type: 'TextControl',

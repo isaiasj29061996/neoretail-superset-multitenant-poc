@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "local-engine"))
 
 from neoretail_local.power_query import apply_fact_contract, transform_dimensions
+from neoretail_local.partitioned_daily import build_partitioned_daily_facts
 from neoretail_local.silver import normalize_frame
 
 
@@ -122,3 +123,32 @@ def test_dimensions_apply_customer_and_retailer_contracts(spark):
     assert result["dim_local"].first().cnpj_formatado == "12.345.678/0001-90"
     assert result["aux_contratado_segmento"].first().segmento == "CERVEJA"
     assert result["dim_catalogo_local"].count() == 1
+
+
+def test_partitioned_customer_daily_builds_dashboard_contracts(spark):
+    row = {
+        "id_time": "2026-09-09", "id_location": 20, "id_item": 10,
+        "ID_CUSTOMER": 142, "VL_QUANTITY_SOLD": 2.0,
+        "VL_SALES_TOTAL_VALUE": 20.0, "VL_QUANTITY_IN_STOCK": 8.0,
+        "VL_STOCK_IN_WAREHOUSE": 3.0, "VL_SECURITY_STOCK": 2.0,
+        "VL_MAX_STOCK": 12.0, "VL_SALES_PRICE": 10.0, "VL_PRICE_COST": 7.0,
+        "VL_QUANTITY_OUT_OF_STOCK": 0, "VL_QUANTITY_VIRTUAL_STOCK": 0,
+        "VL_STOCK_IN_TRANSFER": 1.0, "BL_OSA_ISSUE": 1,
+        "TP_OSA_PRODUCT_CLASS": 1, "VL_QUANTITY_SALE_PREDICTED": 3.0,
+        "VL_AVERAGE_DEMAND_TRUNCATED": 1.5, "VL_QUANTITY_OSA_LOST_SALES": 1.0,
+        "VL_VALUE_OSA_LOST_SALES": 10.0, "VL_AVERAGE_YEARLY_STOCK_TURNOVER": 4.0,
+        "VL_AVERAGE_MONTHLY_STOCK_TURNOVER": 2.0, "TP_ACTIVITY_LEVEL": "F",
+        "TP_OSA_ROOT_CAUSE": "RUPTURA", "VL_TVD": 5.0, "VL_IVD": 0.0,
+        "VL_DAYS_WITH_NO_SALE": 1, "QUANTITY_VALID_ITEM": 1, "BL_RCA_VALID": 1,
+    }
+    result = build_partitioned_daily_facts(spark.createDataFrame([row]), 142)
+    assert set(result) == {
+        "fato_diaria", "fato_semanal", "fato_historico", "fato_ivd_tvd",
+        "fato_nivel_atividade", "fato_mensal_causa_osa", "fato_preco",
+        "etl_calc_v2", "calculo_oportunidades",
+    }
+    assert result["fato_diaria"].first().id_customer == 142
+    assert result["fato_semanal"].first().cd_week == "2026-37"
+    opportunity = result["calculo_oportunidades"].first()
+    assert str(opportunity.tvd) == "5.0000"
+    assert opportunity.regra_critico == "F"
