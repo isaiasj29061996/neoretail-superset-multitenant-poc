@@ -1,6 +1,45 @@
+import fs from "node:fs";
+import YAML from "yaml";
+
 const base = process.env.SMOKE_BASE_URL || "http://localhost:3000";
 const password = process.env.DEMO_USER_PASSWORD;
 if (!password) throw new Error("DEMO_USER_PASSWORD não configurada");
+
+const tenantConfigPath = process.env.TENANTS_CONFIG || "/app/config/tenants.yaml";
+const tenantConfig = YAML.parse(fs.readFileSync(tenantConfigPath, "utf8"));
+
+function expectedDashboardIds(idCustomer) {
+  const modules = new Set(tenantConfig.customers?.[String(idCustomer)]?.modules || []);
+  return Object.entries(tenantConfig.dashboards || {})
+    .filter(([, dashboard]) => !dashboard.required_module || modules.has(dashboard.required_module))
+    .map(([dashboardId]) => dashboardId);
+}
+
+function assertSameDashboardSet(idCustomer, catalog) {
+  const expected = expectedDashboardIds(idCustomer);
+  const actual = (catalog.dashboards || []).map((dashboard) => dashboard.key);
+  const actualSet = new Set(actual);
+  if (actualSet.size !== actual.length) {
+    throw new Error(`Catálogo contém dashboards duplicados para ${idCustomer}`);
+  }
+  const missing = expected.filter((dashboardId) => !actualSet.has(dashboardId));
+  const unexpected = actual.filter((dashboardId) => !expected.includes(dashboardId));
+  if (missing.length || unexpected.length) {
+    throw new Error(
+      `Contrato de dashboards inválido para ${idCustomer}: `
+      + `faltando=[${missing.join(",")}], inesperados=[${unexpected.join(",")}]`,
+    );
+  }
+  const navigationIds = (catalog.navigation || [])
+    .flatMap((section) => section.items || [])
+    .map((dashboard) => dashboard.key);
+  if (new Set(navigationIds).size !== navigationIds.length
+      || navigationIds.some((dashboardId) => !actualSet.has(dashboardId))
+      || actual.some((dashboardId) => !navigationIds.includes(dashboardId))) {
+    throw new Error(`Navegação inconsistente com o catálogo para ${idCustomer}`);
+  }
+  return actual.length;
+}
 
 let cookie = "";
 async function request(path, options = {}) {
@@ -26,6 +65,7 @@ if (!login.response.ok) throw new Error(`Login falhou: ${login.response.status}`
 
 const expectedCustomers = [142];
 let issuedTokens = 0;
+let authorizedDashboards = 0;
 for (const idCustomer of expectedCustomers) {
   const context = await request("/api/context", {
     method: "POST", body: JSON.stringify({ idCustomer }),
@@ -33,9 +73,10 @@ for (const idCustomer of expectedCustomers) {
   if (!context.response.ok) throw new Error(`Contexto ${idCustomer} falhou`);
 
   const catalog = await request("/api/catalog");
-  if (!catalog.response.ok || catalog.body.dashboards?.length !== 4) {
+  if (!catalog.response.ok || !Array.isArray(catalog.body.dashboards)) {
     throw new Error(`Catálogo inválido para ${idCustomer}`);
   }
+  authorizedDashboards += assertSameDashboardSet(idCustomer, catalog.body);
   for (const dashboard of catalog.body.dashboards) {
     const guest = await request("/api/guest-token", {
       method: "POST", body: JSON.stringify({ dashboardKey: dashboard.key }),
@@ -70,6 +111,6 @@ for (const idCustomer of deniedCustomers) {
 
 console.log(JSON.stringify({
   status: "ok", customers: expectedCustomers.length,
-  dashboards: 4, guestTokens: issuedTokens,
+  dashboards: authorizedDashboards, guestTokens: issuedTokens,
   deniedCustomers: deniedCustomers.length,
 }));
