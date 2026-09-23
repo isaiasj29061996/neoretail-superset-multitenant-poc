@@ -194,13 +194,21 @@ def test_v9_customer_registry_and_embedded_rls():
         (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
     )
     assert set(tenant_config["dashboards"]) == {
-        "overview", "panorama", "osa", "tasks",
+        "overview", "overview_quantity", "panorama", "osa", "tasks",
         "export_daily", "export_monthly",
     }
     assert len({
         definition["embedded_id"]
         for definition in tenant_config["dashboards"].values()
-    }) == 6
+    }) == 7
+
+    smoke = (ROOT / "embedded-app/smoke.mjs").read_text(encoding="utf-8")
+    assert "TENANTS_CONFIG" in smoke
+    assert "assertSameDashboardSet" in smoke
+    assert "missing" in smoke
+    assert "unexpected" in smoke
+    assert re.search(r"dashboards\?\.length\s*!==\s*\d+", smoke) is None
+    assert re.search(r"dashboards:\s*\d+", smoke) is None
 
     smoke = (ROOT / "embedded-app/smoke.mjs").read_text(encoding="utf-8")
     assert "TENANTS_CONFIG" in smoke
@@ -228,3 +236,26 @@ def test_concurrency_benchmark_uses_real_cache_bypass_and_safe_stats_monitor():
     assert "WaitForExit" in wrapper
     assert "System.IO.StreamWriter" in monitor
     assert "docker stats --no-stream" in monitor
+
+
+def test_overview_quantity_uses_certified_components_and_filtered_fallback():
+    sql = (ROOT / "analytics-db/marts/40_overview_quantity_semantic.sql").read_text(
+        encoding="utf-8"
+    )
+    bootstrap = (ROOT / "superset/bootstrap_overview_quantity.py").read_text(
+        encoding="utf-8"
+    )
+    validator = (ROOT / "superset/validate_overview_quantity.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "nr_overview_quantity_default" in sql
+    assert "FILTER (WHERE faturamento > 0)" in sql
+    assert "COUNT(DISTINCT cnpj) FILTER (WHERE positivacao = 1)" in sql
+    assert "SUM(COALESCE(status_item_geral, 0))" in sql
+    assert "SUM(COALESCE(demanda_media, 0))" in sql
+    assert "COUNT(o.id_item) FILTER" in sql
+    assert "nr_overview_quantity_detail" in bootstrap
+    assert "remove_filter=True" in bootstrap or "_jinja_filter_predicates" in bootstrap
+    assert "ratio_percent" in bootstrap
+    assert "nr_overview_quantity_default" in validator

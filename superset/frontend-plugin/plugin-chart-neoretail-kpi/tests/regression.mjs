@@ -55,6 +55,10 @@ equal(missingAxisRejected, true, 'Reject a missing temporal axis');
 const transform = load('transformProps', {
   getMetricLabel: metric => typeof metric === 'string' ? metric : metric.label,
 });
+const formatValue = load('formatValue', {});
+equal(formatValue(null, 'percent'), '—', 'Format preserves null as BLANK');
+equal(formatValue(undefined, 'currency'), '—', 'Format preserves undefined as BLANK');
+equal(formatValue(0, 'percent'), '0%', 'Format preserves a legitimate numeric zero');
 const formData = { xAxis: 'snapshot', metrics: [{ label: 'TVD' }, 'Qtd'], criticalMetric: 'Criticos', riskMetric: 'Risco', cardTitle: 'Meu TVD', helpText: 'Detalhes', cardVariant: 'multi', metricLabels: 'Valor|Quantidade', metricFormats: 'currency|number', metricDirections: 'lower|higher', semanticProfile: 'direct_average', showTasks: false, accentColor: '#123abc', analysisUrl: ' /tvd ' };
 const rows = [
   { snapshot: '2026-08-02', TVD: '15', Qtd: 8, Criticos: '7', Risco: '9' },
@@ -99,6 +103,11 @@ equal(
 );
 equal(monthlySemantic.series.length, 3, 'Monthly area series includes the available month closings');
 equal(monthlySemantic.timeGrain, 'P1M', 'Monthly semantic series exposes year/month grain');
+equal(
+  [monthlySemantic.indicators[0].lastYear.current, monthlySemantic.indicators[0].lastYear.previous, monthlySemantic.indicators[0].lastYear.average],
+  [null, null, null],
+  'Missing prior-year months remain BLANK instead of zero',
+);
 const weighted = transform({
   formData: {
     xAxis: 'data', metrics: ['Giro soma', 'Giro contagem'], metricLabels: 'Giro',
@@ -139,6 +148,91 @@ const osaBlank = transform({
   queriesData: [{ data: [{ data: '2026-05-01', Problemas: 2, Ativos: 0 }] }],
 });
 equal(osaBlank.indicators[0].current, null, 'OSA preserves BLANK when the active denominator is zero');
+equal(osaBlank.indicators[0].average, null, 'OSA U3M preserves BLANK when every denominator is absent or zero');
+const directSum = transform({
+  formData: { xAxis: 'data', metrics: ['Perda'], semanticProfile: 'direct_sum' },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Perda: 10 }, { data: '2026-03-01', Perda: 20 },
+    { data: '2026-04-01', Perda: 30 }, { data: '2026-05-01', Perda: 40 },
+  ] }],
+});
+equal(directSum.indicators[0].average, 60, 'Loss U3M sums the three prior months without dividing by three');
+const quantityRatios = transform({
+  formData: { xAxis: 'data', metrics: ['Numerador', 'Denominador'], semanticProfile: 'ratio_percent' },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Numerador: 1, Denominador: 10 },
+    { data: '2026-03-01', Numerador: 2, Denominador: 20 },
+    { data: '2026-04-01', Numerador: 3, Denominador: 30 },
+    { data: '2026-05-01', Numerador: 4, Denominador: 40 },
+  ] }],
+});
+equal(quantityRatios.indicators[0].average, 10, 'Quantity percentages recalculate the ratio over U3M totals');
+const coverage = transform({
+  formData: { xAxis: 'data', metrics: ['Estoque', 'Demanda'], semanticProfile: 'ratio' },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Estoque: 100, Demanda: 10 },
+    { data: '2026-03-01', Estoque: 200, Demanda: 20 },
+    { data: '2026-04-01', Estoque: 300, Demanda: 30 },
+    { data: '2026-05-01', Estoque: 400, Demanda: 40 },
+  ] }],
+});
+equal(coverage.indicators[0].average, 10, 'Coverage U3M divides aggregated stock by aggregated demand');
+const coverageBlank = transform({
+  formData: { xAxis: 'data', metrics: ['Estoque', 'Demanda'], semanticProfile: 'ratio' },
+  queriesData: [{ data: [
+    { data: '2025-04-01', Estoque: 100, Demanda: 10 },
+    { data: '2025-05-01', Estoque: 100, Demanda: 0 },
+    { data: '2026-05-01', Estoque: 400, Demanda: 0 },
+  ] }],
+});
+equal(coverageBlank.indicators[0].current, null, 'Coverage preserves BLANK when current demand is zero');
+equal(coverageBlank.indicators[0].lastYear.current, null, 'Coverage LY preserves BLANK when its demand is zero');
+equal(coverageBlank.indicators[0].lastYear.previous, 10, 'Coverage LY keeps a legitimate prior-month ratio');
+const missingNumerator = transform({
+  formData: { xAxis: 'data', metrics: ['Soma', 'Contagem'], semanticProfile: 'weighted_average' },
+  queriesData: [{ data: [{ data: '2026-05-01', Soma: null, Contagem: 10 }] }],
+});
+equal(missingNumerator.indicators[0].current, null, 'A missing numerator remains BLANK with a valid denominator');
+const zeroVersusBlank = transform({
+  formData: { xAxis: 'data', metrics: ['Perda'], semanticProfile: 'direct_sum' },
+  queriesData: [{ data: [
+    { data: '2026-04-01', Perda: null },
+    { data: '2026-05-01', Perda: 0 },
+  ] }],
+});
+equal(
+  [zeroVersusBlank.indicators[0].current, zeroVersusBlank.indicators[0].previous],
+  [0, null],
+  'A legitimate zero remains distinct from a BLANK month',
+);
+const priceLyPending = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Preco soma', 'Preco contagem'],
+    semanticProfile: 'weighted_average', semanticDisableLy: true,
+  },
+  queriesData: [{ data: [
+    { data: '2025-05-01', 'Preco soma': 100, 'Preco contagem': 10 },
+    { data: '2026-05-01', 'Preco soma': 200, 'Preco contagem': 10 },
+  ] }],
+});
+equal(
+  priceLyPending.indicators[0].lastYear,
+  { current: null, previous: null, average: null },
+  'Price LY stays BLANK while the original DAX definition is unavailable',
+);
+const distribution = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Lojas', 'Itens', 'Lojas U3M', 'Itens U3M'],
+    metricLabels: 'Lojas|Itens', semanticProfile: 'distribution_bundle',
+  },
+  queriesData: [{ data: [
+    { data: '2026-03-01', Lojas: 2, Itens: 3, 'Lojas U3M': 8, 'Itens U3M': 9 },
+    { data: '2026-04-01', Lojas: 4, Itens: 5, 'Lojas U3M': 10, 'Itens U3M': 11 },
+    { data: '2026-05-01', Lojas: 6, Itens: 7, 'Lojas U3M': 12, 'Itens U3M': 13 },
+  ] }],
+});
+equal(distribution.indicators.map(item => item.current), [6, 7], 'Distribution exposes stores and items');
+equal(distribution.indicators.map(item => item.average), [10, 11], 'Distribution uses precomputed distinct U3M cardinality');
 const osaBundle = transform({
   formData: {
     xAxis: 'data', metrics: ['Problemas', 'Ativos', 'Perda'],
@@ -154,6 +248,14 @@ const osaBundle = transform({
 });
 equal(osaBundle.indicators.map(item => item.current), [90, 120], 'OSA bundle restores percentage and loss');
 equal(osaBundle.indicators[1].average, 60, 'OSA loss U3M divides the full measure by three');
+const osaBundleBlank = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Problemas', 'Ativos', 'Perda'],
+    metricLabels: '% OSA|Perda OSA', semanticProfile: 'osa_bundle',
+  },
+  queriesData: [{ data: [{ data: '2026-05-01', Problemas: null, Ativos: 10, Perda: null }] }],
+});
+equal(osaBundleBlank.indicators.map(item => item.current), [null, null], 'OSA bundle preserves missing numerators as BLANK');
 const roi = transform({
   formData: {
     xAxis: 'data', metrics: ['Sellout', 'Custo', 'Estoque'], metricLabels: 'ROI',
