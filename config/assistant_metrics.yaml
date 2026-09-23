@@ -1,0 +1,137 @@
+version: "1.0"
+policy:
+  tenant_source: authenticated_session
+  sql_mode: fixed_allowlisted_read_only
+  numeric_source: metric_api
+  llm_role: explanation_only
+  default_period: MTD
+  max_result_rows: 10
+
+metrics:
+  sales:
+    display_name: Vendas
+    formula_version: overview-quantity-v1
+    formula: "unidade -> SUM(volume_unidades) * MAX(fator); U3M -> soma dos meses M-1, M-2 e M-3 / 3"
+    description: Quantidade de venda sell-out na medida unidade, conforme o contrato da Visão Geral Quantidade.
+    source: gold.nr_overview_quantity_default
+    filtered_source: gold.nr_overview_quantity_detail
+    periods: [MTD, M-1, U3M]
+    format: number
+    statuses:
+      technical: RECONCILED
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+      additional: [PENDENTE_VARIANCE_DAX]
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_overview_quantity.py
+      contract: docs/metric_certification_overview_quantity.md
+      mart: analytics-db/marts/40_overview_quantity_semantic.sql
+
+  percentual_osa:
+    display_name: "% OSA"
+    formula_version: overview-quantity-v1
+    formula: "100 * (1 - SUM(qtd_problemas_osa) / SUM(qtd_item_ativo_osa)); BLANK quando o denominador é zero"
+    description: Percentual de itens ativos sem problema de OSA no período.
+    source: gold.nr_overview_quantity_default
+    filtered_source: gold.nr_overview_quantity_detail
+    periods: [MTD, M-1, U3M]
+    format: percent
+    statuses:
+      technical: RECONCILED
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+      additional: [PENDENTE_VARIANCE_DAX]
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_overview_quantity.py
+      contract: docs/metric_certification_overview_quantity.md
+      mart: analytics-db/marts/40_overview_quantity_semantic.sql
+
+  tvd:
+    display_name: TVD - Pré-ruptura
+    formula_version: stock-headline-v1
+    formula: "SUM(tvd)"
+    description: Oportunidade de pré-ruptura no último dia disponível.
+    source: gold.nr_tvd_daily_summary
+    filtered_source: gold.nr_tvd_daily
+    periods: [MTD, M-1, U3M]
+    format: currency
+    statuses:
+      technical: CERTIFICADA
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_stock_headlines.py
+      contract: docs/metric_certification_overview.md
+      mart: analytics-db/marts/35_stock_headline_performance.sql
+
+  ivd:
+    display_name: IVD - Excesso de estoque
+    formula_version: stock-headline-v1
+    formula: "SUM(ivd)"
+    description: Oportunidade de excesso de estoque no último dia disponível.
+    source: gold.nr_ivd_daily_summary
+    filtered_source: gold.nr_ivd_daily
+    periods: [MTD, M-1, U3M]
+    format: currency
+    statuses:
+      technical: CERTIFICADA
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_stock_headlines.py
+      contract: docs/metric_certification_overview.md
+      mart: analytics-db/marts/35_stock_headline_performance.sql
+
+  stock:
+    display_name: Estoque
+    formula_version: overview-quantity-v1
+    formula: "SUM(estoque_unidades)"
+    description: Quantidade de estoque no último período mensal disponível.
+    source: gold.nr_overview_quantity_default
+    filtered_source: gold.nr_overview_quantity_detail
+    periods: [MTD, M-1, U3M]
+    format: number
+    statuses:
+      technical: RECONCILED
+      business: pending
+      temporal: PARCIAL_CALENDARIO
+    owners: { technical: data_team, business: pending }
+    ai: { query_allowed: true, explain_allowed: true }
+    evidence:
+      validator: superset/validate_overview_quantity.py
+      contract: docs/metric_certification_overview_quantity.md
+      mart: analytics-db/marts/40_overview_quantity_semantic.sql
+
+tools:
+  osa_causes:
+    source: gold.nr_osa_industry_causes
+    max_rows: 10
+  stock_tasks:
+    source: gold.nr_stock_tasks
+    max_rows: 10
+  top_opportunities:
+    source: gold.nr_panorama_opportunities_latest
+    max_rows: 10
+
+filters:
+  rede: rede
+  bandeira: bandeira
+  uf: uf
+  cidade: cidade
+  tipo_local: tipo_local
+  loja: loja
+  regiao: regiao
+  deposito: deposito
+  item: item
+  marca: descricao_marca
+  hierarquia_1: hierarquia_1
+  hierarquia_2: hierarquia_2
+  hierarquia_3: hierarquia_3

@@ -22,6 +22,33 @@ button:disabled { cursor: wait; opacity: .65; }
 [hidden] { display: none !important; }
 .modal-open { overflow: hidden; }
 
+/* Governed analytics assistant. Hidden unless enabled by the backend session. */
+.assistant-trigger { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 14px; border: 1px solid #0d789f; border-radius: 20px; color: #075779; background: #eef9fc; font-size: 13px; font-weight: 800; }
+.assistant-trigger span { color: var(--coral); font-size: 18px; }
+.assistant-backdrop { position: fixed; z-index: 80; inset: 0; background: #001d2d66; backdrop-filter: blur(2px); }
+.assistant-panel { position: fixed; z-index: 90; top: 0; right: 0; width: min(460px, 100vw); height: 100vh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; background: #f8fafb; box-shadow: -18px 0 55px #002f4730; transform: translateX(105%); transition: transform .22s ease; }
+.assistant-panel.open { transform: translateX(0); }
+.assistant-header { display: flex; justify-content: space-between; gap: 18px; padding: 24px; color: white; background: linear-gradient(145deg, var(--navy), #075a7b); }
+.assistant-header h2 { margin: 4px 0 6px; font-size: 25px; }.assistant-header p { margin: 0; color: #b9dce8; font-size: 12px; line-height: 1.45; }
+.assistant-kicker { color: #79d2eb; font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+.assistant-close { align-self: start; width: 34px; height: 34px; border: 1px solid #ffffff45; border-radius: 50%; color: white; background: transparent; font-size: 22px; }
+.assistant-suggestions { display: flex; gap: 7px; overflow-x: auto; padding: 12px 18px; border-bottom: 1px solid var(--line); background: white; }
+.assistant-suggestions button { flex: 0 0 auto; max-width: 210px; padding: 8px 11px; border: 1px solid #bfd9e3; border-radius: 16px; color: var(--navy-2); background: #f5fbfd; font-size: 11px; }
+.assistant-messages { overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 18px; }
+.assistant-message { max-width: 92%; padding: 12px 14px; border: 1px solid #d8e3e8; border-radius: 14px; background: white; box-shadow: 0 5px 18px #002f470b; }
+.assistant-message p { margin: 0; white-space: pre-line; font-size: 13px; line-height: 1.55; }
+.assistant-message-user { align-self: flex-end; border-color: #a8d4e4; color: white; background: var(--navy-2); }
+.assistant-message-system { max-width: 100%; color: #4e626e; background: #edf5f8; }
+.assistant-message-loading { color: var(--muted); font-size: 12px; }
+.assistant-evidence-details { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e9ec; }
+.assistant-evidence-details summary { cursor: pointer; color: #536a76; font-size: 10px; font-weight: 800; }
+.assistant-evidence { display: grid; grid-template-columns: auto 1fr; gap: 4px 9px; margin: 8px 0 0; font-size: 10px; }
+.assistant-evidence dt { color: #70828d; font-weight: 700; }.assistant-evidence dd { overflow-wrap: anywhere; margin: 0; color: #173c50; font-weight: 700; }
+.assistant-error { margin: 0 18px 10px; padding: 10px 12px; border: 1px solid #f3b3bb; border-radius: 9px; color: #9b1730; background: #fff1f3; font-size: 12px; }
+.assistant-form { padding: 14px 18px 18px; border-top: 1px solid var(--line); background: white; }.assistant-form > label { display: block; margin-bottom: 7px; color: #536a76; font-size: 11px; font-weight: 800; }
+.assistant-form > div { display: grid; grid-template-columns: 1fr 42px; gap: 8px; }.assistant-form textarea { width: 100%; resize: none; padding: 11px; border: 1px solid #bdcbd2; border-radius: 10px; color: var(--ink); }.assistant-form textarea:focus { outline: 2px solid #1aa4d455; border-color: var(--sky); }
+.assistant-form #assistant-send { border: 0; border-radius: 10px; color: white; background: var(--blue); font-size: 20px; }.assistant-clear { margin-top: 8px; padding: 0; border: 0; color: #667b86; background: transparent; font-size: 11px; text-decoration: underline; }
+
 .portal-symbol, .nr-symbol { position: relative; display: inline-block; width: 34px; height: 34px; transform: rotate(45deg); }
 .portal-symbol i, .nr-symbol i { position: absolute; width: 23px; height: 23px; border-radius: 4px 14px 4px 14px; background: var(--coral); }
 .portal-symbol i:first-child, .nr-symbol i:first-child { top: 0; left: 0; opacity: .7; }

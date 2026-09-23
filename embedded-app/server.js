@@ -3,6 +3,7 @@ import session from "express-session";
 import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
+import { createAssistantService, registerAssistantRoutes } from "./assistant/index.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -14,6 +15,9 @@ const dashboards = tenantConfig.dashboards || {};
 const navigation = tenantConfig.navigation || [];
 const publishedCatalogPath = process.env.PUBLISHED_DASHBOARDS_CONFIG
   || "/app/generated/neoretail-published-dashboards.json";
+const assistantService = createAssistantService({
+  dashboards: Object.keys(dashboards),
+});
 
 function dashboardCatalog() {
   try {
@@ -90,6 +94,7 @@ function sessionPayload(req) {
     publicSupersetUrl: process.env.PUBLIC_SUPERSET_URL || "http://localhost:8088",
     defaultDashboard: tenantConfig.default_dashboard || "overview",
     analyticsMode: process.env.ANALYTICS_MODE || "local_postgres",
+    assistantEnabled: assistantService.enabled,
   };
 }
 
@@ -105,6 +110,8 @@ function requireIdentity(req, res) {
 function authorizedDashboard(identity, key) {
   return authorizedDashboards(identity).find((dashboard) => dashboard.key === key) || null;
 }
+
+registerAssistantRoutes(app, { service: assistantService, requireIdentity });
 
 app.post("/api/login", (req, res) => {
   const username = String(req.body?.username || "").trim();

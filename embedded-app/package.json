@@ -7,12 +7,16 @@
     "build": "esbuild src/app.js --bundle --format=iife --target=es2022 --outfile=public/app.bundle.js",
     "start": "node server.js",
     "check": "node --check server.js && node --check src/app.js && node --check smoke.mjs",
-    "smoke": "node smoke.mjs"
+    "smoke": "node smoke.mjs",
+    "test:assistant": "node --test assistant/tests/*.test.js",
+    "test:assistant:regression": "node assistant/demo-regression.mjs",
+    "smoke:assistant": "node assistant/api-smoke.mjs"
   },
   "dependencies": {
     "@superset-ui/embedded-sdk": "0.4.0",
     "express": "5.1.0",
     "express-session": "1.18.2",
+    "pg": "8.16.3",
     "yaml": "2.8.1"
   },
   "devDependencies": {
