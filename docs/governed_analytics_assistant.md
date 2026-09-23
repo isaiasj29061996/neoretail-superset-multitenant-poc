@@ -120,6 +120,43 @@ disponibilidade.
 backend usa exclusivamente o tenant da sessão e devolve HTTP 403 em tentativas
 de override.
 
+## Comportamento conversacional determinístico
+
+O orchestrator distingue valor, comparação, variação, fonte, explicação da
+fórmula, versão da fórmula e governança antes de chamar o provider. A métrica
+ativa vem do texto explícito, do `context.metricId` mantido pela UI ou, como
+fallback, do histórico recente. O LLM não decide qual métrica ou ferramenta será
+usada.
+
+Respostas de negócio não exibem códigos internos. `technicalStatus`,
+`businessStatus`, `temporalStatus`, fonte, versão, validador e contrato continuam
+no payload de evidências. Quando a pergunta trata diretamente de governança, o
+MockProvider traduz os estados para linguagem amigável sem promover
+certificação.
+
+O bloco **Ver evidências** do embedded é recolhível e mostra período, tenant,
+fonte, estados, atualização e versão da fórmula depois da resposta principal.
+
+## Regression gate
+
+O gate funcional usa o mesmo `createAssistantService`, orchestrator, Metric
+Tools, conexão PostgreSQL `READ ONLY` e MockProvider usados em produção:
+
+```powershell
+docker run --rm --network neoretail-v9-multitenant_default `
+  -v "${PWD}:/repo" `
+  -w /repo/embedded-app `
+  -e ANALYTICS_DB_HOST=analytics-db `
+  -e ASSISTANT_METRIC_CATALOG=/repo/config/assistant_metrics.yaml `
+  node:22-alpine npm run test:assistant:regression
+```
+
+O script valida semanticamente vinte perguntas canônicas, incluindo valores do
+tenant 142, fontes, fórmula, versão, governança, respostas sem linhas e seis
+tentativas de violação de política. O demo gate é o subconjunto obrigatório de
+oito perguntas da apresentação. Ambos falham por conteúdo incorreto, e não
+apenas por erro HTTP.
+
 ## Auditoria
 
 Cada chamada registra JSON estruturado em stdout com `request_id`, usuário
