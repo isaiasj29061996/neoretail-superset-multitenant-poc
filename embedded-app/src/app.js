@@ -200,6 +200,10 @@ function setupAssistant({ getIdentity, getDashboard }) {
   }
 
   function evidenceNode(evidence) {
+    const details = document.createElement("details");
+    details.className = "assistant-evidence-details";
+    const summary = document.createElement("summary");
+    summary.textContent = "Ver evidências";
     const root = document.createElement("dl");
     root.className = "assistant-evidence";
     const fields = [
@@ -211,6 +215,7 @@ function setupAssistant({ getIdentity, getDashboard }) {
       ["Status negócio", evidence.businessStatus],
       ["Calendário", evidence.temporalStatus],
       ["Atualização", evidence.snapshot],
+      ["Versão da fórmula", evidence.formulaVersion],
     ];
     for (const [label, value] of fields) {
       if (value === null || value === undefined || value === "") continue;
@@ -220,7 +225,8 @@ function setupAssistant({ getIdentity, getDashboard }) {
       description.textContent = String(value);
       root.append(term, description);
     }
-    return root;
+    details.append(summary, root);
+    return details;
   }
 
   function appendMessage(role, content, evidence = []) {

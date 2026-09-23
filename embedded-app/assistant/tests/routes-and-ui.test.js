@@ -40,9 +40,12 @@ test("route rejects every client-side tenant override before orchestration", asy
 test("assistant UI is optional and never sends tenant authority", () => {
   const html = fs.readFileSync(new URL("../../public/index.html", import.meta.url), "utf8");
   const frontend = fs.readFileSync(new URL("../../public/app.bundle.js", import.meta.url), "utf8");
+  const frontendSource = fs.readFileSync(new URL("../../src/app.js", import.meta.url), "utf8");
   assert.match(html, /id="assistant-panel"/);
   assert.match(html, /id="assistant-open"[^>]+hidden/);
   assert.match(frontend, /assistantEnabled/);
   assert.match(frontend, /\/api\/assistant\/chat/);
+  assert.match(frontendSource, /Ver evidências/);
+  assert.match(frontendSource, /Versão da fórmula/);
   assert.doesNotMatch(frontend, /tenantId:getIdentity|idCustomer:getIdentity/);
 });

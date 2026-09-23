@@ -40,7 +40,9 @@ button:disabled { cursor: wait; opacity: .65; }
 .assistant-message-user { align-self: flex-end; border-color: #a8d4e4; color: white; background: var(--navy-2); }
 .assistant-message-system { max-width: 100%; color: #4e626e; background: #edf5f8; }
 .assistant-message-loading { color: var(--muted); font-size: 12px; }
-.assistant-evidence { display: grid; grid-template-columns: auto 1fr; gap: 4px 9px; margin: 12px 0 0; padding-top: 10px; border-top: 1px solid #e2e9ec; font-size: 10px; }
+.assistant-evidence-details { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e9ec; }
+.assistant-evidence-details summary { cursor: pointer; color: #536a76; font-size: 10px; font-weight: 800; }
+.assistant-evidence { display: grid; grid-template-columns: auto 1fr; gap: 4px 9px; margin: 8px 0 0; font-size: 10px; }
 .assistant-evidence dt { color: #70828d; font-weight: 700; }.assistant-evidence dd { overflow-wrap: anywhere; margin: 0; color: #173c50; font-weight: 700; }
 .assistant-error { margin: 0 18px 10px; padding: 10px 12px; border: 1px solid #f3b3bb; border-radius: 9px; color: #9b1730; background: #fff1f3; font-size: 12px; }
 .assistant-form { padding: 14px 18px 18px; border-top: 1px solid var(--line); background: white; }.assistant-form > label { display: block; margin-bottom: 7px; color: #536a76; font-size: 11px; font-weight: 800; }
