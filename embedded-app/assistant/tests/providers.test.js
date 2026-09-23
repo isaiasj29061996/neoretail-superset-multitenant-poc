@@ -13,6 +13,45 @@ test("provider abstraction defaults to deterministic mock", async () => {
   assert.match(SYSTEM_PROMPT, /não possui autoridade/i);
 });
 
+test("mock keeps business answers separate from governance metadata", async () => {
+  const provider = new MockProvider();
+  const evidence = {
+    displayName: "% OSA", source: "gold.nr_overview_quantity_default",
+    technicalStatus: "RECONCILED", businessStatus: "pending", temporalStatus: "PARCIAL_CALENDARIO",
+  };
+  const value = await provider.generate([], { intent: "metric_value", result: { value: 74.1269, format: "percent", period: "MTD" }, evidence });
+  assert.match(value, /74,13%/);
+  assert.doesNotMatch(value, /RECONCILED|pending|PARCIAL_CALENDARIO|Governança/);
+  const comparison = await provider.generate([], { intent: "metric_comparison", result: { current: 74.1269, previous: 75.4232, variation: -1.2963, format: "percent", comparisonPeriod: "M-1" }, evidence });
+  assert.match(comparison, /74,13%/);
+  assert.match(comparison, /75,42%/);
+  assert.match(comparison, /-1,3 p\.p\./);
+  assert.doesNotMatch(comparison, /RECONCILED|pending|PARCIAL_CALENDARIO|Governança/);
+});
+
+test("mock answers governance, source, formula version and empty rankings explicitly", async () => {
+  const provider = new MockProvider();
+  const evidence = {
+    displayName: "% OSA", source: "gold.nr_overview_quantity_default",
+    technicalStatus: "RECONCILED", businessStatus: "pending", temporalStatus: "PARCIAL_CALENDARIO",
+  };
+  const governance = await provider.generate([], { intent: "metric_governance", result: { certificationQuestion: true }, evidence });
+  assert.match(governance, /Ainda não completamente/);
+  assert.match(governance, /tecnicamente reconciliado/);
+  assert.match(governance, /negócio ainda está pendente/);
+  assert.match(governance, /temporal é parcial/);
+  assert.doesNotMatch(governance, /RECONCILED|PARCIAL_CALENDARIO/);
+  const source = await provider.generate([], { intent: "metric_source", result: { source: evidence.source, filteredSource: "gold.nr_overview_quantity_detail" }, evidence });
+  assert.match(source, /gold\.nr_overview_quantity_default/);
+  assert.match(source, /gold\.nr_overview_quantity_detail/);
+  const version = await provider.generate([], { intent: "metric_formula_version", result: { formulaVersion: "overview-quantity-v1" }, evidence });
+  assert.match(version, /overview-quantity-v1/);
+  const emptyCauses = await provider.generate([], { intent: "osa_causes", result: { rows: [] }, evidence });
+  assert.match(emptyCauses, /Não encontrei causas/);
+  const emptyTasks = await provider.generate([], { intent: "stock_tasks", result: { rows: [] }, evidence });
+  assert.match(emptyTasks, /Não encontrei tarefas/);
+});
+
 test("ollama health covers online, missing model and offline", async () => {
   const online = new OllamaProvider({ baseUrl: "http://ollama", model: "llama3.1:8b", fetchImpl: async () => response(200, { models: [{ name: "llama3.1:8b" }] }) });
   assert.equal((await online.health()).available, true);

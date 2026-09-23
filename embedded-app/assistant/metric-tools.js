@@ -243,6 +243,15 @@ export class MetricTools {
     const metric = metricDefinition(this.catalog, metricId);
     return { description: metric.description, formula: metric.formula, evidence: metricGovernance(metricId, metric) };
   }
+  getMetricSource(metricId) {
+    const metric = metricDefinition(this.catalog, metricId);
+    const evidence = metricGovernance(metricId, metric);
+    return { source: metric.source, filteredSource: metric.filtered_source || null, evidence };
+  }
+  getMetricFormulaVersion(metricId) {
+    const metric = metricDefinition(this.catalog, metricId);
+    return { formulaVersion: metric.formula_version, evidence: metricGovernance(metricId, metric) };
+  }
   getMetricGovernance(metricId) { const metric = metricDefinition(this.catalog, metricId); return metricGovernance(metricId, metric); }
 }
 
