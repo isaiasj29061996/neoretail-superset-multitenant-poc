@@ -91,6 +91,24 @@ export default {
         ],
         [
           {
+            name: 'summary_labels',
+            config: { type: 'TextControl', label: t('Rótulos secundários do resumo'), description: t('Separe por |; padrão U3M.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'metric_summary_modes',
+            config: { type: 'TextControl', label: t('Modos do resumo'), description: t('u3m ou annual12; separe por |.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'timeline_zero_blank_indices',
+            config: { type: 'TextControl', label: t('Zeros como BLANK na timeline'), description: t('Índices de saída separados por |, começando em 0.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
             name: 'metric_semantics',
             config: {
               type: 'TextControl',
