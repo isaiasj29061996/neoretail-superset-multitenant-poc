@@ -23,9 +23,20 @@ def test_stock_weekly_matches_power_bi_dax_components():
     assert "week_rank<=13" in bootstrap
 
 
-def test_stock_card_uses_two_output_average_semantics():
+def test_stock_card_preserves_literal_dax_u3m_asymmetry():
     bootstrap = bootstrap_text()
-    assert 'stock_semantics = "direct_average:0:1|direct_average:1:1"' in bootstrap
+    transform = (
+        ROOT
+        / "superset"
+        / "frontend-plugin"
+        / "plugin-chart-neoretail-kpi"
+        / "src"
+        / "transformProps.js"
+    ).read_text(encoding="utf-8")
+    assert 'semantic_profile="stock_bundle"' in bootstrap
+    assert "profile === 'stock_bundle'" in transform
+    assert "values.reduce((sum, value) => sum + value, 0) / 3" in transform
+    assert "latestStock?.values[index] == null ? null : latestStock.values[index] / 3" in transform
     assert 'summary_count=2' in bootstrap
     assert 'timeline_limit=13' in bootstrap
     assert 'labels="Estoque Preço Custo|Estoque Quantidade"' in bootstrap
