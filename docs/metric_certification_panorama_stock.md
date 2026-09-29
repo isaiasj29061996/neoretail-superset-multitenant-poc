@@ -57,19 +57,21 @@ para o `nm_measure` selecionado no contexto filtrado.
 
 ### Resumo lateral
 
-Para as duas métricas:
+O DAX é assimétrico e essa assimetria precisa ser preservada literalmente:
 
-- MTD = valor no contexto atual.
-- U3M = soma dos três meses anteriores dividida por 3.
+- **Estoque Preço Custo MTD** = custo em M0.
+- **Estoque Preço Custo U3M** = custo no contexto U3M dividido por 3. Como a medida base de custo soma as linhas, isso equivale à média dos três meses.
+- **Estoque Quantidade MTD** = `[Estoque qtd]` no contexto MTD.
+- **Estoque Quantidade U3M** = `CALCULATE([Estoque qtd], U3M=TRUE) / 3`.
 
-O plugin usa:
+A última regra não é uma média comum. A medida `[Estoque qtd]` calcula
+`MaxDataMes` dentro do contexto recebido e mantém somente esse mês. Logo, no
+contexto U3M ela retorna o estoque do mês máximo do U3M e só depois o BN divide
+esse valor por 3.
 
-```text
-direct_average:0:1|direct_average:1:1
-```
-
-Portanto a ausência de um dos meses não altera silenciosamente o denominador
-do contrato: o cálculo continua sendo dividido por 3.
+O plugin já possui o perfil `stock_bundle`, que reproduz exatamente essa regra:
+o índice 0 agrega os três meses e divide por 3; o índice 1 usa o último mês do
+U3M e divide por 3.
 
 ## Implementação Superset
 
@@ -110,6 +112,6 @@ para manter o isolamento por tenant.
 - Fórmula de Estoque Preço Custo semanal: **CERTIFICADA NO CÓDIGO**
 - Conversão de Estoque Quantidade mensal: **CERTIFICADA NO CÓDIGO**
 - Conversão de Estoque Quantidade semanal: **CERTIFICADA NO CÓDIGO**
-- MTD/U3M das duas métricas: **CERTIFICADO NO CONTRATO DO PLUGIN**
+- MTD/U3M: **CERTIFICADO NO CONTRATO DO PLUGIN**, incluindo a assimetria literal de `Estoque qtd`
 - Card único mensal/semanal: **IMPLEMENTADO**
 - Reconciliação com o PostgreSQL/Superset local: **PENDENTE DE EXECUÇÃO NO AMBIENTE DOCKER**
