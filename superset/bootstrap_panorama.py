@@ -394,193 +394,313 @@ FROM monthly m JOIN monthly_factors f USING(data,id_customer)
 
 
 
-def monthly_stock_semantic_sql() -> str:
-    """DAX-equivalent monthly stock cost and converted stock quantity."""
+def monthly_inventory_semantic_sql() -> str:
+    """Certified monthly Stock/Giro/ROI/OSA components over the serving mart."""
+    checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
     predicates = _jinja_filter_predicates("h")
-    return f"""
+    detail = f"""
 WITH filtered AS (
   SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
 {predicates}
 ), monthly AS (
   SELECT
-    data,
-    id_customer,
-    SUM(COALESCE(estoque_medio,0) * COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
-    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base
+    data,id_customer,
+    SUM(COALESCE(faturamento,0))::float8 AS faturamento_sum,
+    SUM(COALESCE(volume_unidades,0))::float8 AS volume_sum,
+    SUM(COALESCE(avg_sales_price,0))::float8 AS fallback_price_sum,
+    COUNT(avg_sales_price)::bigint AS fallback_price_count,
+    SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 AS sales_cost_sum,
+    SUM(COALESCE(estoque_medio,0)*COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base,
+    SUM(giro) FILTER (WHERE giro>0)::float8 AS giro_num,
+    COUNT(giro) FILTER (WHERE giro>0)::bigint AS giro_den,
+    SUM(COALESCE(qtd_problemas_osa,0))::float8 AS osa_problem_sum,
+    SUM(COALESCE(qtd_item_ativo_osa,0))::float8 AS osa_active_sum,
+    SUM(COALESCE(rup,0))::float8 AS rupture_sum,
+    SUM(COALESCE(status_item_geral,0))::float8 AS status_sum,
+    SUM(COALESCE(est_virtual,0))::float8 AS isv_sum
   FROM filtered
   GROUP BY data,id_customer
 ), factors AS (
-  SELECT
-    f.data,
-    f.id_customer,
-    c.nm_measure,
-    MAX(c.conversion_rate)::float8 AS conversion_factor
+  SELECT f.data,f.id_customer,c.nm_measure,MAX(c.conversion_rate)::float8 AS conversion_factor
   FROM (SELECT DISTINCT data,id_customer,id_item FROM filtered) f
   JOIN gold.dim_conversao c
-    ON c.id_customer=f.id_customer
-   AND c.id_item::text=f.id_item
+    ON c.id_customer=f.id_customer AND c.id_item::text=f.id_item::text
   GROUP BY f.data,f.id_customer,c.nm_measure
 )
 SELECT
-  m.data,
-  m.id_customer,
-  f.nm_measure,
-  m.stock_cost_sum,
-  (m.stock_qty_base * f.conversion_factor)::float8 AS stock_qty_sum,
-  NULL::text AS rede,
-  NULL::text AS bandeira,
-  NULL::text AS uf,
-  NULL::text AS cidade,
-  NULL::text AS tipo_local,
-  NULL::text AS loja,
-  NULL::text AS regiao,
-  NULL::text AS tp_activity_level,
-  NULL::text AS activity_level,
-  NULL::text AS item,
-  NULL::text AS descricao_marca,
-  NULL::text AS hierarquia_1,
-  NULL::text AS hierarquia_2,
-  NULL::text AS hierarquia_3
+  m.data,m.id_customer,f.nm_measure,
+  CASE WHEN m.faturamento_sum>0 THEN m.faturamento_sum
+       WHEN f.conversion_factor IS NOT NULL AND m.fallback_price_count>0
+       THEN (m.volume_sum*f.conversion_factor)
+          *((m.fallback_price_sum/m.fallback_price_count)*f.conversion_factor)
+       ELSE NULL END::float8 AS sellout_sum,
+  m.sales_cost_sum,m.stock_cost_sum,
+  (m.stock_qty_base*f.conversion_factor)::float8 AS stock_qty_sum,
+  m.giro_num,m.giro_den,
+  m.osa_problem_sum,m.osa_active_sum,m.rupture_sum,m.status_sum,m.isv_sum,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,
+  NULL::text tp_activity_level,NULL::text activity_level,NULL::text item,
+  NULL::text descricao_marca,NULL::text hierarquia_1,NULL::text hierarquia_2,
+  NULL::text hierarquia_3
 FROM monthly m
 JOIN factors f USING(data,id_customer)
 """.strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n" + detail + "\n"
+        "{% else %}\nSELECT * FROM gold.nr_panorama_inventory_monthly_default\n{% endif %}"
+    )
 
 
-def weekly_stock_card_semantic_sql() -> str:
-    """One stock slice: TOP 13 weekly timeline plus monthly MTD/U3M context."""
-    weekly_predicates = _jinja_filter_predicates("w", "status_item_geral", {
-        "rede": "l.rede", "bandeira": "l.bandeira", "uf": "l.uf",
-        "cidade": "l.cidade", "tipo_local": "l.tipo_local",
-        "loja": "l.loja", "regiao": "l.regiao", "item": "i.item",
-        "descricao_marca": "i.descricao_marca", "hierarquia_1": "i.hierarquia_1",
-        "hierarquia_2": "i.hierarquia_2", "hierarquia_3": "i.hierarquia_3",
-    })
+def weekly_inventory_card_semantic_sql() -> str:
+    """TOP-13 weekly inventory timeline plus monthly summary in one dataset."""
+    checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
+    weekly_predicates = _jinja_filter_predicates("w")
     monthly_predicates = _jinja_filter_predicates("h")
-    return f"""
+    detail = f"""
 WITH weekly_filtered AS (
-  SELECT
-    w.id_time AS data,
-    w.cd_week,
-    w.id_customer,
-    w.id_item,
-    w.id_location,
-    w.estoque_unidades,
-    w.estoque_medio,
-    w.avg_price_cost,
-    w.status_item_geral::text AS tp_activity_level,
-    COALESCE(w.status_item_geral::text,'Outros') AS activity_level,
-    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,
-    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3
-  FROM gold.fato_semanal w
-  LEFT JOIN gold.dim_local l
-    ON l.id_customer=w.id_customer AND l.id_location=w.id_location
-  LEFT JOIN gold.dim_itens i
-    ON i.id_customer=w.id_customer AND i.id_item=w.id_item
-  WHERE 1=1
+  SELECT w.* FROM gold.nr_panorama_inventory_weekly_detail w WHERE 1=1
 {weekly_predicates}
 ), ranked_weeks AS (
   SELECT id_customer,data,cd_week,DENSE_RANK() OVER (
     PARTITION BY id_customer ORDER BY cd_week DESC
   ) AS week_rank
   FROM (SELECT DISTINCT id_customer,data,cd_week FROM weekly_filtered) x
+), tenant_latest AS (
+  SELECT id_customer,MAX(cd_week) AS latest_cd_week
+  FROM gold.nr_panorama_inventory_weekly_detail
+  GROUP BY id_customer
 ), weekly_scoped AS (
-  SELECT f.*
+  SELECT f.*,l.latest_cd_week
   FROM weekly_filtered f
   JOIN ranked_weeks r USING(id_customer,data,cd_week)
+  JOIN tenant_latest l USING(id_customer)
   WHERE r.week_rank<=13
 ), weekly AS (
   SELECT
-    data,
-    id_customer,
-    MAX(cd_week) AS cd_week,
-    SUM(COALESCE(estoque_medio,0) * COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
-    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base
+    data,cd_week,id_customer,MAX(latest_cd_week) AS latest_cd_week,
+    SUM(COALESCE(faturamento,0))::float8 AS faturamento_sum,
+    SUM(COALESCE(volume_unidades,0))::float8 AS volume_sum,
+    SUM(COALESCE(avg_sales_price,0))::float8 AS fallback_price_sum,
+    COUNT(avg_sales_price)::bigint AS fallback_price_count,
+    SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 AS sales_cost_sum,
+    SUM(COALESCE(estoque_medio,0)*COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base,
+    SUM(giro) FILTER (WHERE giro IS NOT NULL)::float8 AS giro_num_raw,
+    COUNT(giro)::bigint AS giro_den_raw,
+    SUM(COALESCE(qtd_problemas_osa,0))::float8 AS osa_problem_sum,
+    SUM(COALESCE(qtd_item_ativo_osa,0))::float8 AS osa_active_sum,
+    SUM(COALESCE(rup,0))::float8 AS rupture_sum,
+    SUM(COALESCE(status_item_geral,0))::float8 AS status_sum,
+    SUM(COALESCE(est_virtual,0))::float8 AS isv_sum
   FROM weekly_scoped
-  GROUP BY data,id_customer
+  GROUP BY data,cd_week,id_customer
 ), weekly_factors AS (
-  SELECT
-    s.data,
-    s.id_customer,
-    c.nm_measure,
-    MAX(c.conversion_rate)::float8 AS conversion_factor
+  SELECT s.data,s.id_customer,c.nm_measure,MAX(c.conversion_rate)::float8 AS conversion_factor
   FROM (SELECT DISTINCT data,id_customer,id_item FROM weekly_scoped) s
   JOIN gold.dim_conversao c
-    ON c.id_customer=s.id_customer
-   AND c.id_item::text=s.id_item
+    ON c.id_customer=s.id_customer AND c.id_item::text=s.id_item::text
   GROUP BY s.data,s.id_customer,c.nm_measure
 ), monthly_filtered AS (
   SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
 {monthly_predicates}
 ), monthly AS (
   SELECT
-    data,
-    id_customer,
-    SUM(COALESCE(estoque_medio,0) * COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
-    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base
+    data,id_customer,
+    SUM(COALESCE(faturamento,0))::float8 AS faturamento_sum,
+    SUM(COALESCE(volume_unidades,0))::float8 AS volume_sum,
+    SUM(COALESCE(avg_sales_price,0))::float8 AS fallback_price_sum,
+    COUNT(avg_sales_price)::bigint AS fallback_price_count,
+    SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 AS sales_cost_sum,
+    SUM(COALESCE(estoque_medio,0)*COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base,
+    SUM(giro) FILTER (WHERE giro>0)::float8 AS giro_num,
+    COUNT(giro) FILTER (WHERE giro>0)::bigint AS giro_den,
+    SUM(COALESCE(qtd_problemas_osa,0))::float8 AS osa_problem_sum,
+    SUM(COALESCE(qtd_item_ativo_osa,0))::float8 AS osa_active_sum,
+    SUM(COALESCE(rup,0))::float8 AS rupture_sum,
+    SUM(COALESCE(status_item_geral,0))::float8 AS status_sum,
+    SUM(COALESCE(est_virtual,0))::float8 AS isv_sum
   FROM monthly_filtered
   GROUP BY data,id_customer
 ), monthly_factors AS (
-  SELECT
-    f.data,
-    f.id_customer,
-    c.nm_measure,
-    MAX(c.conversion_rate)::float8 AS conversion_factor
+  SELECT f.data,f.id_customer,c.nm_measure,MAX(c.conversion_rate)::float8 AS conversion_factor
   FROM (SELECT DISTINCT data,id_customer,id_item FROM monthly_filtered) f
   JOIN gold.dim_conversao c
-    ON c.id_customer=f.id_customer
-   AND c.id_item::text=f.id_item
+    ON c.id_customer=f.id_customer AND c.id_item::text=f.id_item::text
   GROUP BY f.data,f.id_customer,c.nm_measure
 )
 SELECT
   'timeline'::text AS row_scope,
-  w.data,
-  w.cd_week,
-  w.id_customer,
-  f.nm_measure,
-  w.stock_cost_sum,
-  (w.stock_qty_base * f.conversion_factor)::float8 AS stock_qty_sum,
-  NULL::text AS rede,
-  NULL::text AS bandeira,
-  NULL::text AS uf,
-  NULL::text AS cidade,
-  NULL::text AS tipo_local,
-  NULL::text AS loja,
-  NULL::text AS regiao,
-  NULL::text AS tp_activity_level,
-  NULL::text AS activity_level,
-  NULL::text AS item,
-  NULL::text AS descricao_marca,
-  NULL::text AS hierarquia_1,
-  NULL::text AS hierarquia_2,
-  NULL::text AS hierarquia_3
+  w.data,w.cd_week,w.id_customer,f.nm_measure,
+  CASE WHEN w.faturamento_sum>0 THEN w.faturamento_sum
+       WHEN f.conversion_factor IS NOT NULL AND w.fallback_price_count>0
+       THEN (w.volume_sum*f.conversion_factor)
+          *((w.fallback_price_sum/w.fallback_price_count)*f.conversion_factor)
+       ELSE NULL END::float8 AS sellout_sum,
+  w.sales_cost_sum,w.stock_cost_sum,
+  (w.stock_qty_base*f.conversion_factor)::float8 AS stock_qty_sum,
+  CASE WHEN w.cd_week=w.latest_cd_week THEN NULL ELSE w.giro_num_raw END::float8 AS giro_num,
+  CASE WHEN w.cd_week=w.latest_cd_week THEN NULL ELSE w.giro_den_raw END::bigint AS giro_den,
+  w.osa_problem_sum,w.osa_active_sum,w.rupture_sum,w.status_sum,w.isv_sum,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,
+  NULL::text tp_activity_level,NULL::text activity_level,NULL::text item,
+  NULL::text descricao_marca,NULL::text hierarquia_1,NULL::text hierarquia_2,
+  NULL::text hierarquia_3
 FROM weekly w
 JOIN weekly_factors f USING(data,id_customer)
+
 UNION ALL
+
 SELECT
   'summary'::text AS row_scope,
-  m.data,
-  NULL::text AS cd_week,
-  m.id_customer,
-  f.nm_measure,
-  m.stock_cost_sum,
-  (m.stock_qty_base * f.conversion_factor)::float8 AS stock_qty_sum,
-  NULL::text AS rede,
-  NULL::text AS bandeira,
-  NULL::text AS uf,
-  NULL::text AS cidade,
-  NULL::text AS tipo_local,
-  NULL::text AS loja,
-  NULL::text AS regiao,
-  NULL::text AS tp_activity_level,
-  NULL::text AS activity_level,
-  NULL::text AS item,
-  NULL::text AS descricao_marca,
-  NULL::text AS hierarquia_1,
-  NULL::text AS hierarquia_2,
-  NULL::text AS hierarquia_3
+  m.data,NULL::text AS cd_week,m.id_customer,f.nm_measure,
+  CASE WHEN m.faturamento_sum>0 THEN m.faturamento_sum
+       WHEN f.conversion_factor IS NOT NULL AND m.fallback_price_count>0
+       THEN (m.volume_sum*f.conversion_factor)
+          *((m.fallback_price_sum/m.fallback_price_count)*f.conversion_factor)
+       ELSE NULL END::float8 AS sellout_sum,
+  m.sales_cost_sum,m.stock_cost_sum,
+  (m.stock_qty_base*f.conversion_factor)::float8 AS stock_qty_sum,
+  m.giro_num,m.giro_den,
+  m.osa_problem_sum,m.osa_active_sum,m.rupture_sum,m.status_sum,m.isv_sum,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,
+  NULL::text tp_activity_level,NULL::text activity_level,NULL::text item,
+  NULL::text descricao_marca,NULL::text hierarquia_1,NULL::text hierarquia_2,
+  NULL::text hierarquia_3
 FROM monthly m
 JOIN monthly_factors f USING(data,id_customer)
 """.strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n" + detail + "\n"
+        "{% else %}\nSELECT * FROM gold.nr_panorama_inventory_weekly_card_default\n{% endif %}"
+    )
+
+
+def monthly_gap_semantic_sql() -> str:
+    """Power BI LASTNONBLANK TVD/IVD at monthly grain."""
+    checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
+    predicates = _jinja_filter_predicates("o")
+    detail = f"""
+WITH filtered AS (
+  SELECT o.* FROM gold.nr_panorama_opportunities o WHERE 1=1
+{predicates}
+), daily AS (
+  SELECT
+    id_customer,data,
+    SUM(tvd_simplificado)::float8 AS tvd,
+    SUM(ivd_simplificado)::float8 AS ivd
+  FROM filtered
+  GROUP BY id_customer,data
+), tagged AS (
+  SELECT d.*,DATE_TRUNC('month',data)::date AS period_start
+  FROM daily d
+), anchors AS (
+  SELECT
+    id_customer,period_start,
+    MAX(data) FILTER (WHERE tvd IS NOT NULL) AS tvd_date,
+    MAX(data) FILTER (WHERE ivd IS NOT NULL) AS ivd_date
+  FROM tagged
+  GROUP BY id_customer,period_start
+)
+SELECT
+  a.period_start AS data,a.id_customer,
+  tvd.tvd,ivd.ivd,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,
+  NULL::text tp_activity_level,NULL::text activity_level,NULL::text item,
+  NULL::text descricao_marca,NULL::text hierarquia_1,NULL::text hierarquia_2,
+  NULL::text hierarquia_3
+FROM anchors a
+LEFT JOIN daily tvd ON tvd.id_customer=a.id_customer AND tvd.data=a.tvd_date
+LEFT JOIN daily ivd ON ivd.id_customer=a.id_customer AND ivd.data=a.ivd_date
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n" + detail + "\n"
+        "{% else %}\nSELECT * FROM gold.nr_panorama_gap_monthly_default\n{% endif %}"
+    )
+
+
+def weekly_gap_card_semantic_sql() -> str:
+    """TOP-13 weekly LASTNONBLANK TVD/IVD plus monthly summary rows."""
+    checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
+    predicates = _jinja_filter_predicates("o")
+    detail = f"""
+WITH filtered AS (
+  SELECT o.* FROM gold.nr_panorama_opportunities o WHERE 1=1
+{predicates}
+), daily AS (
+  SELECT
+    id_customer,data,
+    SUM(tvd_simplificado)::float8 AS tvd,
+    SUM(ivd_simplificado)::float8 AS ivd
+  FROM filtered
+  GROUP BY id_customer,data
+), weekly_tagged AS (
+  SELECT d.*,DATE_TRUNC('week',data)::date AS period_start FROM daily d
+), weekly_anchors AS (
+  SELECT
+    id_customer,period_start,
+    MAX(data) FILTER (WHERE tvd IS NOT NULL) AS tvd_date,
+    MAX(data) FILTER (WHERE ivd IS NOT NULL) AS ivd_date
+  FROM weekly_tagged
+  GROUP BY id_customer,period_start
+), weekly_values AS (
+  SELECT
+    a.id_customer,a.period_start AS data,tvd.tvd,ivd.ivd,
+    DENSE_RANK() OVER (
+      PARTITION BY a.id_customer ORDER BY a.period_start DESC
+    ) AS week_rank
+  FROM weekly_anchors a
+  LEFT JOIN daily tvd ON tvd.id_customer=a.id_customer AND tvd.data=a.tvd_date
+  LEFT JOIN daily ivd ON ivd.id_customer=a.id_customer AND ivd.data=a.ivd_date
+), monthly_tagged AS (
+  SELECT d.*,DATE_TRUNC('month',data)::date AS period_start FROM daily d
+), monthly_anchors AS (
+  SELECT
+    id_customer,period_start,
+    MAX(data) FILTER (WHERE tvd IS NOT NULL) AS tvd_date,
+    MAX(data) FILTER (WHERE ivd IS NOT NULL) AS ivd_date
+  FROM monthly_tagged
+  GROUP BY id_customer,period_start
+)
+SELECT
+  'timeline'::text AS row_scope,
+  w.data,w.id_customer,w.tvd,w.ivd,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,
+  NULL::text tp_activity_level,NULL::text activity_level,NULL::text item,
+  NULL::text descricao_marca,NULL::text hierarquia_1,NULL::text hierarquia_2,
+  NULL::text hierarquia_3
+FROM weekly_values w
+WHERE w.week_rank<=13
+
+UNION ALL
+
+SELECT
+  'summary'::text AS row_scope,
+  a.period_start AS data,a.id_customer,tvd.tvd,ivd.ivd,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,
+  NULL::text tp_activity_level,NULL::text activity_level,NULL::text item,
+  NULL::text descricao_marca,NULL::text hierarquia_1,NULL::text hierarquia_2,
+  NULL::text hierarquia_3
+FROM monthly_anchors a
+LEFT JOIN daily tvd ON tvd.id_customer=a.id_customer AND tvd.data=a.tvd_date
+LEFT JOIN daily ivd ON ivd.id_customer=a.id_customer AND ivd.data=a.ivd_date
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n" + detail + "\n"
+        "{% else %}\nSELECT * FROM gold.nr_panorama_gap_weekly_card_default\n{% endif %}"
+    )
+
 
 def sql_filter(expression):
     return {
