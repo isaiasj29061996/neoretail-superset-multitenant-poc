@@ -43,11 +43,15 @@ for (const [name, chart] of Object.entries(fixture.charts)) {
     assert(close(point.values[2], 100 * point.components[0] / point.components[1]), `${name}: Markup is not Sell Out/Cost`);
   }
 
-  if (!name.includes('Resumo')) {
-    assert(props.timelineLimit === 13, `${name}: timeline_limit did not reach renderer`);
-    assert(props.summaryCount === 0, `${name}: summary_count zero did not reach renderer`);
-    assert(props.timeline.slice(-props.timelineLimit).length === 13, `${name}: renderer does not display thirteen periods`);
-    if (name.includes('semanal')) assert(props.timeline.length === 13, `${name}: weekly dataset must already be TOP 13`);
+  assert(props.timelineLimit === 13, `${name}: timeline_limit did not reach renderer`);
+  assert(props.summaryCount === 3, `${name}: summary must be embedded in the same rendered card`);
+  assert(props.timeline.slice(-props.timelineLimit).length === 13, `${name}: renderer does not display thirteen periods`);
+  if (name.includes('semanal')) {
+    assert(chart.queriesData.length === 2, `${name}: weekly single slice must carry timeline and monthly summary queries`);
+    assert(chart.queriesData[1].data.length > 3, `${name}: monthly summary query did not return enough history for U3M`);
+    assert(props.timeline.length === 13, `${name}: weekly dataset must already be TOP 13`);
+  } else {
+    assert(chart.queriesData.length === 1, `${name}: monthly single slice should not need a secondary query`);
   }
 }
 
