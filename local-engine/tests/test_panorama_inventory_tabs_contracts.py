@@ -112,3 +112,13 @@ def test_inventory_datasets_are_in_native_filter_scope():
     bootstrap = read("superset/bootstrap_panorama.py")
     for dataset in ("monthly_inventory.id", "weekly_inventory_card.id", "gap_monthly.id", "gap_weekly_card.id"):
         assert dataset in bootstrap
+
+
+def test_monthly_osa_status_denominator_comes_from_fato_historico():
+    mart = read("analytics-db/marts/43_panorama_inventory_semantic.sql")
+    bootstrap = read("superset/bootstrap_panorama.py")
+    assert "FROM gold.fato_historico f" in mart
+    assert "SUM(COALESCE(f.status_item_geral,0))::double precision AS status_sum" in mart
+    assert "f.status_item_geral," in bootstrap
+    assert "FROM gold.fato_historico f" in bootstrap
+    assert "SUM(COALESCE(status_item_geral,0))::float8 AS status_sum" in bootstrap
