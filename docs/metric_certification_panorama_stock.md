@@ -77,8 +77,8 @@ U3M e divide por 3.
 
 Foram criados dois datasets virtuais dedicados:
 
-- `nr_panorama_stock_monthly_interactive`
-- `nr_panorama_stock_weekly_card_interactive`
+- `nr_panorama_inventory_monthly_interactive`
+- `nr_panorama_inventory_weekly_card_interactive`
 
 O mensal entrega custo e quantidade convertida por mês.
 
@@ -105,6 +105,10 @@ com `summary_count=2` e `timeline_limit=13`.
 o valor monetário original. Os filtros dimensionais são empurrados para a base
 antes das agregações, e `id_customer` continua fazendo parte do dataset final
 para manter o isolamento por tenant.
+
+## Arquitetura de serving
+
+A implementação final usa marts físicos dedicados para o bloco de inventário. O caminho sem filtros é `gold.nr_panorama_inventory_monthly_default` / `gold.nr_panorama_inventory_weekly_card_default`; quando filtros dimensionais são aplicados, o dataset virtual empurra os filtros para `gold.nr_overview_history` ou `gold.nr_panorama_inventory_weekly_detail` antes de recompor as mesmas fórmulas. Assim a regra não fica escondida somente em SQL virtual do Superset.
 
 ## Status
 
