@@ -335,7 +335,39 @@ WITH weekly_filtered AS (
   JOIN gold.dim_conversao c ON c.id_customer=s.id_customer AND c.id_item::text=s.id_item
   GROUP BY s.data,s.id_customer,c.nm_measure
 ), monthly_filtered AS (
-  SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
+  SELECT
+    f.mes_ano::date AS data,
+    f.id_customer,
+    f.id_item,
+    f.id_location,
+    f.volume_unidades,
+    f.faturamento,
+    f.estoque_unidades,
+    f.estoque_medio,
+    f.qtd_problemas_osa,
+    f.qtd_item_ativo_osa,
+    f.rup,
+    f.est_virtual,
+    f.giro,
+    f.avg_sales_price,
+    f.avg_price_cost,
+    f.status_item_geral,
+    f.tp_activity_level,
+    CASE f.tp_activity_level
+      WHEN 'F' THEN 'Fast Mover'
+      WHEN 'S' THEN 'Slow Mover'
+      WHEN 'US' THEN 'Ultra Slow Mover'
+      WHEN 'N' THEN 'New Mover'
+      ELSE COALESCE(f.tp_activity_level,'Outros')
+    END AS activity_level,
+    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,
+    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3
+  FROM gold.fato_historico f
+  LEFT JOIN gold.dim_local l
+    ON l.id_customer=f.id_customer AND l.id_location=f.id_location
+  LEFT JOIN gold.dim_itens i
+    ON i.id_customer=f.id_customer AND i.id_item=f.id_item
+  WHERE 1=1
 {monthly_predicates}
 ), monthly AS (
   SELECT data,id_customer,
@@ -397,10 +429,48 @@ FROM monthly m JOIN monthly_factors f USING(data,id_customer)
 def monthly_inventory_semantic_sql() -> str:
     """Certified monthly Stock/Giro/ROI/OSA components over the serving mart."""
     checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
-    predicates = _jinja_filter_predicates("h")
+    predicates = _jinja_filter_predicates("f", "tp_activity_level", {
+        "rede": "l.rede", "bandeira": "l.bandeira", "uf": "l.uf",
+        "cidade": "l.cidade", "tipo_local": "l.tipo_local",
+        "loja": "l.loja", "regiao": "l.regiao", "item": "i.item",
+        "descricao_marca": "i.descricao_marca", "hierarquia_1": "i.hierarquia_1",
+        "hierarquia_2": "i.hierarquia_2", "hierarquia_3": "i.hierarquia_3",
+    })
     detail = f"""
 WITH filtered AS (
-  SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
+  SELECT
+    f.mes_ano::date AS data,
+    f.id_customer,
+    f.id_item,
+    f.id_location,
+    f.volume_unidades,
+    f.faturamento,
+    f.estoque_unidades,
+    f.estoque_medio,
+    f.qtd_problemas_osa,
+    f.qtd_item_ativo_osa,
+    f.rup,
+    f.est_virtual,
+    f.giro,
+    f.avg_sales_price,
+    f.avg_price_cost,
+    f.status_item_geral,
+    f.tp_activity_level,
+    CASE f.tp_activity_level
+      WHEN 'F' THEN 'Fast Mover'
+      WHEN 'S' THEN 'Slow Mover'
+      WHEN 'US' THEN 'Ultra Slow Mover'
+      WHEN 'N' THEN 'New Mover'
+      ELSE COALESCE(f.tp_activity_level,'Outros')
+    END AS activity_level,
+    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,
+    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3
+  FROM gold.fato_historico f
+  LEFT JOIN gold.dim_local l
+    ON l.id_customer=f.id_customer AND l.id_location=f.id_location
+  LEFT JOIN gold.dim_itens i
+    ON i.id_customer=f.id_customer AND i.id_item=f.id_item
+  WHERE 1=1
 {predicates}
 ), monthly AS (
   SELECT
@@ -458,7 +528,13 @@ def weekly_inventory_card_semantic_sql() -> str:
     """TOP-13 weekly inventory timeline plus monthly summary in one dataset."""
     checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
     weekly_predicates = _jinja_filter_predicates("w")
-    monthly_predicates = _jinja_filter_predicates("h")
+    monthly_predicates = _jinja_filter_predicates("f", "tp_activity_level", {
+        "rede": "l.rede", "bandeira": "l.bandeira", "uf": "l.uf",
+        "cidade": "l.cidade", "tipo_local": "l.tipo_local",
+        "loja": "l.loja", "regiao": "l.regiao", "item": "i.item",
+        "descricao_marca": "i.descricao_marca", "hierarquia_1": "i.hierarquia_1",
+        "hierarquia_2": "i.hierarquia_2", "hierarquia_3": "i.hierarquia_3",
+    })
     detail = f"""
 WITH weekly_filtered AS (
   SELECT w.* FROM gold.nr_panorama_inventory_weekly_detail w WHERE 1=1
