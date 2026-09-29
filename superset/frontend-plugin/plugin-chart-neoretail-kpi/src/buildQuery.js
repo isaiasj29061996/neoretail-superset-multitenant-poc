@@ -20,7 +20,18 @@ export default function buildQuery(formData, options) {
       if (['rankbars', 'verticalbars', 'stackedrank'].includes(formData.card_variant) && groupby.length) {
         return [{ ...common, columns: groupby, orderby: metrics[0] ? [[metrics[0], false]] : [], row_limit: baseQueryObject.row_limit ?? 10 }];
       }
-      const queries = [{ ...common, columns: [xAxis] }];
+      const timelineScope = String(formData.timeline_query_scope || '').trim();
+      const summaryScope = String(formData.summary_query_scope || '').trim();
+      const withScope = (query, scope, grain = common.extras.time_grain_sqla) => ({
+        ...query,
+        columns: [xAxis],
+        filters: scope
+          ? [...(query.filters || []), { col: 'row_scope', op: 'IN', val: [scope] }]
+          : query.filters,
+        extras: { ...query.extras, time_grain_sqla: grain },
+      });
+      const queries = [withScope(common, timelineScope)];
+      if (summaryScope) queries.push(withScope(common, summaryScope, 'P1M'));
       if (formData.card_variant === 'bars' && groupby.length) queries.push({ ...common, columns: [xAxis, ...groupby] });
       return queries;
     },
