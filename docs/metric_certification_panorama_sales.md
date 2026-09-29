@@ -37,7 +37,7 @@ Também foram corrigidos dois comportamentos adjacentes comprovados durante a re
 - `summary_count=0` agora permanece zero em vez de cair no total de indicadores;
 - configurações persistidas deixam de ser concatenadas aos defaults (`bar|bar|line` não vira seis estilos).
 
-O gate `runtime-panorama-sales.mjs` recebe os `chart.params` e as respostas reais extraídas do Superset, simula a conversão snake_case → camelCase e executa o mesmo `transformProps.js` usado pelo renderer. O resultado final foi de 62 checks aprovados: exatamente três séries nos oito charts, Preço Médio derivado, Markup derivado, U3M preenchido e limite 13 entregue ao renderer.
+O gate `runtime-panorama-sales.mjs` recebe os `chart.params` e as respostas reais extraídas do Superset, simula a conversão snake_case → camelCase e executa o mesmo `transformProps.js` usado pelo renderer. Antes da consolidação visual, ele havia validado oito slices técnicos. Após a mudança para um único slice por combinação, o gate foi atualizado para exigir quatro charts finais, `summary_count=3` embutido em todos eles e duas respostas (`timeline` + `summary`) somente nos caminhos semanais.
 
 ## Composição visual integrada
 
@@ -81,7 +81,7 @@ Validador: `superset/validate_panorama_sales.py`.
 
 - Python: 52 testes aprovados na suíte completa `local-engine/tests`.
 - Plugin: 81 checks de regressão aprovados.
-- Runtime real: 62 checks aprovados com `chart.params` e respostas efetivas dos oito charts.
+- Runtime real anterior: 62 checks aprovados antes da consolidação. O gate agora valida a arquitetura de quatro charts finais e deve ser reexecutado após rebuild/bootstrap para registrar a nova contagem.
 - Build de produção do Superset/plugin aprovado; apenas os avisos preexistentes de tamanho de bundle foram emitidos.
 - Bootstrap real do Panorama aprovado.
 - Marts recriados e analisados: 162 linhas mensais e 630 linhas semanais no snapshot local; o tenant 142 mantém 105 semanas por medida antes do TOP 13.
