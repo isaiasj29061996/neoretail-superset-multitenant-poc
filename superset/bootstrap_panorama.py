@@ -286,6 +286,105 @@ FROM monthly m JOIN factors f USING(data,id_customer)
     )
 
 
+def weekly_sales_card_semantic_sql() -> str:
+    """Single-card dataset: weekly TOP 13 timeline plus monthly summary rows."""
+    checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
+    weekly_predicates = _jinja_filter_predicates("w", "status_item_geral", {
+        "rede": "l.rede", "bandeira": "l.bandeira", "uf": "l.uf",
+        "cidade": "l.cidade", "tipo_local": "l.tipo_local",
+        "loja": "l.loja", "regiao": "l.regiao", "item": "i.item",
+        "descricao_marca": "i.descricao_marca", "hierarquia_1": "i.hierarquia_1",
+        "hierarquia_2": "i.hierarquia_2", "hierarquia_3": "i.hierarquia_3",
+    })
+    monthly_predicates = _jinja_filter_predicates("h")
+    detail = f"""
+WITH weekly_filtered AS (
+  SELECT
+    w.id_time AS data,w.cd_week,w.id_customer,w.id_item,w.id_location,
+    w.volume_unidade AS volume_unidades,w.faturamento,w.qtd_perda_osa,
+    w.avg_sales_price,w.avg_price_cost,w.status_item_geral::text AS tp_activity_level,
+    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,
+    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3
+  FROM gold.fato_semanal w
+  LEFT JOIN gold.dim_local l ON l.id_customer=w.id_customer AND l.id_location=w.id_location
+  LEFT JOIN gold.dim_itens i ON i.id_customer=w.id_customer AND i.id_item=w.id_item
+  WHERE 1=1
+{weekly_predicates}
+), ranked_weeks AS (
+  SELECT id_customer,data,cd_week,DENSE_RANK() OVER (
+    PARTITION BY id_customer ORDER BY cd_week DESC
+  ) week_rank
+  FROM (SELECT DISTINCT id_customer,data,cd_week FROM weekly_filtered) x
+), weekly_scoped AS (
+  SELECT f.* FROM weekly_filtered f JOIN ranked_weeks r USING(id_customer,data,cd_week)
+  WHERE r.week_rank<=13
+), weekly AS (
+  SELECT data,id_customer,MAX(cd_week) cd_week,
+    SUM(COALESCE(faturamento,0))::float8 faturamento_sum,
+    SUM(COALESCE(volume_unidades,0))::float8 volume_sum,
+    SUM(COALESCE(avg_sales_price,0))::float8 fallback_price_sum,
+    COUNT(avg_sales_price)::bigint fallback_price_count,
+    SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 cost_sum,
+    SUM(COALESCE(qtd_perda_osa,0))::float8 loss_sum,
+    SUM(COALESCE(avg_sales_price,0)) FILTER (WHERE faturamento>0)::float8 price_sum,
+    COUNT(avg_sales_price) FILTER (WHERE faturamento>0)::bigint price_count
+  FROM weekly_scoped GROUP BY data,id_customer
+), weekly_factors AS (
+  SELECT s.data,s.id_customer,c.nm_measure,MAX(c.conversion_rate)::float8 conversion_factor
+  FROM (SELECT DISTINCT data,id_customer,id_item FROM weekly_scoped) s
+  JOIN gold.dim_conversao c ON c.id_customer=s.id_customer AND c.id_item::text=s.id_item
+  GROUP BY s.data,s.id_customer,c.nm_measure
+), monthly_filtered AS (
+  SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
+{monthly_predicates}
+), monthly AS (
+  SELECT data,id_customer,
+    SUM(COALESCE(faturamento,0))::float8 faturamento_sum,
+    SUM(COALESCE(volume_unidades,0))::float8 volume_sum,
+    SUM(COALESCE(avg_sales_price,0))::float8 fallback_price_sum,
+    COUNT(avg_sales_price)::bigint fallback_price_count,
+    SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 cost_sum,
+    SUM(COALESCE(qtd_perda_osa,0))::float8 loss_sum,
+    SUM(COALESCE(avg_sales_price,0)) FILTER (WHERE faturamento>0)::float8 price_sum,
+    COUNT(avg_sales_price) FILTER (WHERE faturamento>0)::bigint price_count
+  FROM monthly_filtered GROUP BY data,id_customer
+), monthly_factors AS (
+  SELECT f.data,f.id_customer,c.nm_measure,MAX(c.conversion_rate)::float8 conversion_factor
+  FROM (SELECT DISTINCT data,id_customer,id_item FROM monthly_filtered) f
+  JOIN gold.dim_conversao c ON c.id_customer=f.id_customer AND c.id_item::text=f.id_item
+  GROUP BY f.data,f.id_customer,c.nm_measure
+)
+SELECT
+  'timeline'::text row_scope,w.data,w.cd_week,w.id_customer,f.nm_measure,
+  CASE WHEN w.faturamento_sum>0 THEN w.faturamento_sum
+       WHEN f.conversion_factor IS NOT NULL AND w.fallback_price_count>0
+       THEN (w.volume_sum*f.conversion_factor)
+          *((w.fallback_price_sum/w.fallback_price_count)*f.conversion_factor)
+       ELSE NULL END::float8 sellout_sum,
+  w.cost_sum,(w.volume_sum*f.conversion_factor)::float8 sales_sum,
+  (w.loss_sum*f.conversion_factor)::float8 loss_sum,
+  (w.price_sum*f.conversion_factor)::float8 price_numerator,w.price_count
+FROM weekly w JOIN weekly_factors f USING(data,id_customer)
+UNION ALL
+SELECT
+  'summary'::text row_scope,m.data,NULL::text cd_week,m.id_customer,f.nm_measure,
+  CASE WHEN m.faturamento_sum>0 THEN m.faturamento_sum
+       WHEN f.conversion_factor IS NOT NULL AND m.fallback_price_count>0
+       THEN (m.volume_sum*f.conversion_factor)
+          *((m.fallback_price_sum/m.fallback_price_count)*f.conversion_factor)
+       ELSE NULL END::float8 sellout_sum,
+  m.cost_sum,(m.volume_sum*f.conversion_factor)::float8 sales_sum,
+  (m.loss_sum*f.conversion_factor)::float8 loss_sum,
+  (m.price_sum*f.conversion_factor)::float8 price_numerator,m.price_count
+FROM monthly m JOIN monthly_factors f USING(data,id_customer)
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {checks} %}}\n"
+        "{% if has_dimension_filter %}\n" + detail + "\n"
+        "{% else %}\nSELECT * FROM gold.nr_panorama_sales_weekly_card_default\n{% endif %}"
+    )
+
+
 def sql_filter(expression):
     return {
         "clause": "WHERE",
@@ -407,6 +506,10 @@ def main():
             db.session, SqlaTable, database, "nr_panorama_sales_weekly_interactive",
             sql=weekly_sales_semantic_sql(),
         )
+        weekly_sales_card = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_sales_weekly_card_interactive",
+            sql=weekly_sales_card_semantic_sql(),
+        )
         monthly_sales = upsert_dataset(
             db.session, SqlaTable, database, "nr_panorama_sales_monthly_interactive",
             sql=monthly_sales_semantic_sql(),
@@ -467,55 +570,52 @@ def main():
             metric("Venda sell out", "SUM(sellout_sum)"),
             metric("Venda custo", "SUM(cost_sum)"),
         ]
-        sales_specs = (
-            ("mensal", monthly_sales, "P1M", value_measures),
-            ("semanal", weekly_sales, "P1W", [
-                metric("Venda sell out semanal", "SUM(sellout_sum)"),
-                metric("Venda custo semanal", "SUM(cost_sum)"),
-            ]),
-        )
-        for period, dataset, grain, measures in sales_specs:
-            params = custom_params(
-                dataset, "Evolutivo de vendas", measures, grain=grain,
-                styles="bar|bar|line", formats="currency|currency|percent",
-                labels="Sell out Venda|Sell out Custo|Markup",
-                metric_semantics=value_semantics, summary_count=0, timeline_limit=13,
-            )
-            add(f"sales_value_{period}", dataset, f"Evolutivo de vendas — Valor {period}", params)
-            summary = custom_params(
-                monthly_sales, "Evolutivo de vendas", value_measures,
-                grain="P1M", styles="hidden|hidden|hidden",
-                formats="currency|currency|percent", variant="panoramasummary",
-                labels="Sell out Venda|Sell out Custo|Markup",
-                metric_semantics=value_semantics, summary_count=3,
-            )
-            add(f"sales_value_summary_{period}", monthly_sales, f"Evolutivo de vendas — Resumo Valor {period}", summary)
+        weekly_value_measures = [
+            metric("Venda sell out semanal", "SUM(sellout_sum)"),
+            metric("Venda custo semanal", "SUM(cost_sum)"),
+        ]
+        quantity_measures = [Q["sales"], Q["loss"], Q["price_num"], Q["price_count"]]
+        weekly_quantity_measures = [
+            metric("Venda quantidade semanal", "SUM(sales_sum)"),
+            metric("Perda OSA semanal", "SUM(loss_sum)"),
+            metric("Preço soma semanal", "SUM(price_numerator)"),
+            metric("Preço linhas semanal", "SUM(price_count)"),
+        ]
 
-        quantity_specs = (
-            ("mensal", monthly_quantity, "P1M", [Q["sales"], Q["loss"], Q["price_num"], Q["price_count"]]),
-            ("semanal", weekly_sales, "P1W", [
-                metric("Venda quantidade semanal", "SUM(sales_sum)"),
-                metric("Perda OSA semanal", "SUM(loss_sum)"),
-                metric("Preço soma semanal", "SUM(price_numerator)"),
-                metric("Preço linhas semanal", "SUM(price_count)"),
-            ]),
+        params = custom_params(
+            monthly_sales, "Evolutivo de vendas", value_measures, grain="P1M",
+            styles="bar|bar|line", formats="currency|currency|percent",
+            labels="Sell out Venda|Sell out Custo|Markup",
+            metric_semantics=value_semantics, summary_count=3, timeline_limit=13,
         )
-        for period, dataset, grain, measures in quantity_specs:
-            params = custom_params(
-                dataset, "Evolutivo de vendas", measures, grain=grain,
-                styles="bar|bar|line", formats="quantity|quantity|currency",
-                labels="Sell out Volume|Perda OSA|Preço Médio",
-                metric_semantics=quantity_semantics, summary_count=0, timeline_limit=13,
-            )
-            add(f"sales_quantity_{period}", dataset, f"Evolutivo de vendas — Quantidade {period}", params)
-            summary = custom_params(
-                monthly_quantity, "Evolutivo de vendas", [Q["sales"], Q["loss"], Q["price_num"], Q["price_count"]],
-                grain="P1M", styles="hidden|hidden|hidden",
-                formats="quantity|quantity|currency", variant="panoramasummary",
-                labels="Sell out Volume|Perda OSA|Preço Médio",
-                metric_semantics=quantity_semantics, summary_count=3,
-            )
-            add(f"sales_quantity_summary_{period}", monthly_quantity, f"Evolutivo de vendas — Resumo Quantidade {period}", summary)
+        add("sales_value_mensal", monthly_sales, "Evolutivo de vendas — Valor mensal", params)
+
+        params = custom_params(
+            weekly_sales_card, "Evolutivo de vendas", weekly_value_measures, grain="P1W",
+            styles="bar|bar|line", formats="currency|currency|percent",
+            labels="Sell out Venda|Sell out Custo|Markup",
+            metric_semantics=value_semantics, summary_count=3, timeline_limit=13,
+            summary_query_scope="summary", timeline_query_scope="timeline",
+        )
+        add("sales_value_semanal", weekly_sales_card, "Evolutivo de vendas — Valor semanal", params)
+
+        params = custom_params(
+            monthly_quantity, "Evolutivo de vendas", quantity_measures, grain="P1M",
+            styles="bar|bar|line", formats="quantity|quantity|currency",
+            labels="Sell out Volume|Perda OSA|Preço Médio",
+            metric_semantics=quantity_semantics, summary_count=3, timeline_limit=13,
+        )
+        add("sales_quantity_mensal", monthly_quantity, "Evolutivo de vendas — Quantidade mensal", params)
+
+        params = custom_params(
+            weekly_sales_card, "Evolutivo de vendas", weekly_quantity_measures, grain="P1W",
+            styles="bar|bar|line", formats="quantity|quantity|currency",
+            labels="Sell out Volume|Perda OSA|Preço Médio",
+            metric_semantics=quantity_semantics, summary_count=3, timeline_limit=13,
+            summary_query_scope="summary", timeline_query_scope="timeline",
+        )
+        add("sales_quantity_semanal", weekly_sales_card, "Evolutivo de vendas — Quantidade semanal", params)
+
         for period, grain in (("mensal", "P1M"), ("semanal", "P1W")):
             params = custom_params(
                 gap_periodic,
@@ -558,8 +658,8 @@ def main():
         layout = Layout()
         grid_parents = ["ROOT_ID", "GRID_ID"]
         layout.period_tabs("GRID_ID", grid_parents, "Evolutivo de vendas", [
-            ("Valor", [(period, [charts[f"sales_value_summary_{period}"], charts[f"sales_value_{period}"]]) for period in ("mensal", "semanal")]),
-            ("Quantidade", [(period, [charts[f"sales_quantity_summary_{period}"], charts[f"sales_quantity_{period}"]]) for period in ("mensal", "semanal")]),
+            ("Valor", [(period, charts[f"sales_value_{period}"]) for period in ("mensal", "semanal")]),
+            ("Quantidade", [(period, charts[f"sales_quantity_{period}"]) for period in ("mensal", "semanal")]),
         ], 58)
         layout.period_tabs("GRID_ID", grid_parents, "Evolutivo de estoque", [
             (section, [(period, charts[f"{key}_{period}"]) for period in ("mensal", "semanal")])
@@ -579,10 +679,10 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; } .dashboard-component-chart-holder:has([data-neoretail-sales-part='summary']) { margin-right: -6px !important; z-index: 2; } .dashboard-component-chart-holder:has([data-neoretail-sales-part='timeline']) { margin-left: -6px !important; }"
+        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
         filter_targets = {column: filter_options.id for column in WEEKLY_FILTER_COLUMNS}
         filter_targets["nm_measure"] = conversion_options.id
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, monthly_sales.id, monthly_quantity.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, weekly_sales_card.id, monthly_sales.id, monthly_quantity.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
         print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
