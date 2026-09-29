@@ -224,6 +224,33 @@ WHERE id_customer=:customer
 ORDER BY data
 """)
 
+GAP_WEEKLY_SOURCE = text("""
+WITH daily AS (
+  SELECT id_time::date AS data,
+         SUM(tvd_simplificado)::float8 AS tvd,
+         SUM(ivd_simplificado)::float8 AS ivd
+  FROM gold.fato_ivd_tvd
+  WHERE id_customer=:customer
+  GROUP BY id_time::date
+), tagged AS (
+  SELECT d.*,DATE_TRUNC('week',data)::date AS period_start FROM daily d
+), anchors AS (
+  SELECT period_start,
+         MAX(data) FILTER (WHERE tvd IS NOT NULL) AS tvd_date,
+         MAX(data) FILTER (WHERE ivd IS NOT NULL) AS ivd_date
+  FROM tagged GROUP BY period_start
+), values AS (
+  SELECT a.period_start AS data,t.tvd,i.ivd,
+         DENSE_RANK() OVER (ORDER BY a.period_start DESC) AS week_rank
+  FROM anchors a
+  LEFT JOIN daily t ON t.data=a.tvd_date
+  LEFT JOIN daily i ON i.data=a.ivd_date
+)
+SELECT data,tvd,ivd FROM values
+WHERE week_rank<=13
+ORDER BY data
+""")
+
 GAP_WEEKLY_MART = text("""
 SELECT data::date data,tvd,ivd
 FROM gold.nr_panorama_gap_weekly_card_default
@@ -359,9 +386,13 @@ def main():
             ).mappings())
             compare_rows(gap_source_m, gap_mart_m, ("tvd", "ivd"), "gap-monthly")
 
+            gap_source_w = list(connection.execute(
+                GAP_WEEKLY_SOURCE, {"customer": CUSTOMER_ID}
+            ).mappings())
             gap_mart_w = list(connection.execute(
                 GAP_WEEKLY_MART, {"customer": CUSTOMER_ID}
             ).mappings())
+            compare_rows(gap_source_w, gap_mart_w, ("tvd", "ivd"), "gap-weekly")
             if len(gap_mart_w) != 13:
                 raise AssertionError(f"gap-weekly: expected 13 weeks, got {len(gap_mart_w)}")
 
