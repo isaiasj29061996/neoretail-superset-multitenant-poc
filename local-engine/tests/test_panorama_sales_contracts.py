@@ -80,3 +80,26 @@ def test_monthly_value_uses_dedicated_certified_dataset():
     assert '"nr_panorama_sales_monthly_interactive"' in bootstrap
     assert '("mensal", monthly_sales, "P1M", value_measures)' in bootstrap
     assert 'monthly_sales, "Evolutivo de vendas", value_measures' in bootstrap
+
+def test_sales_summary_and_timeline_are_visually_joined_without_semantic_merge():
+    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    renderer = (
+        ROOT
+        / "superset"
+        / "frontend-plugin"
+        / "plugin-chart-neoretail-kpi"
+        / "src"
+        / "NeoRetailKpi.jsx"
+    ).read_text(encoding="utf-8")
+    assert "data-neoretail-sales-part" in renderer
+    assert "isJoinedSalesSummary" in renderer
+    assert "isJoinedSalesTimeline" in renderer
+    assert "borderRadius: '8px 0 0 8px'" in renderer
+    assert "borderRadius: '0 8px 8px 0'" in renderer
+    assert "data-neoretail-sales-part='summary'" in bootstrap
+    assert "data-neoretail-sales-part='timeline'" in bootstrap
+    # Keep the two technical slices so weekly tabs continue to reuse the
+    # monthly MTD/U3M contract while presenting a single visual card.
+    assert 'charts[f"sales_value_summary_{period}"]' in bootstrap
+    assert 'charts[f"sales_quantity_summary_{period}"]' in bootstrap
+
