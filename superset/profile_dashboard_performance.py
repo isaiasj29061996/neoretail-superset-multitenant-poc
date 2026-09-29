@@ -130,7 +130,27 @@ def build_queries(form, dashboard_default_filters=None):
         grain = form.get("time_grain_sqla", "P1M")
         common["extras"] = {**extras, "time_grain_sqla": grain}
         common["orderby"] = [[axis, True]]
-        queries = [{**common, "columns": [_time_column(axis, grain)]}]
+        timeline_scope = str(form.get("timeline_query_scope") or "").strip()
+        summary_scope = str(form.get("summary_query_scope") or "").strip()
+        timeline_filters = list(common["filters"])
+        if timeline_scope:
+            timeline_filters.append({"col": "row_scope", "op": "IN", "val": [timeline_scope]})
+        queries = [{
+            **common,
+            "columns": [_time_column(axis, grain)],
+            "filters": timeline_filters,
+        }]
+        if summary_scope:
+            summary_filters = [
+                *common["filters"],
+                {"col": "row_scope", "op": "IN", "val": [summary_scope]},
+            ]
+            queries.append({
+                **common,
+                "columns": [_time_column(axis, "P1M")],
+                "filters": summary_filters,
+                "extras": {**extras, "time_grain_sqla": "P1M"},
+            })
         if variant == "bars" and groupby:
             queries.append({
                 **common,
