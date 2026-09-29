@@ -337,4 +337,36 @@ equal(transformRows([]).hasData, false, 'Empty query response');
 equal(transformRows([{ data: null, TVD: 100 }]).hasData, false, 'Null date is not January 1970');
 equal(transformRows([{ __timestamp: Date.UTC(2026, 7, 2), TVD: 0 }]).hasData, true, 'Accept epoch timestamps and zero metrics');
 equal(transformRows([{ data: '2026-08-02', TVD: 42, Criticos: 3, Risco: 4 }]).critical, 3, 'Support rawFormData');
+const panoramaQuantity = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Venda', 'Perda', 'Preco soma', 'Preco contagem'],
+    metricLabels: 'Sell out Volume|Perda OSA|Preco Medio',
+    metricSemantics: 'direct_average:0:1|direct_sum:1:1|weighted_average:2:2',
+    cardVariant: 'panorama',
+  },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Venda: 10, Perda: 1, 'Preco soma': 100, 'Preco contagem': 10 },
+    { data: '2026-03-01', Venda: 20, Perda: 2, 'Preco soma': 200, 'Preco contagem': 20 },
+    { data: '2026-04-01', Venda: 30, Perda: 3, 'Preco soma': 300, 'Preco contagem': 30 },
+    { data: '2026-05-01', Venda: 40, Perda: 4, 'Preco soma': 400, 'Preco contagem': 40 },
+  ] }],
+});
+equal(panoramaQuantity.indicators.map(item => item.current), [40, 4, 10], 'Panorama quantity derives three outputs from four additive components');
+equal(panoramaQuantity.indicators.map(item => item.average), [20, 6, 10], 'Panorama quantity applies average, sum and weighted U3M per metric');
+const panoramaValue = transform({
+  formData: {
+    xAxis: 'data', metrics: ['Sellout', 'Custo'],
+    metricLabels: 'Sell out Venda|Sell out Custo|Markup',
+    metricSemantics: 'direct_average:0:1|direct_average:1:1|markup_blank:0:2',
+    cardVariant: 'panorama',
+  },
+  queriesData: [{ data: [
+    { data: '2026-02-01', Sellout: 100, Custo: 50 },
+    { data: '2026-03-01', Sellout: 200, Custo: 100 },
+    { data: '2026-04-01', Sellout: 300, Custo: 100 },
+    { data: '2026-05-01', Sellout: 0, Custo: 150 },
+  ] }],
+});
+equal(panoramaValue.indicators.map(item => item.average), [200, 250 / 3, 240], 'Panorama value averages components and recomputes U3M markup');
+equal(panoramaValue.timeline.at(-1).values[2], null, 'Panorama markup line preserves BLANK when its result is zero');
 console.log(`${checks} regression checks passed (Superset dependency doubles).`);

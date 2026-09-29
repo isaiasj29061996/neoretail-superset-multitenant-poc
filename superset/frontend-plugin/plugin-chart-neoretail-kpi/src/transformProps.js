@@ -24,7 +24,8 @@ const semanticValue = (profile, components) => {
     if (numerator === null || denominator === null || stockCost === null || stockCost === 0) return [null];
     return [100 * (numerator - denominator) / stockCost];
   }
-  if (profile === 'markup') {
+  if (profile === 'markup' || profile === 'markup_blank') {
+    if (profile === 'markup_blank' && (numerator === 0 || denominator === 0)) return [null];
     if (numerator === 0 || denominator === 0) return [0];
     if (numerator === null || denominator === null) return [null];
     return [100 * numerator / denominator];
@@ -73,6 +74,33 @@ const semanticAggregate = (profile, rows, index) => {
   return semanticValue(profile, components)[index] ?? null;
 };
 
+const VALID_SEMANTIC_PROFILES = [
+  'direct_average', 'direct_sum', 'stock_bundle', 'weighted_average',
+  'one_minus_ratio', 'ratio_percent', 'ratio', 'distribution_bundle',
+  'osa_bundle', 'roi', 'markup', 'markup_blank',
+];
+
+// A Panorama combo can mix measures whose U3M semantics differ. Each spec is
+// `profile:componentOffset:componentCount`, for example:
+// direct_average:0:1|direct_sum:1:1|weighted_average:2:2.
+const parseMetricSemantics = value => String(value || '').split('|').map(spec => {
+  const [profile, offset, count] = spec.split(':');
+  return VALID_SEMANTIC_PROFILES.includes(profile)
+    ? { profile, offset: Number(offset), count: Number(count) }
+    : null;
+}).filter(spec => spec && Number.isInteger(spec.offset) && spec.offset >= 0
+  && Number.isInteger(spec.count) && spec.count > 0);
+
+const aggregateMetricSpec = (spec, rows) => semanticAggregate(
+  spec.profile,
+  rows.map(row => ({
+    ...row,
+    components: row?.components?.slice(spec.offset, spec.offset + spec.count) || [],
+    values: row?.components?.slice(spec.offset, spec.offset + spec.count) || [],
+  })),
+  0,
+);
+
 const ALLOWED_ACTIVITY_LEVELS = [
   'Fast Mover', 'Slow Mover', 'Ultra Slow Mover', 'New Mover',
 ];
@@ -104,9 +132,10 @@ export default function transformProps(chartProps) {
   const directions = splitConfig(formData.metric_directions, [formData.lower_is_better === false ? 'higher' : 'lower']);
   const criticalLabel = metricLabel(formData.critical_metric);
   const riskLabel = metricLabel(formData.risk_metric);
-  const semanticProfile = ['direct_average', 'direct_sum', 'stock_bundle', 'weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'distribution_bundle', 'osa_bundle', 'roi', 'markup'].includes(formData.semantic_profile)
+  const semanticProfile = VALID_SEMANTIC_PROFILES.includes(formData.semantic_profile)
     ? formData.semantic_profile
     : null;
+  const metricSemantics = parseMetricSemantics(formData.metric_semantics);
   const normalize = (rows, grouped = false) => rows.map(row => ({
     date: asDate(row.__timestamp ?? row[dateColumn]),
     category: grouped ? String(row[groupColumn] ?? 'Outros') : null,
@@ -114,11 +143,16 @@ export default function transformProps(chartProps) {
     critical: numeric(row[criticalLabel]),
     risk: numeric(row[riskLabel]),
   })).filter(row => row.date).sort((left, right) => left.date - right.date);
-  const applySemanticProfile = row => ({
-    ...row,
-    components: row.values,
-    values: semanticValue(semanticProfile, row.values),
-  });
+  const applySemanticProfile = row => {
+    const components = row.values;
+    const values = metricSemantics.length
+      ? metricSemantics.map(spec => semanticValue(
+        spec.profile,
+        components.slice(spec.offset, spec.offset + spec.count),
+      )[0] ?? null)
+      : semanticValue(semanticProfile, components);
+    return { ...row, components, values };
+  };
   const timeline = normalize(queriesData[0]?.data || []).map(applySemanticProfile);
   const rankItems = (queriesData[0]?.data || []).map(row => ({
     category: String(row[groupColumn] ?? 'Outros'),
@@ -141,9 +175,9 @@ export default function transformProps(chartProps) {
   const currentMonth = latest ? monthKey(latest.date) : null;
   const lastByMonth = new Map();
   semanticTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
-  const outputCount = ['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
+  const outputCount = metricSemantics.length || (['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
     : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup'].includes(semanticProfile) ? 1
-      : metricLabels.length;
+      : metricLabels.length);
   const displayMetricLabels = labels.slice(0, outputCount);
   const indicators = displayMetricLabels.map((label, index) => {
     const previous = latest ? lastByMonth.get(shiftMonth(latest.date, -1)) : null;
@@ -160,11 +194,15 @@ export default function transformProps(chartProps) {
       previous: previous?.values[index] ?? null,
       // DAX contract: DIVIDE(M1 + M2 + M3, 3). Missing months do not
       // change the denominator and BLANK participates as zero in the sum.
-      average: latest ? semanticAggregate(semanticProfile, prior, index) : null,
+      average: latest ? (metricSemantics[index]
+        ? aggregateMetricSpec(metricSemantics[index], prior)
+        : semanticAggregate(semanticProfile, prior, index)) : null,
       lastYear: disableLy ? { current: null, previous: null, average: null } : {
         current: priorYearCurrent?.values[index] ?? null,
         previous: priorYearPrevious?.values[index] ?? null,
-        average: latest ? semanticAggregate(semanticProfile, priorYear, index) : null,
+        average: latest ? (metricSemantics[index]
+          ? aggregateMetricSpec(metricSemantics[index], priorYear)
+          : semanticAggregate(semanticProfile, priorYear, index)) : null,
       },
       annual: semanticProfile === 'roi' && latest
         ? semanticTimeline.slice(-12).reduce((sum, row) => sum + (row.values[0] ?? 0), 0)
@@ -190,6 +228,7 @@ export default function transformProps(chartProps) {
     taskLabels: splitConfig(formData.task_labels, ['itens críticos', 'itens com risco']),
     chartStyles: splitConfig(formData.chart_styles, ['bar', 'bar', 'line']),
     timeGrain: monthlyLastNonBlank ? 'P1M' : (formData.time_grain_sqla || 'P1M'),
+    timelineLimit: Math.max(1, Number(formData.timeline_limit) || 12),
     summaryCount: Math.max(0, Number(formData.summary_count) || indicators.length),
     indicators,
     critical: latest?.critical || 0,

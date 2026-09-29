@@ -4,6 +4,8 @@ const formatValue = (value, type) => {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
   const options = type === 'decimal'
     ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    : type === 'quantity' && Math.abs(Number(value)) < 1
+      ? { minimumFractionDigits: 4, maximumFractionDigits: 4 }
     : type === 'currency'
     ? { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 2 }
     : type === 'percent'
@@ -55,6 +57,16 @@ const Tasks = ({ critical, risk, labels }) => <>
   <div style={styles.task}>{new Intl.NumberFormat('pt-BR').format(risk)} {labels[1]}</div>
 </>;
 
+const PanoramaSummary = ({ indicators }) => <div style={{ padding: '12px 16px' }}>
+  {indicators.map(indicator => <div key={indicator.label} style={{ marginBottom: 15 }}>
+    <b style={{ display: 'block', fontSize: 11 }}>{indicator.label}</b>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: 6 }}>
+      <span><small style={styles.label}>MTD</small><strong style={styles.value}>{formatValue(indicator.current, indicator.format)}</strong></span>
+      <span><small style={styles.label}>U3M</small><strong style={styles.value}>{formatValue(indicator.average, indicator.format)}</strong></span>
+    </div>
+  </div>)}
+</div>;
+
 const HeadlineArea = ({ indicator, timeline, accentColor }) => {
   const observations = timeline.map(point => ({ value: point.values[0] }));
   const points = areaPoints(observations, 600, 130);
@@ -80,8 +92,8 @@ const isoWeekYear = date => {
   return current.getUTCFullYear();
 };
 
-const Panorama = ({ indicators, timeline, chartStyles, summaryCount, width, height, timeGrain }) => {
-  const points = timeline.slice(-12);
+const Panorama = ({ indicators, timeline, chartStyles, summaryCount, width, height, timeGrain, timelineLimit }) => {
+  const points = timeline.slice(-timelineLimit);
   const colors = ['#00557C', '#4F86BF', '#858585', '#7C4AD9'];
   const maxima = indicators.map((_, metricIndex) => Math.max(1, ...points.map(point => Math.abs(point.values[metricIndex] || 0))));
   const containerWidth = Number.isFinite(width) ? width : 840;
@@ -123,10 +135,12 @@ const Panorama = ({ indicators, timeline, chartStyles, summaryCount, width, heig
   const legendWidths = legendItems.map(item => Math.max(75, item.label.length * 6.2 + 28));
   const legendStart = Math.max(left, (viewWidth - legendWidths.reduce((sum, item) => sum + item, 0)) / 2);
   const linePath = metricIndex => points.map((point, index) => {
+    if (point.values[metricIndex] == null) return null;
     const x = pointX(index);
     const y = pointY(metricIndex, point.values[metricIndex]);
-    return `${index ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  }).join(' ');
+    const previousIsValue = index > 0 && points[index - 1].values[metricIndex] != null;
+    return `${previousIsValue ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).filter(Boolean).join(' ');
   return <div style={{ display: 'grid', gridTemplateColumns: summaryCount ? `${summaryWidth}px 1fr` : '1fr', height: 'calc(100% - 44px)', minHeight: 0 }}>
     {summaryCount > 0 && <div style={{ padding: '10px 16px', borderRight: '1px solid #E2E6EA' }}>{indicators.slice(0, summaryCount).map(indicator => <div key={indicator.label} style={{ marginBottom: 13 }}><b style={{ display: 'block', fontSize: 11 }}>{indicator.label}</b><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: 5 }}><span><small style={styles.label}>MTD</small><strong style={styles.value}>{formatValue(indicator.current, indicator.format)}</strong></span><span><small style={styles.label}>U3M</small><strong style={styles.value}>{formatValue(indicator.average, indicator.format)}</strong></span></div></div>)}</div>}
     <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: '100%', minHeight: 245 }}>
@@ -135,6 +149,7 @@ const Panorama = ({ indicators, timeline, chartStyles, summaryCount, width, heig
         ? <g key={indicator.label}>
           <path d={linePath(metricIndex)} fill="none" stroke={colors[metricIndex]} strokeWidth="3" />
           {points.map((point, index) => {
+            if (point.values[metricIndex] == null) return null;
             const x = pointX(index); const y = pointY(metricIndex, point.values[metricIndex]);
             const labelY = y < top - 8 ? y + 16 : y - 9;
             return <g key={`${indicator.label}-point-${index}`}>
@@ -207,13 +222,13 @@ const RankBars = ({ items, format }) => {
 };
 
 export default function NeoRetailKpi(props) {
-  const { width, height, title, helpText, variant, accentColor, analysisUrl, showTasks, showAnnual, taskLabels, chartStyles, timeGrain, summaryCount, indicators, critical, risk, series, timeline, bars, rankItems, rankSeries, hasData } = props;
+  const { width, height, title, helpText, variant, accentColor, analysisUrl, showTasks, showAnnual, taskLabels, chartStyles, timeGrain, timelineLimit, summaryCount, indicators, critical, risk, series, timeline, bars, rankItems, rankSeries, hasData } = props;
   if (!hasData || !indicators.length) return <div style={{ ...styles.card, display: 'grid', placeItems: 'center', color: '#6C727A' }}>Sem dados para os filtros selecionados.</div>;
   const points = areaPoints(series);
   const maxBar = Math.max(1, ...bars.flatMap(item => [item.current, item.previous]));
   return <div data-neoretail-variant={variant} style={{ ...styles.card, width, height }}>
-    <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>
-    {variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} timeGrain={timeGrain} summaryCount={summaryCount} width={width} height={height} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} showAnnual={showAnnual} /></div>) : <MetricTriplet indicator={indicators[0]} showAnnual={showAnnual} />}
+    {variant !== 'panoramasummary' && <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>}
+    {variant === 'panoramasummary' ? <PanoramaSummary indicators={indicators} /> : variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} timeGrain={timeGrain} timelineLimit={timelineLimit} summaryCount={summaryCount} width={width} height={height} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} showAnnual={showAnnual} /></div>) : <MetricTriplet indicator={indicators[0]} showAnnual={showAnnual} />}
     {variant === 'area' && <svg viewBox="0 0 300 94" preserveAspectRatio="none" role="img" aria-label={`Evolução de ${title}`} style={{ display: 'block', width: 'calc(100% - 24px)', height: Math.max(65, Math.min(130, height - 225)), margin: '0 12px 7px', borderBottom: '1px solid #D9DDE3' }}><polygon points={points.polygon} fill={accentColor} fillOpacity="0.4" /><polyline points={points.line} fill="none" stroke={accentColor} strokeWidth="1.6" /></svg>}
     {variant === 'bars' && <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-around', gap: 8, height: Math.max(90, height - 190), padding: '5px 18px 0' }}>{bars.map(item => <div key={item.category} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'end' }}><div style={{ height: 'calc(100% - 25px)', display: 'flex', alignItems: 'end', justifyContent: 'center', gap: 2 }}><span style={{ width: 22, height: `${Math.max(2, item.current / maxBar * 100)}%`, background: '#0070A3' }} /><span style={{ width: 22, height: `${Math.max(2, item.previous / maxBar * 100)}%`, background: '#8C8C8C' }} /></div><span style={{ height: 25, color: '#777', fontSize: 9, textAlign: 'center' }}>{item.category}</span></div>)}</div>}
     {(variant === 'area' || variant === 'osa') && showTasks && <Tasks critical={critical} risk={risk} labels={taskLabels} />}
