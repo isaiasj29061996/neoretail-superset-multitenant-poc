@@ -579,7 +579,7 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
+        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; } .dashboard-component-chart-holder:has([data-neoretail-sales-part='summary']) { margin-right: -6px !important; z-index: 2; } .dashboard-component-chart-holder:has([data-neoretail-sales-part='timeline']) { margin-left: -6px !important; }"
         filter_targets = {column: filter_options.id for column in WEEKLY_FILTER_COLUMNS}
         filter_targets["nm_measure"] = conversion_options.id
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, monthly_sales.id, monthly_quantity.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
