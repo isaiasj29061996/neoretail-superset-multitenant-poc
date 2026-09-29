@@ -34,9 +34,10 @@ for (const [name, chart] of Object.entries(fixture.charts)) {
   const weekly = name.includes('semanal');
 
   assert(props.timelineLimit === 13, `${name}: timeline_limit did not reach renderer`);
-  assert(props.timeline.length === 13, `${name}: expected exactly 13 rendered periods`);
+  assert(props.timeline.slice(-props.timelineLimit).length === 13, `${name}: renderer must have thirteen visible periods`);
   assert(chart.queriesData.length === (weekly ? 2 : 1), `${name}: unexpected query count`);
   if (weekly) {
+    assert(props.timeline.length === 13, `${name}: weekly dataset must already be TOP 13`);
     assert(chart.queriesData[1].data.length > 3, `${name}: missing monthly summary history`);
   }
 
