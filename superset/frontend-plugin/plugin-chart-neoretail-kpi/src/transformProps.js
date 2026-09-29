@@ -164,6 +164,11 @@ export default function transformProps(chartProps) {
     return { ...row, components, values };
   };
   const timeline = normalize(queriesData[0]?.data || []).map(applySemanticProfile);
+  const hasSummaryQuery = Boolean(String(formData.summary_query_scope || '').trim());
+  const summaryTimeline = hasSummaryQuery
+    ? normalize(queriesData[1]?.data || []).map(applySemanticProfile)
+    : [];
+  const groupedQueryIndex = hasSummaryQuery ? 2 : 1;
   const rankItems = (queriesData[0]?.data || []).map(row => ({
     category: String(row[groupColumn] ?? 'Outros'),
     value: numeric(row[metricLabels[0]]),
@@ -173,18 +178,24 @@ export default function transformProps(chartProps) {
     values: metricLabels.map(label => numeric(row[label])),
   })).sort((left, right) => right.values.reduce((sum, value) => sum + Math.abs(value), 0)
     - left.values.reduce((sum, value) => sum + Math.abs(value), 0));
-  const grouped = normalize(queriesData[1]?.data || [], true).map(applySemanticProfile);
+  const grouped = normalize(queriesData[groupedQueryIndex]?.data || [], true).map(applySemanticProfile);
   const monthlyLastNonBlank = formData.semantic_period === 'month_last_nonblank';
-  // The query deliberately stays daily. Native filters are evaluated by
-  // Superset first; only then can we reproduce DAX LASTNONBLANK for each month
-  // without summing every daily snapshot in that month.
-  const semanticTimeline = monthlyLastNonBlank
-    ? [...timeline.reduce((months, row) => months.set(monthKey(row.date), row), new Map()).values()]
-    : timeline;
-  const latest = semanticTimeline[semanticTimeline.length - 1] || null;
-  const currentMonth = latest ? monthKey(latest.date) : null;
+  const collapseMonthly = rows => [...rows.reduce(
+    (months, row) => months.set(monthKey(row.date), row),
+    new Map(),
+  ).values()];
+  // The primary query owns the plotted timeline. A weekly Panorama sales card
+  // may provide a second, monthly query from the same datasource so MTD/U3M
+  // stay on the certified monthly DAX contract inside one Superset slice.
+  const semanticTimeline = monthlyLastNonBlank ? collapseMonthly(timeline) : timeline;
+  const semanticSummaryTimeline = summaryTimeline.length
+    ? collapseMonthly(summaryTimeline)
+    : semanticTimeline;
+  const timelineLatest = semanticTimeline[semanticTimeline.length - 1] || null;
+  const latest = semanticSummaryTimeline[semanticSummaryTimeline.length - 1] || null;
+  const currentMonth = timelineLatest ? monthKey(timelineLatest.date) : null;
   const lastByMonth = new Map();
-  semanticTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
+  semanticSummaryTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
   const outputCount = metricSemantics.length || (['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
     : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup', 'markup_blank'].includes(semanticProfile) ? 1
       : metricLabels.length);
@@ -215,7 +226,7 @@ export default function transformProps(chartProps) {
           : semanticAggregate(semanticProfile, priorYear, index)) : null,
       },
       annual: semanticProfile === 'roi' && latest
-        ? semanticTimeline.slice(-12).reduce((sum, row) => sum + (row.values[0] ?? 0), 0)
+        ? semanticSummaryTimeline.slice(-12).reduce((sum, row) => sum + (row.values[0] ?? 0), 0)
         : null,
     };
   });
@@ -223,7 +234,7 @@ export default function transformProps(chartProps) {
   grouped.filter(row => ALLOWED_ACTIVITY_LEVELS.includes(row.category)).forEach(row => {
     const entry = categories.get(row.category) || {};
     if (monthKey(row.date) === currentMonth) entry.current = row.values[0];
-    if (latest && monthKey(row.date) === shiftMonth(latest.date, -1)) entry.previous = row.values[0];
+    if (timelineLatest && monthKey(row.date) === shiftMonth(timelineLatest.date, -1)) entry.previous = row.values[0];
     categories.set(row.category, entry);
   });
   const parsedTimelineLimit = Number(formData.timeline_limit);
