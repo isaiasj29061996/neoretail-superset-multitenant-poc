@@ -823,7 +823,9 @@ def main():
         #   Estoque Preço Custo = SUMX(ESTOQUE_MEDIO * AVG_PRICE_COST)
         #   Estoque Quantidade = SUM(ESTOQUE_UNIDADES) * selected conversion factor
         #   both U3M values = three-month context / 3.
-        stock_semantics = "direct_average:0:1|direct_average:1:1"
+        # stock_bundle mirrors the literal DAX asymmetry:
+        # cost U3M = SUM(three months) / 3, while [Estoque qtd] first keeps
+        # only MaxDataMes inside U3M and the BN measure then divides it by 3.
         stock_measures = [
             metric("Estoque preço custo", "SUM(stock_cost_sum)"),
             metric("Estoque quantidade", "SUM(stock_qty_sum)"),
@@ -837,7 +839,7 @@ def main():
             styles="bar|bar",
             formats="currency|quantity",
             labels="Estoque Preço Custo|Estoque Quantidade",
-            metric_semantics=stock_semantics,
+            semantic_profile="stock_bundle",
             summary_count=2,
             timeline_limit=13,
         )
@@ -851,7 +853,7 @@ def main():
             styles="bar|bar",
             formats="currency|quantity",
             labels="Estoque Preço Custo|Estoque Quantidade",
-            metric_semantics=stock_semantics,
+            semantic_profile="stock_bundle",
             summary_count=2,
             timeline_limit=13,
             summary_query_scope="summary",
