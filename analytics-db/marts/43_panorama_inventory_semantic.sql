@@ -14,6 +14,7 @@
 BEGIN;
 
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_weekly_card_default;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_monthly_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_inventory_weekly_card_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_inventory_monthly_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_inventory_weekly_detail;
@@ -282,29 +283,94 @@ CREATE INDEX ix_nr_panorama_inventory_weekly_card_default
         id_customer, nm_measure, row_scope, data
     );
 
+CREATE MATERIALIZED VIEW gold.nr_panorama_gap_monthly_default AS
+WITH daily AS (
+    SELECT
+        o.id_customer,
+        o.data,
+        SUM(o.tvd_simplificado)::double precision AS tvd,
+        SUM(o.ivd_simplificado)::double precision AS ivd
+    FROM gold.nr_panorama_opportunities o
+    GROUP BY o.id_customer,o.data
+), tagged AS (
+    SELECT
+        d.*,
+        DATE_TRUNC('month',d.data)::date AS period_start
+    FROM daily d
+), anchors AS (
+    SELECT
+        id_customer,
+        period_start,
+        MAX(data) FILTER (WHERE tvd IS NOT NULL) AS tvd_date,
+        MAX(data) FILTER (WHERE ivd IS NOT NULL) AS ivd_date
+    FROM tagged
+    GROUP BY id_customer,period_start
+)
+SELECT
+    a.period_start AS data,
+    a.id_customer,
+    tvd.tvd,
+    ivd.ivd,
+    NULL::text AS rede,
+    NULL::text AS bandeira,
+    NULL::text AS uf,
+    NULL::text AS cidade,
+    NULL::text AS tipo_local,
+    NULL::text AS loja,
+    NULL::text AS regiao,
+    NULL::text AS tp_activity_level,
+    NULL::text AS activity_level,
+    NULL::text AS item,
+    NULL::text AS descricao_marca,
+    NULL::text AS hierarquia_1,
+    NULL::text AS hierarquia_2,
+    NULL::text AS hierarquia_3
+FROM anchors a
+LEFT JOIN daily tvd
+  ON tvd.id_customer=a.id_customer AND tvd.data=a.tvd_date
+LEFT JOIN daily ivd
+  ON ivd.id_customer=a.id_customer AND ivd.data=a.ivd_date;
+
+CREATE UNIQUE INDEX ux_nr_panorama_gap_monthly_default
+    ON gold.nr_panorama_gap_monthly_default (id_customer,data);
+
 CREATE MATERIALIZED VIEW gold.nr_panorama_gap_weekly_card_default AS
-WITH weekly_ranked AS (
+WITH daily AS (
     SELECT
-        p.id_customer,
-        p.data,
-        SUM(p.tvd)::double precision AS tvd,
-        SUM(p.ivd)::double precision AS ivd,
+        o.id_customer,
+        o.data,
+        SUM(o.tvd_simplificado)::double precision AS tvd,
+        SUM(o.ivd_simplificado)::double precision AS ivd
+    FROM gold.nr_panorama_opportunities o
+    GROUP BY o.id_customer,o.data
+), weekly_tagged AS (
+    SELECT
+        d.*,
+        DATE_TRUNC('week',d.data)::date AS period_start
+    FROM daily d
+), weekly_anchors AS (
+    SELECT
+        id_customer,
+        period_start,
+        MAX(data) FILTER (WHERE tvd IS NOT NULL) AS tvd_date,
+        MAX(data) FILTER (WHERE ivd IS NOT NULL) AS ivd_date
+    FROM weekly_tagged
+    GROUP BY id_customer,period_start
+), weekly_values AS (
+    SELECT
+        a.id_customer,
+        a.period_start AS data,
+        tvd.tvd,
+        ivd.ivd,
         DENSE_RANK() OVER (
-            PARTITION BY p.id_customer
-            ORDER BY p.data DESC
+            PARTITION BY a.id_customer
+            ORDER BY a.period_start DESC
         ) AS week_rank
-    FROM gold.nr_panorama_gap_periodic p
-    WHERE p.period_type='semanal'
-    GROUP BY p.id_customer,p.data
-), monthly AS (
-    SELECT
-        p.id_customer,
-        p.data,
-        SUM(p.tvd)::double precision AS tvd,
-        SUM(p.ivd)::double precision AS ivd
-    FROM gold.nr_panorama_gap_periodic p
-    WHERE p.period_type='mensal'
-    GROUP BY p.id_customer,p.data
+    FROM weekly_anchors a
+    LEFT JOIN daily tvd
+      ON tvd.id_customer=a.id_customer AND tvd.data=a.tvd_date
+    LEFT JOIN daily ivd
+      ON ivd.id_customer=a.id_customer AND ivd.data=a.ivd_date
 )
 SELECT
     'timeline'::text AS row_scope,
@@ -326,7 +392,7 @@ SELECT
     NULL::text AS hierarquia_1,
     NULL::text AS hierarquia_2,
     NULL::text AS hierarquia_3
-FROM weekly_ranked w
+FROM weekly_values w
 WHERE w.week_rank <= 13
 
 UNION ALL
@@ -337,21 +403,21 @@ SELECT
     m.id_customer,
     m.tvd,
     m.ivd,
-    NULL::text AS rede,
-    NULL::text AS bandeira,
-    NULL::text AS uf,
-    NULL::text AS cidade,
-    NULL::text AS tipo_local,
-    NULL::text AS loja,
-    NULL::text AS regiao,
-    NULL::text AS tp_activity_level,
-    NULL::text AS activity_level,
-    NULL::text AS item,
-    NULL::text AS descricao_marca,
-    NULL::text AS hierarquia_1,
-    NULL::text AS hierarquia_2,
-    NULL::text AS hierarquia_3
-FROM monthly m;
+    m.rede,
+    m.bandeira,
+    m.uf,
+    m.cidade,
+    m.tipo_local,
+    m.loja,
+    m.regiao,
+    m.tp_activity_level,
+    m.activity_level,
+    m.item,
+    m.descricao_marca,
+    m.hierarquia_1,
+    m.hierarquia_2,
+    m.hierarquia_3
+FROM gold.nr_panorama_gap_monthly_default m;
 
 CREATE INDEX ix_nr_panorama_gap_weekly_card_default
     ON gold.nr_panorama_gap_weekly_card_default (id_customer,row_scope,data);
@@ -360,12 +426,15 @@ COMMENT ON MATERIALIZED VIEW gold.nr_panorama_inventory_monthly_default IS
 'Certified monthly serving mart for Panorama stock/Giro/ROI/OSA.';
 COMMENT ON MATERIALIZED VIEW gold.nr_panorama_inventory_weekly_card_default IS
 'Certified weekly TOP-13 timeline plus monthly summary rows for Panorama stock/Giro/ROI/OSA.';
+COMMENT ON MATERIALIZED VIEW gold.nr_panorama_gap_monthly_default IS
+'LASTNONBLANK-equivalent monthly TVD/IVD snapshots for Panorama.';
 COMMENT ON MATERIALIZED VIEW gold.nr_panorama_gap_weekly_card_default IS
-'Weekly TOP-13 TVD/IVD timeline plus monthly rows for Panorama MTD/U3M summary.';
+'LASTNONBLANK-equivalent TOP-13 weekly TVD/IVD timeline plus monthly summary rows.';
 
 ANALYZE gold.nr_panorama_inventory_weekly_detail;
 ANALYZE gold.nr_panorama_inventory_monthly_default;
 ANALYZE gold.nr_panorama_inventory_weekly_card_default;
+ANALYZE gold.nr_panorama_gap_monthly_default;
 ANALYZE gold.nr_panorama_gap_weekly_card_default;
 
 COMMIT;
