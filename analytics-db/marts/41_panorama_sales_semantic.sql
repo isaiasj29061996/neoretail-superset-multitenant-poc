@@ -4,6 +4,7 @@
 
 BEGIN;
 
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_sales_weekly_card_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_sales_weekly_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_sales_monthly_default;
 
@@ -110,6 +111,67 @@ JOIN factors f USING (data, id_customer);
 CREATE UNIQUE INDEX ux_nr_panorama_sales_weekly_default
     ON gold.nr_panorama_sales_weekly_default (id_customer, data, nm_measure);
 
+CREATE MATERIALIZED VIEW gold.nr_panorama_sales_weekly_card_default AS
+WITH ranked_weekly AS (
+    SELECT
+        w.*,
+        DENSE_RANK() OVER (
+            PARTITION BY w.id_customer, w.nm_measure
+            ORDER BY w.cd_week DESC
+        ) AS week_rank
+    FROM gold.nr_panorama_sales_weekly_default w
+), monthly_summary AS (
+    SELECT
+        m.data,
+        m.id_customer,
+        m.nm_measure,
+        m.sellout_sum,
+        m.cost_sum,
+        q.sales_sum,
+        q.loss_sum,
+        q.price_numerator,
+        q.price_count
+    FROM gold.nr_panorama_sales_monthly_default m
+    JOIN gold.nr_overview_quantity_default q
+      ON q.data = m.data
+     AND q.id_customer = m.id_customer
+     AND q.nm_measure = m.nm_measure
+)
+SELECT
+    'timeline'::text AS row_scope,
+    w.data,
+    w.cd_week,
+    w.id_customer,
+    w.nm_measure,
+    w.sellout_sum,
+    w.cost_sum,
+    w.sales_sum,
+    w.loss_sum,
+    w.price_numerator,
+    w.price_count
+FROM ranked_weekly w
+WHERE w.week_rank <= 13
+UNION ALL
+SELECT
+    'summary'::text AS row_scope,
+    m.data,
+    NULL::text AS cd_week,
+    m.id_customer,
+    m.nm_measure,
+    m.sellout_sum,
+    m.cost_sum,
+    m.sales_sum,
+    m.loss_sum,
+    m.price_numerator,
+    m.price_count
+FROM monthly_summary m;
+
+CREATE INDEX ix_nr_panorama_sales_weekly_card_default
+    ON gold.nr_panorama_sales_weekly_card_default (id_customer, nm_measure, row_scope, data);
+
+COMMENT ON MATERIALIZED VIEW gold.nr_panorama_sales_weekly_card_default IS
+'Single-card serving contract: TOP-13 weekly timeline plus monthly rows used by the embedded MTD/U3M summary.';
+
 COMMENT ON MATERIALIZED VIEW gold.nr_panorama_sales_weekly_default IS
 'Panorama sales components at tenant/week/measure grain; consumed through a TOP-13 semantic dataset.';
 
@@ -118,5 +180,6 @@ COMMENT ON MATERIALIZED VIEW gold.nr_panorama_sales_monthly_default IS
 
 ANALYZE gold.nr_panorama_sales_monthly_default;
 ANALYZE gold.nr_panorama_sales_weekly_default;
+ANALYZE gold.nr_panorama_sales_weekly_card_default;
 
 COMMIT;
