@@ -146,6 +146,13 @@ export default function transformProps(chartProps) {
     ? formData.semantic_profile
     : null;
   const metricSemantics = parseMetricSemantics(formData.metric_semantics);
+  const summaryLabels = splitConfig(formData.summary_labels, []);
+  const metricSummaryModes = splitConfig(formData.metric_summary_modes, []);
+  const timelineZeroBlankIndices = new Set(
+    splitConfig(formData.timeline_zero_blank_indices, [])
+      .map(value => Number(value))
+      .filter(value => Number.isInteger(value) && value >= 0),
+  );
   const normalize = (rows, grouped = false) => rows.map(row => ({
     date: asDate(row.__timestamp ?? row[dateColumn]),
     category: grouped ? String(row[groupColumn] ?? 'Outros') : null,
@@ -200,6 +207,29 @@ export default function transformProps(chartProps) {
     : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup', 'markup_blank'].includes(semanticProfile) ? 1
       : metricLabels.length);
   const displayMetricLabels = labels.slice(0, outputCount);
+  const metricSpecValue = (spec, row) => {
+    if (!row) return null;
+    if (spec) {
+      return semanticValue(
+        spec.profile,
+        row.components.slice(spec.offset, spec.offset + spec.count),
+      )[0] ?? null;
+    }
+    return row.values[0] ?? null;
+  };
+  const summaryValue = (index, prior) => {
+    const mode = metricSummaryModes[index] || 'u3m';
+    if (mode === 'annual12') {
+      const rows = semanticSummaryTimeline.slice(-12);
+      const values = rows.map(row => metricSemantics[index]
+        ? metricSpecValue(metricSemantics[index], row)
+        : row.values[index]).filter(value => value != null);
+      return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+    }
+    return metricSemantics[index]
+      ? aggregateMetricSpec(metricSemantics[index], prior)
+      : semanticAggregate(semanticProfile, prior, index);
+  };
   const indicators = displayMetricLabels.map((label, index) => {
     const previous = latest ? lastByMonth.get(shiftMonth(latest.date, -1)) : null;
     const prior = latest ? [-1, -2, -3].map(offset => lastByMonth.get(shiftMonth(latest.date, offset))) : [];
@@ -215,9 +245,7 @@ export default function transformProps(chartProps) {
       previous: previous?.values[index] ?? null,
       // DAX contract: DIVIDE(M1 + M2 + M3, 3). Missing months do not
       // change the denominator and BLANK participates as zero in the sum.
-      average: latest ? (metricSemantics[index]
-        ? aggregateMetricSpec(metricSemantics[index], prior)
-        : semanticAggregate(semanticProfile, prior, index)) : null,
+      average: latest ? summaryValue(index, prior) : null,
       lastYear: disableLy ? { current: null, previous: null, average: null } : {
         current: priorYearCurrent?.values[index] ?? null,
         previous: priorYearPrevious?.values[index] ?? null,
@@ -239,6 +267,12 @@ export default function transformProps(chartProps) {
   });
   const parsedTimelineLimit = Number(formData.timeline_limit);
   const parsedSummaryCount = Number(formData.summary_count);
+  const displayTimeline = semanticTimeline.map(row => ({
+    ...row,
+    values: row.values.map((value, index) => (
+      timelineZeroBlankIndices.has(index) && value === 0 ? null : value
+    )),
+  }));
   return {
     width, height, semanticProfile,
     title: formData.card_title || 'NeoRetail',
@@ -249,6 +283,7 @@ export default function transformProps(chartProps) {
     showTasks: formData.show_tasks !== false,
     showAnnual: formData.show_annual === true,
     taskLabels: splitConfig(formData.task_labels, ['itens críticos', 'itens com risco']),
+    summaryLabels,
     chartStyles: splitConfig(formData.chart_styles, ['bar', 'bar', 'line']),
     timeGrain: monthlyLastNonBlank ? 'P1M' : (formData.time_grain_sqla || 'P1M'),
     timelineLimit: Number.isFinite(parsedTimelineLimit) && parsedTimelineLimit > 0
@@ -263,7 +298,7 @@ export default function transformProps(chartProps) {
       ? semanticTimeline
       : timeline.filter(row => monthKey(row.date) === currentMonth))
       .map(row => ({ date: row.date, value: row.values[0] })),
-    timeline: semanticTimeline.map(row => ({ date: row.date, values: row.values, components: row.components })),
+    timeline: displayTimeline.map(row => ({ date: row.date, values: row.values, components: row.components })),
     bars: ALLOWED_ACTIVITY_LEVELS
       .filter(category => categories.has(category))
       .map(category => {
