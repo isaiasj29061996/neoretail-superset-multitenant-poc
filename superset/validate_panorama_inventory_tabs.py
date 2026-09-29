@@ -23,6 +23,16 @@ def close(left, right):
     return math.isclose(float(left), float(right), rel_tol=1e-9, abs_tol=1e-7)
 
 
+def json_safe(value):
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    return value
+
+
 def safe_ratio(numerator, denominator, *, one_minus=False):
     if numerator is None or denominator in (None, 0):
         return None
@@ -427,7 +437,7 @@ def main():
         fixture_path = os.environ.get("PANORAMA_INVENTORY_RUNTIME_FIXTURE")
         if fixture_path:
             Path(fixture_path).write_text(
-                json.dumps(runtime_fixture, ensure_ascii=False, default=str, allow_nan=False),
+                json.dumps(json_safe(runtime_fixture), ensure_ascii=False, default=str, allow_nan=False),
                 encoding="utf-8",
             )
             report["runtime_fixture"] = fixture_path
