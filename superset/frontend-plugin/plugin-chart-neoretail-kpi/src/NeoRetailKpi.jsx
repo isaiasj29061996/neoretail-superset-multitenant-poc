@@ -226,8 +226,24 @@ export default function NeoRetailKpi(props) {
   if (!hasData || !indicators.length) return <div style={{ ...styles.card, display: 'grid', placeItems: 'center', color: '#6C727A' }}>Sem dados para os filtros selecionados.</div>;
   const points = areaPoints(series);
   const maxBar = Math.max(1, ...bars.flatMap(item => [item.current, item.previous]));
-  return <div data-neoretail-variant={variant} style={{ ...styles.card, width, height }}>
-    {variant !== 'panoramasummary' && <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>}
+  // The sales summary intentionally remains a separate monthly Superset slice so
+  // Mensal and Semanal keep the same MTD/U3M DAX contract. The two slices are
+  // stitched visually here into one card, avoiding a semantic change just to
+  // reproduce the Power BI composition.
+  const isJoinedSalesSummary = title === 'Evolutivo de vendas' && variant === 'panoramasummary';
+  const isJoinedSalesTimeline = title === 'Evolutivo de vendas' && variant === 'panorama' && summaryCount === 0;
+  const joinedCardStyle = isJoinedSalesSummary
+    ? { borderRadius: '8px 0 0 8px', borderRight: 0 }
+    : isJoinedSalesTimeline
+      ? { borderRadius: '0 8px 8px 0', borderLeft: '1px solid #EDF0F4' }
+      : {};
+  const salesPart = isJoinedSalesSummary ? 'summary' : isJoinedSalesTimeline ? 'timeline' : undefined;
+  return <div data-neoretail-variant={variant} data-neoretail-sales-part={salesPart} style={{ ...styles.card, width, height, ...joinedCardStyle }}>
+    {isJoinedSalesSummary
+      ? <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>
+      : isJoinedSalesTimeline
+        ? <header aria-hidden="true" style={styles.header} />
+        : variant !== 'panoramasummary' && <header style={styles.header}><strong>{title}</strong><span style={styles.info} title={helpText}>i</span></header>}
     {variant === 'panoramasummary' ? <PanoramaSummary indicators={indicators} /> : variant === 'panorama' ? <Panorama indicators={indicators} timeline={timeline} chartStyles={chartStyles} timeGrain={timeGrain} timelineLimit={timelineLimit} summaryCount={summaryCount} width={width} height={height} /> : variant === 'headlinearea' ? <HeadlineArea indicator={indicators[0]} timeline={timeline} accentColor={accentColor} /> : variant === 'stackedrank' ? <StackedRankBars items={rankSeries} indicators={indicators} /> : variant === 'stacked' ? <StackedBars indicators={indicators} timeline={timeline} /> : variant === 'verticalbars' ? <VerticalBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'rankbars' ? <RankBars items={rankItems} format={indicators[0]?.format || 'number'} /> : variant === 'multi' || variant === 'osa' ? indicators.map(indicator => <div key={indicator.label}><span style={styles.section}>{indicator.label}</span><MetricTriplet indicator={indicator} showAnnual={showAnnual} /></div>) : <MetricTriplet indicator={indicators[0]} showAnnual={showAnnual} />}
     {variant === 'area' && <svg viewBox="0 0 300 94" preserveAspectRatio="none" role="img" aria-label={`Evolução de ${title}`} style={{ display: 'block', width: 'calc(100% - 24px)', height: Math.max(65, Math.min(130, height - 225)), margin: '0 12px 7px', borderBottom: '1px solid #D9DDE3' }}><polygon points={points.polygon} fill={accentColor} fillOpacity="0.4" /><polyline points={points.line} fill="none" stroke={accentColor} strokeWidth="1.6" /></svg>}
     {variant === 'bars' && <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-around', gap: 8, height: Math.max(90, height - 190), padding: '5px 18px 0' }}>{bars.map(item => <div key={item.category} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'end' }}><div style={{ height: 'calc(100% - 25px)', display: 'flex', alignItems: 'end', justifyContent: 'center', gap: 2 }}><span style={{ width: 22, height: `${Math.max(2, item.current / maxBar * 100)}%`, background: '#0070A3' }} /><span style={{ width: 22, height: `${Math.max(2, item.previous / maxBar * 100)}%`, background: '#8C8C8C' }} /></div><span style={{ height: 25, color: '#777', fontSize: 9, textAlign: 'center' }}>{item.category}</span></div>)}</div>}
