@@ -45,8 +45,8 @@ def test_stock_card_preserves_literal_dax_u3m_asymmetry():
 
 def test_stock_monthly_and_weekly_use_one_slice_each():
     bootstrap = bootstrap_text()
-    assert 'add("stock_mensal", monthly_stock' in bootstrap
-    assert 'add("stock_semanal", weekly_stock_card' in bootstrap
+    assert 'add("stock_mensal", monthly_inventory' in bootstrap
+    assert 'add("stock_semanal", weekly_inventory_card' in bootstrap
     assert 'summary_query_scope="summary"' in bootstrap
     assert 'timeline_query_scope="timeline"' in bootstrap
     assert 'stock_summary_' not in bootstrap
@@ -54,15 +54,18 @@ def test_stock_monthly_and_weekly_use_one_slice_each():
 
 def test_stock_conversion_filter_reaches_both_stock_datasets():
     bootstrap = bootstrap_text()
-    assert '"nr_panorama_stock_monthly_interactive"' in bootstrap
-    assert '"nr_panorama_stock_weekly_card_interactive"' in bootstrap
+    assert '"nr_panorama_inventory_monthly_interactive"' in bootstrap
+    assert '"nr_panorama_inventory_weekly_card_interactive"' in bootstrap
     assert 'filter_targets["nm_measure"] = conversion_options.id' in bootstrap
-    assert "monthly_stock.id" in bootstrap
-    assert "weekly_stock_card.id" in bootstrap
+    assert "monthly_inventory.id" in bootstrap
+    assert "weekly_inventory_card.id" in bootstrap
 
 
-def test_stock_change_does_not_replace_other_panorama_sections():
+def test_inventory_tabs_are_explicitly_certified():
     bootstrap = bootstrap_text()
-    assert 'add(f"giro_roi_{period}"' in bootstrap
-    assert 'add(f"osa_{period}"' in bootstrap
-    assert 'f"gap_{period}"' in bootstrap
+    assert 'add("giro_roi_mensal", monthly_inventory' in bootstrap
+    assert 'add("giro_roi_semanal", weekly_inventory_card' in bootstrap
+    assert 'add("osa_mensal", monthly_inventory' in bootstrap
+    assert 'add("osa_semanal", weekly_inventory_card' in bootstrap
+    assert 'add("gap_mensal", gap_monthly' in bootstrap
+    assert 'add("gap_semanal", gap_weekly_card' in bootstrap
