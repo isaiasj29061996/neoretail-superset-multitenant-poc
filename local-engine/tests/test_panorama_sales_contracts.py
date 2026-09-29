@@ -16,12 +16,13 @@ def test_weekly_sales_contract_uses_real_fact_and_top_13_cd_week():
 
 def test_sales_tabs_and_per_metric_semantics_are_declared():
     bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
-    assert 'charts[f"sales_value_summary_{period}"]' in bootstrap
     assert 'charts[f"sales_value_{period}"]' in bootstrap
-    assert 'charts[f"sales_quantity_summary_{period}"]' in bootstrap
     assert 'charts[f"sales_quantity_{period}"]' in bootstrap
+    assert 'sales_value_summary_' not in bootstrap
+    assert 'sales_quantity_summary_' not in bootstrap
     assert "direct_average:0:1|direct_sum:1:1|weighted_average:2:2" in bootstrap
     assert "direct_average:0:1|direct_average:1:1|markup_blank:0:2" in bootstrap
+    assert "summary_count=3" in bootstrap
 
 
 def test_quantity_reuses_certified_overview_contract():
@@ -50,6 +51,7 @@ def test_runtime_controls_register_persisted_panorama_parameters():
     for name in (
         "metric_semantics", "timeline_limit", "summary_count", "card_variant",
         "metric_labels", "metric_formats", "chart_styles",
+        "timeline_query_scope", "summary_query_scope",
     ):
         assert f"name: '{name}'" in controls
 
@@ -81,25 +83,33 @@ def test_monthly_value_uses_dedicated_certified_dataset():
     assert '("mensal", monthly_sales, "P1M", value_measures)' in bootstrap
     assert 'monthly_sales, "Evolutivo de vendas", value_measures' in bootstrap
 
-def test_sales_summary_and_timeline_are_visually_joined_without_semantic_merge():
+def test_sales_uses_true_single_slice_with_embedded_summary():
     bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
-    renderer = (
+    build_query = (
         ROOT
         / "superset"
         / "frontend-plugin"
         / "plugin-chart-neoretail-kpi"
         / "src"
-        / "NeoRetailKpi.jsx"
+        / "buildQuery.js"
     ).read_text(encoding="utf-8")
-    assert "data-neoretail-sales-part" in renderer
-    assert "isJoinedSalesSummary" in renderer
-    assert "isJoinedSalesTimeline" in renderer
-    assert "borderRadius: '8px 0 0 8px'" in renderer
-    assert "borderRadius: '0 8px 8px 0'" in renderer
-    assert "data-neoretail-sales-part='summary'" in bootstrap
-    assert "data-neoretail-sales-part='timeline'" in bootstrap
-    # Keep the two technical slices so weekly tabs continue to reuse the
-    # monthly MTD/U3M contract while presenting a single visual card.
-    assert 'charts[f"sales_value_summary_{period}"]' in bootstrap
-    assert 'charts[f"sales_quantity_summary_{period}"]' in bootstrap
+    transform = (
+        ROOT
+        / "superset"
+        / "frontend-plugin"
+        / "plugin-chart-neoretail-kpi"
+        / "src"
+        / "transformProps.js"
+    ).read_text(encoding="utf-8")
 
+    assert '"nr_panorama_sales_weekly_card_interactive"' in bootstrap
+    assert 'summary_query_scope="summary"' in bootstrap
+    assert 'timeline_query_scope="timeline"' in bootstrap
+    assert '("Valor", [(period, charts[f"sales_value_{period}"])' in bootstrap
+    assert '("Quantidade", [(period, charts[f"sales_quantity_{period}"])' in bootstrap
+    assert 'sales_value_summary_' not in bootstrap
+    assert 'sales_quantity_summary_' not in bootstrap
+    assert "summary_query_scope" in build_query
+    assert "row_scope" in build_query
+    assert "semanticSummaryTimeline" in transform
+    assert "queriesData[1]" in transform
