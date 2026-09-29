@@ -114,6 +114,28 @@ export default {
         ],
         [
           {
+            name: 'timeline_query_scope',
+            config: {
+              type: 'TextControl',
+              label: t('Escopo da timeline'),
+              default: '',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'summary_query_scope',
+            config: {
+              type: 'TextControl',
+              label: t('Escopo do resumo'),
+              default: '',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
             name: 'card_title',
             config: {
               type: 'TextControl',
