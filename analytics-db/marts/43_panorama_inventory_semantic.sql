@@ -72,38 +72,35 @@ CREATE INDEX ix_nr_panorama_inventory_weekly_detail_product
 CREATE MATERIALIZED VIEW gold.nr_panorama_inventory_monthly_default AS
 WITH monthly AS (
     SELECT
-        h.data,
-        h.id_customer,
-        SUM(COALESCE(h.faturamento,0))::double precision AS faturamento_sum,
-        SUM(COALESCE(h.volume_unidades,0))::double precision AS volume_sum,
-        SUM(COALESCE(h.avg_sales_price,0))::double precision AS fallback_price_sum,
-        COUNT(h.avg_sales_price)::bigint AS fallback_price_count,
-        SUM(COALESCE(h.volume_unidades,0) * COALESCE(h.avg_price_cost,0))::double precision AS sales_cost_sum,
-        SUM(COALESCE(h.estoque_medio,0) * COALESCE(h.avg_price_cost,0))::double precision AS stock_cost_sum,
-        SUM(COALESCE(h.estoque_unidades,0))::double precision AS stock_qty_base,
-        SUM(h.giro) FILTER (WHERE h.giro > 0)::double precision AS giro_num,
-        COUNT(h.giro) FILTER (WHERE h.giro > 0)::bigint AS giro_den,
-        SUM(COALESCE(h.qtd_problemas_osa,0))::double precision AS osa_problem_sum,
-        SUM(COALESCE(h.qtd_item_ativo_osa,0))::double precision AS osa_active_sum,
-        SUM(COALESCE(h.rup,0))::double precision AS rupture_sum,
-        SUM(COALESCE(h.status_item_geral,0))::double precision AS status_sum,
-        SUM(COALESCE(h.est_virtual,0))::double precision AS isv_sum
-    FROM gold.nr_overview_history h
-    GROUP BY h.data,h.id_customer
+        f.mes_ano::date AS data,
+        f.id_customer,
+        SUM(COALESCE(f.faturamento,0))::double precision AS faturamento_sum,
+        SUM(COALESCE(f.volume_unidades,0))::double precision AS volume_sum,
+        SUM(COALESCE(f.avg_sales_price,0))::double precision AS fallback_price_sum,
+        COUNT(f.avg_sales_price)::bigint AS fallback_price_count,
+        SUM(COALESCE(f.volume_unidades,0) * COALESCE(f.avg_price_cost,0))::double precision AS sales_cost_sum,
+        SUM(COALESCE(f.estoque_medio,0) * COALESCE(f.avg_price_cost,0))::double precision AS stock_cost_sum,
+        SUM(COALESCE(f.estoque_unidades,0))::double precision AS stock_qty_base,
+        SUM(f.giro) FILTER (WHERE f.giro > 0)::double precision AS giro_num,
+        COUNT(f.giro) FILTER (WHERE f.giro > 0)::bigint AS giro_den,
+        SUM(COALESCE(f.qtd_problemas_osa,0))::double precision AS osa_problem_sum,
+        SUM(COALESCE(f.qtd_item_ativo_osa,0))::double precision AS osa_active_sum,
+        SUM(COALESCE(f.rup,0))::double precision AS rupture_sum,
+        SUM(COALESCE(f.status_item_geral,0))::double precision AS status_sum,
+        SUM(COALESCE(f.est_virtual,0))::double precision AS isv_sum
+    FROM gold.fato_historico f
+    GROUP BY f.mes_ano,f.id_customer
 ), factors AS (
     SELECT
-        h.data,
-        h.id_customer,
+        f.mes_ano::date AS data,
+        f.id_customer,
         c.nm_measure,
         MAX(c.conversion_rate)::double precision AS conversion_factor
-    FROM (
-        SELECT DISTINCT data,id_customer,id_item
-        FROM gold.nr_overview_history
-    ) h
+    FROM gold.fato_historico f
     JOIN gold.dim_conversao c
-      ON c.id_customer=h.id_customer
-     AND c.id_item::text=h.id_item::text
-    GROUP BY h.data,h.id_customer,c.nm_measure
+      ON c.id_customer=f.id_customer
+     AND c.id_item::text=f.id_item::text
+    GROUP BY f.mes_ano,f.id_customer,c.nm_measure
 )
 SELECT
     m.data,
