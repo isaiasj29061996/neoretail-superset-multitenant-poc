@@ -19,7 +19,7 @@ O semanal seleciona os 13 maiores valores reais de `CD_WEEK` no contexto filtrad
 
 ## Semântica por métrica
 
-O plugin passou a aceitar `metric_semantics` no formato `perfil:offset:quantidade`. Isso permite que um único gráfico preserve regras diferentes sem alterar os perfis usados por outros dashboards. O resumo lateral é um chart mensal próprio, reutilizado nas abas Mensal e Semanal; assim, trocar a granularidade da timeline não transforma MTD/U3M em agregações semanais.
+O plugin passou a aceitar `metric_semantics` no formato `perfil:offset:quantidade`. Isso permite que um único gráfico preserve regras diferentes sem alterar os perfis usados por outros dashboards. O resumo lateral continua sendo um chart mensal próprio, reutilizado nas abas Mensal e Semanal; assim, trocar a granularidade da timeline não transforma MTD/U3M em agregações semanais. Na composição visual, resumo e timeline agora são costurados como um único card: o resumo ocupa a lateral esquerda, o gráfico ocupa a direita e há um único cabeçalho visual de `Evolutivo de vendas`. Essa decisão preserva a semântica certificada enquanto aproxima a apresentação do Power BI.
 
 - Valor: sell out U3M `/ 3`; custo U3M `/ 3`; markup calculado por `SUM(sell out) / SUM(custo)`.
 - Quantidade: venda U3M `/ 3`; perda OSA U3M como soma; preço médio U3M por `SUM(price_numerator) / SUM(price_count)`.
@@ -38,6 +38,16 @@ Também foram corrigidos dois comportamentos adjacentes comprovados durante a re
 - configurações persistidas deixam de ser concatenadas aos defaults (`bar|bar|line` não vira seis estilos).
 
 O gate `runtime-panorama-sales.mjs` recebe os `chart.params` e as respostas reais extraídas do Superset, simula a conversão snake_case → camelCase e executa o mesmo `transformProps.js` usado pelo renderer. O resultado final foi de 62 checks aprovados: exatamente três séries nos oito charts, Preço Médio derivado, Markup derivado, U3M preenchido e limite 13 entregue ao renderer.
+
+## Composição visual integrada
+
+A validação visual posterior à certificação mostrou que o usuário precisava do mesmo padrão de leitura do Power BI: valores MTD/U3M e gráfico no mesmo bloco. Para não alterar as fontes nem recalcular o resumo semanal a partir do fato semanal, a implementação manteve os dois slices técnicos e os unificou somente na apresentação.
+
+- o slice `panoramasummary` renderiza a metade esquerda e concentra o título;
+- o slice `panorama` renderiza a timeline à direita e usa um cabeçalho vazio apenas para alinhamento;
+- bordas e raio dos dois lados são complementares;
+- o CSS do dashboard fecha a pequena emenda entre os holders somente quando `data-neoretail-sales-part` está presente;
+- nenhuma fórmula de Sell Out, Custo, Markup, Quantidade, Perda OSA, Preço Médio, U3M ou TOP 13 foi modificada por essa mudança.
 
 ## Conversão
 
