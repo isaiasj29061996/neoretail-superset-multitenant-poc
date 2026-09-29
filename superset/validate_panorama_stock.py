@@ -172,11 +172,10 @@ def main():
         monthly_chart = charts[monthly_name]
         weekly_chart = charts[weekly_name]
 
-        expected_semantics = "direct_average:0:1|direct_average:1:1"
         for name, chart in ((monthly_name, monthly_chart), (weekly_name, weekly_chart)):
             params = json.loads(chart.params)
-            if params.get("metric_semantics") != expected_semantics:
-                raise AssertionError(f"{name}: metric_semantics diverged")
+            if params.get("semantic_profile") != "stock_bundle":
+                raise AssertionError(f"{name}: semantic_profile diverged")
             if int(params.get("summary_count", -1)) != 2:
                 raise AssertionError(f"{name}: summary_count diverged")
             if int(params.get("timeline_limit", -1)) != 13:
