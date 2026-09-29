@@ -148,7 +148,13 @@ SELECT
     w.sales_sum,
     w.loss_sum,
     w.price_numerator,
-    w.price_count
+    w.price_count,
+    NULL::text AS rede, NULL::text AS bandeira, NULL::text AS uf,
+    NULL::text AS cidade, NULL::text AS tipo_local, NULL::text AS loja,
+    NULL::text AS regiao, NULL::text AS tp_activity_level,
+    NULL::text AS activity_level, NULL::text AS item,
+    NULL::text AS descricao_marca, NULL::text AS hierarquia_1,
+    NULL::text AS hierarquia_2, NULL::text AS hierarquia_3
 FROM ranked_weekly w
 WHERE w.week_rank <= 13
 UNION ALL
@@ -163,7 +169,13 @@ SELECT
     m.sales_sum,
     m.loss_sum,
     m.price_numerator,
-    m.price_count
+    m.price_count,
+    NULL::text AS rede, NULL::text AS bandeira, NULL::text AS uf,
+    NULL::text AS cidade, NULL::text AS tipo_local, NULL::text AS loja,
+    NULL::text AS regiao, NULL::text AS tp_activity_level,
+    NULL::text AS activity_level, NULL::text AS item,
+    NULL::text AS descricao_marca, NULL::text AS hierarquia_1,
+    NULL::text AS hierarquia_2, NULL::text AS hierarquia_3
 FROM monthly_summary m;
 
 CREATE INDEX ix_nr_panorama_sales_weekly_card_default
