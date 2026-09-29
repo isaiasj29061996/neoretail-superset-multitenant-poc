@@ -363,7 +363,11 @@ SELECT
        ELSE NULL END::float8 sellout_sum,
   w.cost_sum,(w.volume_sum*f.conversion_factor)::float8 sales_sum,
   (w.loss_sum*f.conversion_factor)::float8 loss_sum,
-  (w.price_sum*f.conversion_factor)::float8 price_numerator,w.price_count
+  (w.price_sum*f.conversion_factor)::float8 price_numerator,w.price_count,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,NULL::text tp_activity_level,
+  NULL::text activity_level,NULL::text item,NULL::text descricao_marca,
+  NULL::text hierarquia_1,NULL::text hierarquia_2,NULL::text hierarquia_3
 FROM weekly w JOIN weekly_factors f USING(data,id_customer)
 UNION ALL
 SELECT
@@ -375,7 +379,11 @@ SELECT
        ELSE NULL END::float8 sellout_sum,
   m.cost_sum,(m.volume_sum*f.conversion_factor)::float8 sales_sum,
   (m.loss_sum*f.conversion_factor)::float8 loss_sum,
-  (m.price_sum*f.conversion_factor)::float8 price_numerator,m.price_count
+  (m.price_sum*f.conversion_factor)::float8 price_numerator,m.price_count,
+  NULL::text rede,NULL::text bandeira,NULL::text uf,NULL::text cidade,
+  NULL::text tipo_local,NULL::text loja,NULL::text regiao,NULL::text tp_activity_level,
+  NULL::text activity_level,NULL::text item,NULL::text descricao_marca,
+  NULL::text hierarquia_1,NULL::text hierarquia_2,NULL::text hierarquia_3
 FROM monthly m JOIN monthly_factors f USING(data,id_customer)
 """.strip()
     return (
