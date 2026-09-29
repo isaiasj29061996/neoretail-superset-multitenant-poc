@@ -197,7 +197,7 @@ def main():
         cost_label = "Estoque preço custo"
         qty_label = "Estoque quantidade"
 
-        with database.get_sqla_engine().connect() as connection:
+        with database.get_sqla_engine() as engine, engine.connect() as connection:
             candidate = connection.execute(
                 NON_UNIT_MEASURE, {"customer": CUSTOMER_ID}
             ).scalar()
@@ -208,14 +208,12 @@ def main():
             report = {"tenant": CUSTOMER_ID, "measures": {}, "charts": {}}
             for measure in measures:
                 params = {"customer": CUSTOMER_ID, "measure": measure}
-                monthly_expected = [
-                    dict(row._mapping)
-                    for row in connection.execute(MONTHLY_SOURCE, params)
-                ]
-                weekly_expected = [
-                    dict(row._mapping)
-                    for row in connection.execute(WEEKLY_SOURCE, params)
-                ]
+                monthly_expected = list(
+                    connection.execute(MONTHLY_SOURCE, params).mappings()
+                )
+                weekly_expected = list(
+                    connection.execute(WEEKLY_SOURCE, params).mappings()
+                )
 
                 filters = [
                     {"col": "id_customer", "op": "IN", "val": [CUSTOMER_ID]},
