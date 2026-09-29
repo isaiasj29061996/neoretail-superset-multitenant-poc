@@ -835,13 +835,21 @@ def main():
             db.session, SqlaTable, database, "nr_overview_quantity_interactive",
             sql=quantity_semantic_sql(),
         )
-        monthly_stock = upsert_dataset(
-            db.session, SqlaTable, database, "nr_panorama_stock_monthly_interactive",
-            sql=monthly_stock_semantic_sql(),
+        monthly_inventory = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_inventory_monthly_interactive",
+            sql=monthly_inventory_semantic_sql(),
         )
-        weekly_stock_card = upsert_dataset(
-            db.session, SqlaTable, database, "nr_panorama_stock_weekly_card_interactive",
-            sql=weekly_stock_card_semantic_sql(),
+        weekly_inventory_card = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_inventory_weekly_card_interactive",
+            sql=weekly_inventory_card_semantic_sql(),
+        )
+        gap_monthly = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_gap_monthly_interactive",
+            sql=monthly_gap_semantic_sql(),
+        )
+        gap_weekly_card = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_gap_weekly_card_interactive",
+            sql=weekly_gap_card_semantic_sql(),
         )
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
         mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
@@ -873,18 +881,6 @@ def main():
         charts = {}
         def add(key, dataset, title, params, viz="neoretail-kpi-card"):
             charts[key] = upsert_chart(db.session, Slice, dataset, f"[Panorama] {title}", params, viz)
-
-        periods = (("mensal", history, "P1M"), ("semanal", weekly, "P1W"))
-        for period, dataset, grain in periods:
-            metrics = WEEKLY_P if period == "semanal" else P
-            giro_roi = [metrics["roi"], metrics["coverage"], metrics["giro"]]
-            osa = [metrics["osa"], metrics["rup"], metrics["isv"]]
-            giro_params = custom_params(dataset, "Evolutivo de estoque", giro_roi, grain=grain, styles="bar|line|line", formats="percent|number|number")
-            osa_params = custom_params(dataset, "Evolutivo de estoque", osa, grain=grain, styles="line|line|line", formats="percent|percent|percent")
-            for params in (giro_params, osa_params):
-                params["adhoc_filters"] = list(weekly_recent if period == "semanal" else [])
-            add(f"giro_roi_{period}", dataset, f"Evolutivo de estoque — Giro e ROI {period}", giro_params)
-            add(f"osa_{period}", dataset, f"Evolutivo de estoque — OSA {period}", osa_params)
 
         value_semantics = "direct_average:0:1|direct_average:1:1|markup_blank:0:2"
         quantity_semantics = "direct_average:0:1|direct_sum:1:1|weighted_average:2:2"
@@ -938,22 +934,17 @@ def main():
         )
         add("sales_quantity_semanal", weekly_sales_card, "Evolutivo de vendas — Quantidade semanal", params)
 
-        # Panorama > Evolutivo de estoque > Estoque.
-        # Power BI contract:
-        #   Estoque Preço Custo = SUMX(ESTOQUE_MEDIO * AVG_PRICE_COST)
-        #   Estoque Quantidade = SUM(ESTOQUE_UNIDADES) * selected conversion factor
-        #   Cost U3M averages the three-month context; quantity U3M preserves
-        #   [Estoque qtd]'s MaxDataMes behavior and divides that last month by 3.
-        # stock_bundle mirrors the literal DAX asymmetry:
-        # cost U3M = SUM(three months) / 3, while [Estoque qtd] first keeps
-        # only MaxDataMes inside U3M and the BN measure then divides it by 3.
+        # Panorama > Evolutivo de estoque.
+        # The Report definition uses four outer views over the same business block:
+        # Estoque, Giro x ROI, OSA and Falta x Excesso.
+
+        # ESTOQUE
         stock_measures = [
             metric("Estoque preço custo", "SUM(stock_cost_sum)"),
             metric("Estoque quantidade", "SUM(stock_qty_sum)"),
         ]
-
         params = custom_params(
-            monthly_stock,
+            monthly_inventory,
             "Evolutivo de estoque",
             stock_measures,
             grain="P1M",
@@ -964,10 +955,10 @@ def main():
             summary_count=2,
             timeline_limit=13,
         )
-        add("stock_mensal", monthly_stock, "Evolutivo de estoque — Estoque mensal", params)
+        add("stock_mensal", monthly_inventory, "Evolutivo de estoque — Estoque mensal", params)
 
         params = custom_params(
-            weekly_stock_card,
+            weekly_inventory_card,
             "Evolutivo de estoque",
             stock_measures,
             grain="P1W",
@@ -980,24 +971,133 @@ def main():
             summary_query_scope="summary",
             timeline_query_scope="timeline",
         )
-        add("stock_semanal", weekly_stock_card, "Evolutivo de estoque — Estoque semanal", params)
+        add("stock_semanal", weekly_inventory_card, "Evolutivo de estoque — Estoque semanal", params)
 
-        for period, grain in (("mensal", "P1M"), ("semanal", "P1W")):
-            params = custom_params(
-                gap_periodic,
-                "Evolutivo de estoque",
-                [GAP_TVD, GAP_IVD],
-                grain=grain,
-                styles="line|line",
-                formats="currency|currency",
-            )
-            params["adhoc_filters"] = [sql_filter(f"period_type = '{period}'")]
-            add(
-                f"gap_{period}",
-                gap_periodic,
-                f"Evolutivo de estoque — Falta e Excesso {period}",
-                params,
-            )
+        # GIRO x ROI
+        # Report contract: Stock Cost as bar + ROI and Giro as lines.
+        # ROI is recomputed from Sell Out / Venda Custo / Estoque Custo.
+        # Giro is a weighted average over additive sum/count components.
+        giro_roi_measures = [
+            metric("Estoque preço custo", "SUM(stock_cost_sum)"),
+            metric("Venda sell out", "SUM(sellout_sum)"),
+            metric("Venda custo", "SUM(sales_cost_sum)"),
+            metric("Estoque custo ROI", "SUM(stock_cost_sum)"),
+            metric("Giro soma", "SUM(giro_num)"),
+            metric("Giro linhas", "SUM(giro_den)"),
+        ]
+        giro_roi_semantics = "direct_average:0:1|roi:1:3|weighted_average:4:2"
+        params = custom_params(
+            monthly_inventory,
+            "Evolutivo de estoque",
+            giro_roi_measures,
+            grain="P1M",
+            styles="bar|line|line",
+            formats="currency|percent|number",
+            labels="Estoque Preço Custo|% ROI|Giro",
+            metric_semantics=giro_roi_semantics,
+            summary_count=3,
+            summary_labels="U3M|Anual|U3M",
+            metric_summary_modes="u3m|annual12|u3m",
+            timeline_zero_blank_indices="1",
+            timeline_limit=13,
+        )
+        add("giro_roi_mensal", monthly_inventory, "Evolutivo de estoque — Giro x ROI mensal", params)
+
+        params = custom_params(
+            weekly_inventory_card,
+            "Evolutivo de estoque",
+            giro_roi_measures,
+            grain="P1W",
+            styles="bar|line|line",
+            formats="currency|percent|number",
+            labels="Estoque Preço Custo|% ROI|Giro",
+            metric_semantics=giro_roi_semantics,
+            summary_count=3,
+            summary_labels="U3M|Anual|U3M",
+            metric_summary_modes="u3m|annual12|u3m",
+            timeline_zero_blank_indices="1",
+            timeline_limit=13,
+            summary_query_scope="summary",
+            timeline_query_scope="timeline",
+        )
+        add("giro_roi_semanal", weekly_inventory_card, "Evolutivo de estoque — Giro x ROI semanal", params)
+
+        # OSA
+        # %OSA = 1 - problems/active; Ruptura and ISV use STATUS_ITEM_GERAL as denominator.
+        osa_measures = [
+            metric("OSA problemas", "SUM(osa_problem_sum)"),
+            metric("OSA ativos", "SUM(osa_active_sum)"),
+            metric("Ruptura numerador", "SUM(rupture_sum)"),
+            metric("Ruptura denominador", "SUM(status_sum)"),
+            metric("ISV numerador", "SUM(isv_sum)"),
+            metric("ISV denominador", "SUM(status_sum)"),
+        ]
+        osa_semantics = "one_minus_ratio:0:2|ratio_percent:2:2|ratio_percent:4:2"
+        params = custom_params(
+            monthly_inventory,
+            "Evolutivo de estoque",
+            osa_measures,
+            grain="P1M",
+            styles="line|line|line",
+            formats="percent|percent|percent",
+            labels="% OSA|% Ruptura|% ISV",
+            metric_semantics=osa_semantics,
+            summary_count=3,
+            timeline_limit=13,
+        )
+        add("osa_mensal", monthly_inventory, "Evolutivo de estoque — OSA mensal", params)
+
+        params = custom_params(
+            weekly_inventory_card,
+            "Evolutivo de estoque",
+            osa_measures,
+            grain="P1W",
+            styles="line|line|line",
+            formats="percent|percent|percent",
+            labels="% OSA|% Ruptura|% ISV",
+            metric_semantics=osa_semantics,
+            summary_count=3,
+            timeline_limit=13,
+            summary_query_scope="summary",
+            timeline_query_scope="timeline",
+        )
+        add("osa_semanal", weekly_inventory_card, "Evolutivo de estoque — OSA semanal", params)
+
+        # FALTA x EXCESSO (Power BI selector TVD x IVD).
+        gap_measures = [
+            metric("TVD", "SUM(tvd)"),
+            metric("IVD", "SUM(ivd)"),
+        ]
+        gap_semantics = "direct_average:0:1|direct_average:1:1"
+        params = custom_params(
+            gap_monthly,
+            "Evolutivo de estoque",
+            gap_measures,
+            grain="P1M",
+            styles="line|line",
+            formats="currency|currency",
+            labels="TVD - Risco|IVD - Excesso",
+            metric_semantics=gap_semantics,
+            summary_count=2,
+            timeline_limit=13,
+        )
+        add("gap_mensal", gap_monthly, "Evolutivo de estoque — Falta x Excesso mensal", params)
+
+        params = custom_params(
+            gap_weekly_card,
+            "Evolutivo de estoque",
+            gap_measures,
+            grain="P1W",
+            styles="line|line",
+            formats="currency|currency",
+            labels="TVD - Risco|IVD - Excesso",
+            metric_semantics=gap_semantics,
+            summary_count=2,
+            timeline_limit=13,
+            summary_query_scope="summary",
+            timeline_query_scope="timeline",
+        )
+        add("gap_semanal", gap_weekly_card, "Evolutivo de estoque — Falta x Excesso semanal", params)
 
         dimensions = (("regiao", "Região"), ("rede", "Varejo"), ("hierarquia_1", "Hierarquia de item"))
         for column, label in dimensions:
@@ -1048,10 +1148,10 @@ def main():
         dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
         filter_targets = {column: filter_options.id for column in WEEKLY_FILTER_COLUMNS}
         filter_targets["nm_measure"] = conversion_options.id
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, weekly_sales_card.id, monthly_sales.id, monthly_quantity.id, monthly_stock.id, weekly_stock_card.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, weekly_sales_card.id, monthly_sales.id, monthly_quantity.id, monthly_inventory.id, weekly_inventory_card.id, gap_monthly.id, gap_weekly_card.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "monthly_stock": monthly_stock.id, "weekly_stock_card": weekly_stock_card.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "monthly_inventory": monthly_inventory.id, "weekly_inventory_card": weekly_inventory_card.id, "gap_monthly": gap_monthly.id, "gap_weekly_card": gap_weekly_card.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
