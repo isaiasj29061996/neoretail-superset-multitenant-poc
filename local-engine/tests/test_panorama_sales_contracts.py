@@ -80,8 +80,9 @@ def test_sellout_fallback_matches_literal_dax_aggregation():
 def test_monthly_value_uses_dedicated_certified_dataset():
     bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
     assert '"nr_panorama_sales_monthly_interactive"' in bootstrap
-    assert '("mensal", monthly_sales, "P1M", value_measures)' in bootstrap
-    assert 'monthly_sales, "Evolutivo de vendas", value_measures' in bootstrap
+    assert 'monthly_sales, "Evolutivo de vendas", value_measures, grain="P1M"' in bootstrap
+    assert 'add("sales_value_mensal", monthly_sales' in bootstrap
+
 
 def test_sales_uses_true_single_slice_with_embedded_summary():
     bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
