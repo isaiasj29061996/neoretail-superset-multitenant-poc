@@ -55,10 +55,11 @@ def execute(factory, command, chart, filters):
         queries=queries, form_data={**form, "force": True, "extra_filters": filters},
     )).run()
     g.form_data = {}
-    response = result["queries"][0]
-    if response.get("error"):
-        raise AssertionError(response["error"])
-    return response
+    responses = result["queries"]
+    for response in responses:
+        if response.get("error"):
+            raise AssertionError(response["error"])
+    return responses
 
 
 MONTHLY_VALUE_SOURCE = text("""
@@ -209,14 +210,10 @@ def main():
         value_semantics = "direct_average:0:1|direct_average:1:1|markup_blank:0:2"
         quantity_semantics = "direct_average:0:1|direct_sum:1:1|weighted_average:2:2"
         for name, semantics, physical_count, summary_count in (
-            ("[Panorama] Evolutivo de vendas — Valor mensal", value_semantics, 2, 0),
-            ("[Panorama] Evolutivo de vendas — Valor semanal", value_semantics, 2, 0),
-            ("[Panorama] Evolutivo de vendas — Quantidade mensal", quantity_semantics, 4, 0),
-            ("[Panorama] Evolutivo de vendas — Quantidade semanal", quantity_semantics, 4, 0),
-            ("[Panorama] Evolutivo de vendas — Resumo Valor mensal", value_semantics, 2, 3),
-            ("[Panorama] Evolutivo de vendas — Resumo Valor semanal", value_semantics, 2, 3),
-            ("[Panorama] Evolutivo de vendas — Resumo Quantidade mensal", quantity_semantics, 4, 3),
-            ("[Panorama] Evolutivo de vendas — Resumo Quantidade semanal", quantity_semantics, 4, 3),
+            ("[Panorama] Evolutivo de vendas — Valor mensal", value_semantics, 2, 3),
+            ("[Panorama] Evolutivo de vendas — Valor semanal", value_semantics, 2, 3),
+            ("[Panorama] Evolutivo de vendas — Quantidade mensal", quantity_semantics, 4, 3),
+            ("[Panorama] Evolutivo de vendas — Quantidade semanal", quantity_semantics, 4, 3),
         ):
             params = json.loads(charts[name].params)
             if params.get("metric_semantics") != semantics:
@@ -227,8 +224,13 @@ def main():
                 raise AssertionError(f"{name}: persisted summary_count diverged")
             if len(semantics.split("|")) != 3:
                 raise AssertionError(f"{name}: semantic output count must be three")
-            if summary_count == 0 and int(params.get("timeline_limit", -1)) != 13:
+            if int(params.get("timeline_limit", -1)) != 13:
                 raise AssertionError(f"{name}: persisted timeline_limit diverged")
+            if "semanal" in name.lower():
+                if params.get("timeline_query_scope") != "timeline":
+                    raise AssertionError(f"{name}: timeline query scope diverged")
+                if params.get("summary_query_scope") != "summary":
+                    raise AssertionError(f"{name}: summary query scope diverged")
             report["persisted_params"][name] = {
                 "physical_components": physical_count,
                 "semantic_outputs": 3,
@@ -279,25 +281,42 @@ def main():
                 }
 
             chart_contracts = {
-                "[Panorama] Evolutivo de vendas — Valor mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
-                "[Panorama] Evolutivo de vendas — Valor semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], weekly_expected, {"sellout_sum": "Venda sell out semanal", "cost_sum": "Venda custo semanal"}),
-                "[Panorama] Evolutivo de vendas — Quantidade mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_quantity_expected, {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"}),
-                "[Panorama] Evolutivo de vendas — Quantidade semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], weekly_expected, {"sales_sum": "Venda quantidade semanal", "loss_sum": "Perda OSA semanal", "price_numerator": "Preço soma semanal", "price_count": "Preço linhas semanal"}),
-                "[Panorama] Evolutivo de vendas — Resumo Valor mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
-                "[Panorama] Evolutivo de vendas — Resumo Valor semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
-                "[Panorama] Evolutivo de vendas — Resumo Quantidade mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_quantity_expected, {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"}),
-                "[Panorama] Evolutivo de vendas — Resumo Quantidade semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_quantity_expected, {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"}),
+                "[Panorama] Evolutivo de vendas — Valor mensal": (
+                    [{"col": "nm_measure", "op": "IN", "val": ["unidade"]}],
+                    monthly_value_expected,
+                    {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"},
+                    None,
+                ),
+                "[Panorama] Evolutivo de vendas — Valor semanal": (
+                    [{"col": "nm_measure", "op": "IN", "val": ["unidade"]}],
+                    weekly_expected,
+                    {"sellout_sum": "Venda sell out semanal", "cost_sum": "Venda custo semanal"},
+                    (monthly_value_expected, {"sellout_sum": "Venda sell out semanal", "cost_sum": "Venda custo semanal"}),
+                ),
+                "[Panorama] Evolutivo de vendas — Quantidade mensal": (
+                    [{"col": "nm_measure", "op": "IN", "val": ["unidade"]}],
+                    monthly_quantity_expected,
+                    {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"},
+                    None,
+                ),
+                "[Panorama] Evolutivo de vendas — Quantidade semanal": (
+                    [{"col": "nm_measure", "op": "IN", "val": ["unidade"]}],
+                    weekly_expected,
+                    {"sales_sum": "Venda quantidade semanal", "loss_sum": "Perda OSA semanal", "price_numerator": "Preço soma semanal", "price_count": "Preço linhas semanal"},
+                    (monthly_quantity_expected, {"sales_sum": "Venda quantidade semanal", "loss_sum": "Perda OSA semanal", "price_numerator": "Preço soma semanal", "price_count": "Preço linhas semanal"}),
+                ),
             }
-            for name, (extra, expected, labels) in chart_contracts.items():
+            for name, (extra, expected, labels, summary_contract) in chart_contracts.items():
                 print(f"validating Superset chart: {name}", flush=True)
                 filters = [{"col": "id_customer", "op": "IN", "val": [CUSTOMER_ID]}, *extra]
                 started = time.perf_counter()
-                response = execute(factory, ChartDataCommand, charts[name], filters)
+                responses = execute(factory, ChartDataCommand, charts[name], filters)
                 elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-                data = response.get("data") or []
+                primary = responses[0]
+                data = primary.get("data") or []
                 if not data:
                     raise AssertionError(f"{name}: Superset returned no data")
-                if "semanal" in name.lower() and "Resumo" not in name and len(data) > 13:
+                if "semanal" in name.lower() and len(data) > 13:
                     raise AssertionError(f"{name}: more than 13 weeks")
                 actual_by_date = {str(row["data"])[:10]: row for row in data}
                 for row in expected:
@@ -307,10 +326,31 @@ def main():
                     for column, label in labels.items():
                         if not close(row[column], actual.get(label)):
                             raise AssertionError({"chart": name, "period": str(row["data"]), "metric": label, "mart": row[column], "superset": actual.get(label)})
-                report["paths"][name] = {"superset_rows": len(data), "elapsed_ms": elapsed_ms}
+
+                if summary_contract is not None:
+                    if len(responses) != 2:
+                        raise AssertionError(f"{name}: expected timeline + monthly summary queries in one slice")
+                    summary_expected, summary_labels = summary_contract
+                    summary_data = responses[1].get("data") or []
+                    summary_by_date = {str(row["data"])[:10]: row for row in summary_data}
+                    for row in summary_expected:
+                        actual = summary_by_date.get(str(row["data"])[:10])
+                        if actual is None:
+                            raise AssertionError(f"{name}: missing monthly summary period {row['data']}")
+                        for column, label in summary_labels.items():
+                            if not close(row[column], actual.get(label)):
+                                raise AssertionError({"chart": name, "summary_period": str(row["data"]), "metric": label, "mart": row[column], "superset": actual.get(label)})
+                elif len(responses) != 1:
+                    raise AssertionError(f"{name}: monthly chart should use one query")
+
+                report["paths"][name] = {
+                    "superset_rows": len(data),
+                    "query_count": len(responses),
+                    "elapsed_ms": elapsed_ms,
+                }
                 runtime_fixture["charts"][name] = {
                     "rawFormData": json.loads(charts[name].params),
-                    "queriesData": [{"data": data}],
+                    "queriesData": [{"data": response.get("data") or []} for response in responses],
                 }
 
         if close(report["measures"]["unidade"]["u3m_sales"], report["measures"]["quilograma"]["u3m_sales"]):
