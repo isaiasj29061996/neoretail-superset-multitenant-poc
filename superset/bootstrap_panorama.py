@@ -822,7 +822,8 @@ def main():
         # Power BI contract:
         #   Estoque Preço Custo = SUMX(ESTOQUE_MEDIO * AVG_PRICE_COST)
         #   Estoque Quantidade = SUM(ESTOQUE_UNIDADES) * selected conversion factor
-        #   both U3M values = three-month context / 3.
+        #   Cost U3M averages the three-month context; quantity U3M preserves
+        #   [Estoque qtd]'s MaxDataMes behavior and divides that last month by 3.
         # stock_bundle mirrors the literal DAX asymmetry:
         # cost U3M = SUM(three months) / 3, while [Estoque qtd] first keeps
         # only MaxDataMes inside U3M and the BN measure then divides it by 3.
