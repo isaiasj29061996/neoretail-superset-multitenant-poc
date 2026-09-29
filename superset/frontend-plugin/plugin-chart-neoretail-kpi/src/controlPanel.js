@@ -66,6 +66,7 @@ export default {
                 ['multi', t('Indicadores múltiplos')],
                 ['osa', t('OSA com tarefas')],
                 ['panorama', t('Evolutivo panorama')],
+                ['panoramasummary', t('Resumo do evolutivo panorama')],
                 ['rankbars', t('Ranking em barras')],
                 ['stacked', t('Colunas empilhadas')],
                 ['verticalbars', t('Barras verticais')],
@@ -86,6 +87,29 @@ export default {
           {
             name: 'summary_count',
             config: { type: 'TextControl', label: t('Quantidade de resumos'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'metric_semantics',
+            config: {
+              type: 'TextControl',
+              label: t('Semantica das metricas'),
+              description: t('Perfil:inicio:quantidade; separe as saidas por |.'),
+              default: '',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'timeline_limit',
+            config: {
+              type: 'TextControl',
+              label: t('Limite de periodos'),
+              default: '12',
+              renderTrigger: true,
+            },
           },
         ],
         [

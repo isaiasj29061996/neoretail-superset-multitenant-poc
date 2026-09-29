@@ -13,7 +13,10 @@ const asDate = value => {
 };
 const monthKey = date => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 const shiftMonth = (date, offset) => monthKey(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1)));
-const splitConfig = (value, fallback = []) => String(value || '').split('|').map(item => item.trim()).filter(Boolean).concat(fallback);
+const splitConfig = (value, fallback = []) => {
+  const configured = String(value || '').split('|').map(item => item.trim()).filter(Boolean);
+  return configured.length ? configured : fallback;
+};
 const semanticValue = (profile, components) => {
   if (!profile || ['direct_average', 'direct_sum', 'stock_bundle'].includes(profile)) return components;
   const numerator = components[0];
@@ -110,9 +113,16 @@ export default function transformProps(chartProps) {
   const normalizeKeys = source => Object.fromEntries(Object.entries(source || {})
     .filter(([, value]) => value !== undefined && value !== null)
     .map(([key, value]) => [key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`), value]));
-  // Superset supplies persisted values in formData (camelCase) and may also
-  // include incomplete/default values in rawFormData. Persisted values must win.
-  const formData = { ...normalizeKeys(chartProps.rawFormData), ...normalizeKeys(chartProps.formData) };
+  // Superset exposes persisted chart.params as snake_case rawFormData and the
+  // registered controls as camelCase formData. A missing/empty control value
+  // must not erase its persisted counterpart; an explicit transformed value
+  // still wins when both are present.
+  const rawFormData = normalizeKeys(chartProps.rawFormData);
+  const transformedFormData = normalizeKeys(chartProps.formData);
+  const formData = { ...rawFormData, ...transformedFormData };
+  Object.entries(rawFormData).forEach(([key, value]) => {
+    if (transformedFormData[key] === '') formData[key] = value;
+  });
   const variantCandidates = [
     chartProps.formData?.cardVariant,
     chartProps.formData?.card_variant,
@@ -176,7 +186,7 @@ export default function transformProps(chartProps) {
   const lastByMonth = new Map();
   semanticTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
   const outputCount = metricSemantics.length || (['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
-    : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup'].includes(semanticProfile) ? 1
+    : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup', 'markup_blank'].includes(semanticProfile) ? 1
       : metricLabels.length);
   const displayMetricLabels = labels.slice(0, outputCount);
   const indicators = displayMetricLabels.map((label, index) => {
@@ -216,6 +226,8 @@ export default function transformProps(chartProps) {
     if (latest && monthKey(row.date) === shiftMonth(latest.date, -1)) entry.previous = row.values[0];
     categories.set(row.category, entry);
   });
+  const parsedTimelineLimit = Number(formData.timeline_limit);
+  const parsedSummaryCount = Number(formData.summary_count);
   return {
     width, height, semanticProfile,
     title: formData.card_title || 'NeoRetail',
@@ -228,8 +240,11 @@ export default function transformProps(chartProps) {
     taskLabels: splitConfig(formData.task_labels, ['itens críticos', 'itens com risco']),
     chartStyles: splitConfig(formData.chart_styles, ['bar', 'bar', 'line']),
     timeGrain: monthlyLastNonBlank ? 'P1M' : (formData.time_grain_sqla || 'P1M'),
-    timelineLimit: Math.max(1, Number(formData.timeline_limit) || 12),
-    summaryCount: Math.max(0, Number(formData.summary_count) || indicators.length),
+    timelineLimit: Number.isFinite(parsedTimelineLimit) && parsedTimelineLimit > 0
+      ? Math.floor(parsedTimelineLimit) : 12,
+    summaryCount: formData.summary_count !== undefined && formData.summary_count !== ''
+      && Number.isFinite(parsedSummaryCount)
+      ? Math.max(0, Math.floor(parsedSummaryCount)) : indicators.length,
     indicators,
     critical: latest?.critical || 0,
     risk: latest?.risk || 0,

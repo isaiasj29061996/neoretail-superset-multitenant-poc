@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
+from pathlib import Path
 
 from flask import g
 from flask_login import login_user
@@ -21,6 +23,16 @@ def close(left, right):
     if left is None or right is None:
         return left is None and right is None
     return math.isclose(float(left), float(right), rel_tol=1e-9, abs_tol=1e-7)
+
+
+def json_safe(value):
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    return value
 
 
 def rows_equal(left, right, columns):
@@ -50,22 +62,39 @@ def execute(factory, command, chart, filters):
 
 
 MONTHLY_VALUE_SOURCE = text("""
-SELECT mes_ano::date data,
-  CASE WHEN SUM(faturamento)>0 THEN SUM(faturamento)
-       ELSE SUM(volume_unidades*avg_sales_price) END::float8 sellout_sum,
-  SUM(volume_unidades*avg_price_cost)::float8 cost_sum
-FROM gold.fato_historico WHERE id_customer=:customer
- AND mes_ano >= (SELECT MAX(mes_ano)-INTERVAL '15 months' FROM gold.fato_historico WHERE id_customer=:customer)
-GROUP BY mes_ano ORDER BY mes_ano
+WITH monthly AS (
+ SELECT mes_ano::date data,id_customer,
+  SUM(COALESCE(faturamento,0))::float8 faturamento_sum,
+  SUM(COALESCE(volume_unidades,0))::float8 volume_sum,
+  SUM(COALESCE(avg_sales_price,0))::float8 fallback_price_sum,
+  COUNT(avg_sales_price)::bigint fallback_price_count,
+  SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 cost_sum
+ FROM gold.fato_historico WHERE id_customer=:customer
+  AND mes_ano >= (SELECT MAX(mes_ano)-INTERVAL '15 months' FROM gold.fato_historico WHERE id_customer=:customer)
+ GROUP BY mes_ano,id_customer
+), factor AS (
+ SELECT f.mes_ano::date data,MAX(c.conversion_rate)::float8 conversion_factor
+ FROM gold.fato_historico f JOIN gold.dim_conversao c
+  ON c.id_customer=f.id_customer AND c.id_item::text=f.id_item AND c.nm_measure=:measure
+ WHERE f.id_customer=:customer
+  AND f.mes_ano >= (SELECT MAX(mes_ano)-INTERVAL '15 months' FROM gold.fato_historico WHERE id_customer=:customer)
+ GROUP BY f.mes_ano
+)
+SELECT m.data,
+ CASE WHEN m.faturamento_sum>0 THEN m.faturamento_sum
+      WHEN f.conversion_factor IS NOT NULL AND m.fallback_price_count>0
+      THEN (m.volume_sum*f.conversion_factor)
+         *((m.fallback_price_sum/m.fallback_price_count)*f.conversion_factor)
+      ELSE NULL END::float8 sellout_sum,
+ m.cost_sum
+FROM monthly m JOIN factor f USING(data) ORDER BY m.data
 """)
 MONTHLY_VALUE_MART = text("""
-SELECT data::date data,
-  CASE WHEN SUM(faturamento)>0 THEN SUM(faturamento)
-       ELSE SUM(volume_unidades*avg_sales_price) END::float8 sellout_sum,
-  SUM(volume_unidades*avg_price_cost)::float8 cost_sum
-FROM gold.nr_overview_history WHERE id_customer=:customer
- AND data >= (SELECT MAX(data)-INTERVAL '15 months' FROM gold.nr_overview_history WHERE id_customer=:customer)
-GROUP BY data ORDER BY data
+SELECT data::date data,sellout_sum,cost_sum
+FROM gold.nr_panorama_sales_monthly_default
+WHERE id_customer=:customer AND nm_measure=:measure
+ AND data >= (SELECT MAX(data)-INTERVAL '15 months' FROM gold.nr_panorama_sales_monthly_default WHERE id_customer=:customer)
+ORDER BY data
 """)
 MONTHLY_QUANTITY_SOURCE = text("""
 WITH monthly AS (
@@ -103,9 +132,10 @@ WITH latest AS (
 ), weekly AS (
  SELECT f.id_time::date data,MAX(f.cd_week) cd_week,
   SUM(COALESCE(f.faturamento,0)) faturamento_sum,
-  SUM(COALESCE(f.volume_unidade,0)*COALESCE(f.avg_sales_price,0)) fallback_sum,
-  SUM(COALESCE(f.volume_unidade,0)*COALESCE(f.avg_price_cost,0)) cost_sum,
   SUM(COALESCE(f.volume_unidade,0)) volume_sum,
+  SUM(COALESCE(f.avg_sales_price,0)) fallback_price_sum,
+  COUNT(f.avg_sales_price) fallback_price_count,
+  SUM(COALESCE(f.volume_unidade,0)*COALESCE(f.avg_price_cost,0)) cost_sum,
   SUM(COALESCE(f.qtd_perda_osa,0)) loss_base,
   SUM(COALESCE(f.avg_sales_price,0)) FILTER(WHERE f.faturamento>0) price_sum,
   COUNT(f.avg_sales_price) FILTER(WHERE f.faturamento>0) price_count
@@ -119,7 +149,11 @@ WITH latest AS (
  WHERE f.id_customer=:customer GROUP BY f.id_time
 )
 SELECT w.data,w.cd_week,
- CASE WHEN w.faturamento_sum>0 THEN w.faturamento_sum ELSE w.fallback_sum END::float8 sellout_sum,
+ CASE WHEN w.faturamento_sum>0 THEN w.faturamento_sum
+      WHEN f.conversion_factor IS NOT NULL AND w.fallback_price_count>0
+      THEN (w.volume_sum*f.conversion_factor)
+         *((w.fallback_price_sum/w.fallback_price_count)*f.conversion_factor)
+      ELSE NULL END::float8 sellout_sum,
  w.cost_sum::float8,(w.volume_sum*f.conversion_factor)::float8 sales_sum,
  (w.loss_base*f.conversion_factor)::float8 loss_sum,
  (w.price_sum*f.conversion_factor)::float8 price_numerator,w.price_count::bigint
@@ -130,6 +164,15 @@ SELECT data::date data,cd_week,sellout_sum,cost_sum,sales_sum,loss_sum,price_num
 FROM gold.nr_panorama_sales_weekly_default
 WHERE id_customer=:customer AND nm_measure=:measure
 ORDER BY data DESC LIMIT 13
+""")
+FALLBACK_PROBE = text("""
+WITH sample(volume,avg_sales_price) AS (VALUES (2.0,100.0),(8.0,10.0)),
+factor AS (SELECT 2.0::float8 conversion_factor)
+SELECT
+ (SUM(volume)*MAX(conversion_factor))
+ *((AVG(avg_sales_price))*MAX(conversion_factor)) AS dax_equivalent,
+ SUM(volume*avg_sales_price) AS rejected_row_product
+FROM sample CROSS JOIN factor
 """)
 
 
@@ -160,12 +203,55 @@ def main():
         charts = {chart.slice_name: chart for chart in dashboard.slices}
         database = next(iter(charts.values())).table.database
         factory = QueryContextFactory()
-        report = {"tenant": CUSTOMER_ID, "paths": {}, "measures": {}}
+        report = {"tenant": CUSTOMER_ID, "paths": {}, "measures": {}, "persisted_params": {}}
+        runtime_fixture = {"charts": {}}
+
+        value_semantics = "direct_average:0:1|direct_average:1:1|markup_blank:0:2"
+        quantity_semantics = "direct_average:0:1|direct_sum:1:1|weighted_average:2:2"
+        for name, semantics, physical_count, summary_count in (
+            ("[Panorama] Evolutivo de vendas — Valor mensal", value_semantics, 2, 0),
+            ("[Panorama] Evolutivo de vendas — Valor semanal", value_semantics, 2, 0),
+            ("[Panorama] Evolutivo de vendas — Quantidade mensal", quantity_semantics, 4, 0),
+            ("[Panorama] Evolutivo de vendas — Quantidade semanal", quantity_semantics, 4, 0),
+            ("[Panorama] Evolutivo de vendas — Resumo Valor mensal", value_semantics, 2, 3),
+            ("[Panorama] Evolutivo de vendas — Resumo Valor semanal", value_semantics, 2, 3),
+            ("[Panorama] Evolutivo de vendas — Resumo Quantidade mensal", quantity_semantics, 4, 3),
+            ("[Panorama] Evolutivo de vendas — Resumo Quantidade semanal", quantity_semantics, 4, 3),
+        ):
+            params = json.loads(charts[name].params)
+            if params.get("metric_semantics") != semantics:
+                raise AssertionError(f"{name}: persisted metric_semantics diverged")
+            if len(params.get("metrics", [])) != physical_count:
+                raise AssertionError(f"{name}: unexpected physical component count")
+            if int(params.get("summary_count", -1)) != summary_count:
+                raise AssertionError(f"{name}: persisted summary_count diverged")
+            if len(semantics.split("|")) != 3:
+                raise AssertionError(f"{name}: semantic output count must be three")
+            if summary_count == 0 and int(params.get("timeline_limit", -1)) != 13:
+                raise AssertionError(f"{name}: persisted timeline_limit diverged")
+            report["persisted_params"][name] = {
+                "physical_components": physical_count,
+                "semantic_outputs": 3,
+                "metric_semantics": semantics,
+                "timeline_limit": params.get("timeline_limit"),
+                "summary_count": params.get("summary_count"),
+                "card_variant": params.get("card_variant"),
+                "metric_labels": params.get("metric_labels"),
+                "metric_formats": params.get("metric_formats"),
+                "chart_styles": params.get("chart_styles"),
+            }
 
         with database.get_sqla_engine() as engine, engine.connect() as connection:
+            fallback_probe = connection.execute(FALLBACK_PROBE).mappings().one()
+            if not close(fallback_probe["dax_equivalent"], 2200) or close(
+                fallback_probe["dax_equivalent"], fallback_probe["rejected_row_product"]
+            ):
+                raise AssertionError("Sell Out fallback no longer matches the literal DAX aggregation")
+            report["fallback_probe"] = dict(fallback_probe)
             print("validating monthly value", flush=True)
-            source = list(connection.execute(MONTHLY_VALUE_SOURCE, {"customer": CUSTOMER_ID}).mappings())
-            mart = list(connection.execute(MONTHLY_VALUE_MART, {"customer": CUSTOMER_ID}).mappings())
+            value_params = {"customer": CUSTOMER_ID, "measure": "unidade"}
+            source = list(connection.execute(MONTHLY_VALUE_SOURCE, value_params).mappings())
+            mart = list(connection.execute(MONTHLY_VALUE_MART, value_params).mappings())
             rows_equal(source, mart, ("sellout_sum", "cost_sum"))
             monthly_value_expected = mart
             report["paths"]["value_monthly"] = {"months": len(mart), "u3m_sellout": u3m(mart, "average", ("sellout_sum",)), "u3m_cost": u3m(mart, "average", ("cost_sum",)), "u3m_markup": 100 * u3m(mart, "ratio", ("sellout_sum", "cost_sum"))}
@@ -193,12 +279,12 @@ def main():
                 }
 
             chart_contracts = {
-                "[Panorama] Evolutivo de vendas — Valor mensal": ([], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
+                "[Panorama] Evolutivo de vendas — Valor mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
                 "[Panorama] Evolutivo de vendas — Valor semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], weekly_expected, {"sellout_sum": "Venda sell out semanal", "cost_sum": "Venda custo semanal"}),
                 "[Panorama] Evolutivo de vendas — Quantidade mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_quantity_expected, {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"}),
                 "[Panorama] Evolutivo de vendas — Quantidade semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], weekly_expected, {"sales_sum": "Venda quantidade semanal", "loss_sum": "Perda OSA semanal", "price_numerator": "Preço soma semanal", "price_count": "Preço linhas semanal"}),
-                "[Panorama] Evolutivo de vendas — Resumo Valor mensal": ([], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
-                "[Panorama] Evolutivo de vendas — Resumo Valor semanal": ([], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
+                "[Panorama] Evolutivo de vendas — Resumo Valor mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
+                "[Panorama] Evolutivo de vendas — Resumo Valor semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_value_expected, {"sellout_sum": "Venda sell out", "cost_sum": "Venda custo"}),
                 "[Panorama] Evolutivo de vendas — Resumo Quantidade mensal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_quantity_expected, {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"}),
                 "[Panorama] Evolutivo de vendas — Resumo Quantidade semanal": ([{"col": "nm_measure", "op": "IN", "val": ["unidade"]}], monthly_quantity_expected, {"sales_sum": "Venda quantidade", "loss_sum": "Perda OSA quantidade", "price_numerator": "Preço soma elegível", "price_count": "Preço linhas elegíveis"}),
             }
@@ -222,9 +308,20 @@ def main():
                         if not close(row[column], actual.get(label)):
                             raise AssertionError({"chart": name, "period": str(row["data"]), "metric": label, "mart": row[column], "superset": actual.get(label)})
                 report["paths"][name] = {"superset_rows": len(data), "elapsed_ms": elapsed_ms}
+                runtime_fixture["charts"][name] = {
+                    "rawFormData": json.loads(charts[name].params),
+                    "queriesData": [{"data": data}],
+                }
 
         if close(report["measures"]["unidade"]["u3m_sales"], report["measures"]["quilograma"]["u3m_sales"]):
             raise AssertionError("conversion selector did not change quantity sales")
+        fixture_path = os.environ.get("PANORAMA_RUNTIME_FIXTURE")
+        if fixture_path:
+            Path(fixture_path).write_text(
+                json.dumps(json_safe(runtime_fixture), ensure_ascii=False, default=str, allow_nan=False),
+                encoding="utf-8",
+            )
+            report["runtime_fixture"] = fixture_path
         print(json.dumps(report, ensure_ascii=False, default=str, indent=2))
 
 

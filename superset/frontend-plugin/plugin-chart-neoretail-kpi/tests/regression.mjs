@@ -369,4 +369,54 @@ const panoramaValue = transform({
 });
 equal(panoramaValue.indicators.map(item => item.average), [200, 250 / 3, 240], 'Panorama value averages components and recomputes U3M markup');
 equal(panoramaValue.timeline.at(-1).values[2], null, 'Panorama markup line preserves BLANK when its result is zero');
+const persistedQuantityParams = transform({
+  rawFormData: {
+    x_axis: 'data', metrics: ['sales', 'loss', 'price_numerator', 'price_count'],
+    metric_labels: 'Sell Out Volume|Perda OSA|Preco Medio',
+    metric_formats: 'quantity|quantity|currency',
+    metric_semantics: 'direct_average:0:1|direct_sum:1:1|weighted_average:2:2',
+    chart_styles: 'bar|bar|line', card_variant: 'panorama',
+    summary_count: 0, timeline_limit: 13,
+  },
+  formData: {
+    xAxis: 'data', metrics: ['sales', 'loss', 'price_numerator', 'price_count'],
+    metricSemantics: '',
+  },
+  queriesData: [{ data: Array.from({ length: 13 }, (_, index) => ({
+    data: new Date(Date.UTC(2025, index, 1)).toISOString().slice(0, 10),
+    sales: index + 1, loss: 2, price_numerator: 100, price_count: 10,
+  })) }],
+});
+equal(persistedQuantityParams.indicators.length, 3, 'Persisted snake_case semantics produce exactly three outputs from four inputs');
+equal(persistedQuantityParams.timeline[0].values, [1, 2, 10], 'Weighted price is derived and its denominator is not exposed');
+equal(persistedQuantityParams.timelineLimit, 13, 'Persisted snake_case timeline limit reaches renderer props');
+equal(persistedQuantityParams.timeline.slice(-persistedQuantityParams.timelineLimit).length, 13, 'Renderer receives thirteen relevant timeline points when configured for thirteen');
+equal(persistedQuantityParams.summaryCount, 0, 'A persisted zero summary count is preserved');
+equal(persistedQuantityParams.chartStyles, ['bar', 'bar', 'line'], 'Persisted chart styles reach renderer props');
+equal(persistedQuantityParams.indicators.map(item => item.label), ['Sell Out Volume', 'Perda OSA', 'Preco Medio'], 'Persisted labels reach renderer props');
+const persistedValueParams = transform({
+  rawFormData: {
+    x_axis: 'data', metrics: ['sellout', 'cost'],
+    metric_labels: 'Sell Out Venda|Sell Out Custo|Markup',
+    metric_formats: 'currency|currency|percent',
+    metric_semantics: 'direct_average:0:1|direct_average:1:1|markup_blank:0:2',
+    card_variant: 'panorama', timeline_limit: 13,
+  },
+  formData: { xAxis: 'data', metrics: ['sellout', 'cost'] },
+  queriesData: [{ data: [{ data: '2026-05-01', sellout: 120, cost: 100 }] }],
+});
+equal(persistedValueParams.indicators.map(item => item.current), [120, 100, 120], 'Two physical value components produce Sell Out, Cost and derived Markup');
+const camelOverridesRaw = transform({
+  rawFormData: {
+    x_axis: 'data', metrics: ['sellout', 'cost'],
+    metric_semantics: 'direct_average:0:1|direct_average:1:1|markup_blank:0:2',
+    timeline_limit: 12,
+  },
+  formData: {
+    xAxis: 'data', metrics: ['sellout', 'cost'],
+    metricSemantics: 'direct_average:0:1|markup_blank:0:2', timelineLimit: 13,
+  },
+  queriesData: [{ data: [{ data: '2026-05-01', sellout: 120, cost: 100 }] }],
+});
+equal([camelOverridesRaw.indicators.length, camelOverridesRaw.timelineLimit], [2, 13], 'Explicit camelCase controls take precedence over raw persisted values');
 console.log(`${checks} regression checks passed (Superset dependency doubles).`);
