@@ -393,6 +393,195 @@ FROM monthly m JOIN monthly_factors f USING(data,id_customer)
     )
 
 
+
+def monthly_stock_semantic_sql() -> str:
+    """DAX-equivalent monthly stock cost and converted stock quantity."""
+    predicates = _jinja_filter_predicates("h")
+    return f"""
+WITH filtered AS (
+  SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
+{predicates}
+), monthly AS (
+  SELECT
+    data,
+    id_customer,
+    SUM(COALESCE(estoque_medio,0) * COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base
+  FROM filtered
+  GROUP BY data,id_customer
+), factors AS (
+  SELECT
+    f.data,
+    f.id_customer,
+    c.nm_measure,
+    MAX(c.conversion_rate)::float8 AS conversion_factor
+  FROM (SELECT DISTINCT data,id_customer,id_item FROM filtered) f
+  JOIN gold.dim_conversao c
+    ON c.id_customer=f.id_customer
+   AND c.id_item::text=f.id_item
+  GROUP BY f.data,f.id_customer,c.nm_measure
+)
+SELECT
+  m.data,
+  m.id_customer,
+  f.nm_measure,
+  m.stock_cost_sum,
+  (m.stock_qty_base * f.conversion_factor)::float8 AS stock_qty_sum,
+  NULL::text AS rede,
+  NULL::text AS bandeira,
+  NULL::text AS uf,
+  NULL::text AS cidade,
+  NULL::text AS tipo_local,
+  NULL::text AS loja,
+  NULL::text AS regiao,
+  NULL::text AS tp_activity_level,
+  NULL::text AS activity_level,
+  NULL::text AS item,
+  NULL::text AS descricao_marca,
+  NULL::text AS hierarquia_1,
+  NULL::text AS hierarquia_2,
+  NULL::text AS hierarquia_3
+FROM monthly m
+JOIN factors f USING(data,id_customer)
+""".strip()
+
+
+def weekly_stock_card_semantic_sql() -> str:
+    """One stock slice: TOP 13 weekly timeline plus monthly MTD/U3M context."""
+    weekly_predicates = _jinja_filter_predicates("w", "status_item_geral", {
+        "rede": "l.rede", "bandeira": "l.bandeira", "uf": "l.uf",
+        "cidade": "l.cidade", "tipo_local": "l.tipo_local",
+        "loja": "l.loja", "regiao": "l.regiao", "item": "i.item",
+        "descricao_marca": "i.descricao_marca", "hierarquia_1": "i.hierarquia_1",
+        "hierarquia_2": "i.hierarquia_2", "hierarquia_3": "i.hierarquia_3",
+    })
+    monthly_predicates = _jinja_filter_predicates("h")
+    return f"""
+WITH weekly_filtered AS (
+  SELECT
+    w.id_time AS data,
+    w.cd_week,
+    w.id_customer,
+    w.id_item,
+    w.id_location,
+    w.estoque_unidades,
+    w.estoque_medio,
+    w.avg_price_cost,
+    w.status_item_geral::text AS tp_activity_level,
+    COALESCE(w.status_item_geral::text,'Outros') AS activity_level,
+    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,
+    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3
+  FROM gold.fato_semanal w
+  LEFT JOIN gold.dim_local l
+    ON l.id_customer=w.id_customer AND l.id_location=w.id_location
+  LEFT JOIN gold.dim_itens i
+    ON i.id_customer=w.id_customer AND i.id_item=w.id_item
+  WHERE 1=1
+{weekly_predicates}
+), ranked_weeks AS (
+  SELECT id_customer,data,cd_week,DENSE_RANK() OVER (
+    PARTITION BY id_customer ORDER BY cd_week DESC
+  ) AS week_rank
+  FROM (SELECT DISTINCT id_customer,data,cd_week FROM weekly_filtered) x
+), weekly_scoped AS (
+  SELECT f.*
+  FROM weekly_filtered f
+  JOIN ranked_weeks r USING(id_customer,data,cd_week)
+  WHERE r.week_rank<=13
+), weekly AS (
+  SELECT
+    data,
+    id_customer,
+    MAX(cd_week) AS cd_week,
+    SUM(COALESCE(estoque_medio,0) * COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base
+  FROM weekly_scoped
+  GROUP BY data,id_customer
+), weekly_factors AS (
+  SELECT
+    s.data,
+    s.id_customer,
+    c.nm_measure,
+    MAX(c.conversion_rate)::float8 AS conversion_factor
+  FROM (SELECT DISTINCT data,id_customer,id_item FROM weekly_scoped) s
+  JOIN gold.dim_conversao c
+    ON c.id_customer=s.id_customer
+   AND c.id_item::text=s.id_item
+  GROUP BY s.data,s.id_customer,c.nm_measure
+), monthly_filtered AS (
+  SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
+{monthly_predicates}
+), monthly AS (
+  SELECT
+    data,
+    id_customer,
+    SUM(COALESCE(estoque_medio,0) * COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base
+  FROM monthly_filtered
+  GROUP BY data,id_customer
+), monthly_factors AS (
+  SELECT
+    f.data,
+    f.id_customer,
+    c.nm_measure,
+    MAX(c.conversion_rate)::float8 AS conversion_factor
+  FROM (SELECT DISTINCT data,id_customer,id_item FROM monthly_filtered) f
+  JOIN gold.dim_conversao c
+    ON c.id_customer=f.id_customer
+   AND c.id_item::text=f.id_item
+  GROUP BY f.data,f.id_customer,c.nm_measure
+)
+SELECT
+  'timeline'::text AS row_scope,
+  w.data,
+  w.cd_week,
+  w.id_customer,
+  f.nm_measure,
+  w.stock_cost_sum,
+  (w.stock_qty_base * f.conversion_factor)::float8 AS stock_qty_sum,
+  NULL::text AS rede,
+  NULL::text AS bandeira,
+  NULL::text AS uf,
+  NULL::text AS cidade,
+  NULL::text AS tipo_local,
+  NULL::text AS loja,
+  NULL::text AS regiao,
+  NULL::text AS tp_activity_level,
+  NULL::text AS activity_level,
+  NULL::text AS item,
+  NULL::text AS descricao_marca,
+  NULL::text AS hierarquia_1,
+  NULL::text AS hierarquia_2,
+  NULL::text AS hierarquia_3
+FROM weekly w
+JOIN weekly_factors f USING(data,id_customer)
+UNION ALL
+SELECT
+  'summary'::text AS row_scope,
+  m.data,
+  NULL::text AS cd_week,
+  m.id_customer,
+  f.nm_measure,
+  m.stock_cost_sum,
+  (m.stock_qty_base * f.conversion_factor)::float8 AS stock_qty_sum,
+  NULL::text AS rede,
+  NULL::text AS bandeira,
+  NULL::text AS uf,
+  NULL::text AS cidade,
+  NULL::text AS tipo_local,
+  NULL::text AS loja,
+  NULL::text AS regiao,
+  NULL::text AS tp_activity_level,
+  NULL::text AS activity_level,
+  NULL::text AS item,
+  NULL::text AS descricao_marca,
+  NULL::text AS hierarquia_1,
+  NULL::text AS hierarquia_2,
+  NULL::text AS hierarquia_3
+FROM monthly m
+JOIN monthly_factors f USING(data,id_customer)
+""".strip()
+
 def sql_filter(expression):
     return {
         "clause": "WHERE",
@@ -526,6 +715,14 @@ def main():
             db.session, SqlaTable, database, "nr_overview_quantity_interactive",
             sql=quantity_semantic_sql(),
         )
+        monthly_stock = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_stock_monthly_interactive",
+            sql=monthly_stock_semantic_sql(),
+        )
+        weekly_stock_card = upsert_dataset(
+            db.session, SqlaTable, database, "nr_panorama_stock_weekly_card_interactive",
+            sql=weekly_stock_card_semantic_sql(),
+        )
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
         mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
         opportunities = mart
@@ -560,15 +757,12 @@ def main():
         periods = (("mensal", history, "P1M"), ("semanal", weekly, "P1W"))
         for period, dataset, grain in periods:
             metrics = WEEKLY_P if period == "semanal" else P
-            stock = [metrics["stock_cost"], metrics["stock_qty"]]
             giro_roi = [metrics["roi"], metrics["coverage"], metrics["giro"]]
             osa = [metrics["osa"], metrics["rup"], metrics["isv"]]
-            stock_params = custom_params(dataset, "Evolutivo de estoque", stock, grain=grain, styles="bar|bar", formats="currency|number")
             giro_params = custom_params(dataset, "Evolutivo de estoque", giro_roi, grain=grain, styles="bar|line|line", formats="percent|number|number")
             osa_params = custom_params(dataset, "Evolutivo de estoque", osa, grain=grain, styles="line|line|line", formats="percent|percent|percent")
-            for params in (stock_params, giro_params, osa_params):
+            for params in (giro_params, osa_params):
                 params["adhoc_filters"] = list(weekly_recent if period == "semanal" else [])
-            add(f"stock_{period}", dataset, f"Evolutivo de estoque — Estoque {period}", stock_params)
             add(f"giro_roi_{period}", dataset, f"Evolutivo de estoque — Giro e ROI {period}", giro_params)
             add(f"osa_{period}", dataset, f"Evolutivo de estoque — OSA {period}", osa_params)
 
@@ -623,6 +817,47 @@ def main():
             summary_query_scope="summary", timeline_query_scope="timeline",
         )
         add("sales_quantity_semanal", weekly_sales_card, "Evolutivo de vendas — Quantidade semanal", params)
+
+        # Panorama > Evolutivo de estoque > Estoque.
+        # Power BI contract:
+        #   Estoque Preço Custo = SUMX(ESTOQUE_MEDIO * AVG_PRICE_COST)
+        #   Estoque Quantidade = SUM(ESTOQUE_UNIDADES) * selected conversion factor
+        #   both U3M values = three-month context / 3.
+        stock_semantics = "direct_average:0:1|direct_average:1:1"
+        stock_measures = [
+            metric("Estoque preço custo", "SUM(stock_cost_sum)"),
+            metric("Estoque quantidade", "SUM(stock_qty_sum)"),
+        ]
+
+        params = custom_params(
+            monthly_stock,
+            "Evolutivo de estoque",
+            stock_measures,
+            grain="P1M",
+            styles="bar|bar",
+            formats="currency|quantity",
+            labels="Estoque Preço Custo|Estoque Quantidade",
+            metric_semantics=stock_semantics,
+            summary_count=2,
+            timeline_limit=13,
+        )
+        add("stock_mensal", monthly_stock, "Evolutivo de estoque — Estoque mensal", params)
+
+        params = custom_params(
+            weekly_stock_card,
+            "Evolutivo de estoque",
+            stock_measures,
+            grain="P1W",
+            styles="bar|bar",
+            formats="currency|quantity",
+            labels="Estoque Preço Custo|Estoque Quantidade",
+            metric_semantics=stock_semantics,
+            summary_count=2,
+            timeline_limit=13,
+            summary_query_scope="summary",
+            timeline_query_scope="timeline",
+        )
+        add("stock_semanal", weekly_stock_card, "Evolutivo de estoque — Estoque semanal", params)
 
         for period, grain in (("mensal", "P1M"), ("semanal", "P1W")):
             params = custom_params(
@@ -690,10 +925,10 @@ def main():
         dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
         filter_targets = {column: filter_options.id for column in WEEKLY_FILTER_COLUMNS}
         filter_targets["nm_measure"] = conversion_options.id
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, weekly_sales_card.id, monthly_sales.id, monthly_quantity.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, weekly_sales_card.id, monthly_sales.id, monthly_quantity.id, monthly_stock.id, weekly_stock_card.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "monthly_stock": monthly_stock.id, "weekly_stock_card": weekly_stock_card.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
