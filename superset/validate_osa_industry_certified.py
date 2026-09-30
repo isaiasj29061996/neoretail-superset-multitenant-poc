@@ -173,11 +173,15 @@ WITH latest AS (
     AVG(avg_sales_price)::float8 avg_sales,
     AVG(avg_price_cost)::float8 avg_cost
   FROM w
+), week_locations AS (
+  SELECT DISTINCT id_location FROM w
 ), demand AS (
-  SELECT SUM(COALESCE(demanda_media,0))::float8 AS demand_sum
-  FROM gold.calculo_oportunidades
-  WHERE id_customer=:customer
-    AND COALESCE(qtd_item_ativo_osa_m0,0)>0
+  SELECT SUM(COALESCE(o.demanda_media,0))::float8 AS demand_sum
+  FROM gold.calculo_oportunidades o
+  JOIN week_locations l
+    ON l.id_location::text=o.id_location::text
+  WHERE o.id_customer=:customer
+    AND COALESCE(o.qtd_item_ativo_osa_m0,0)>0
 )
 SELECT
   (SELECT data FROM latest) AS data,
