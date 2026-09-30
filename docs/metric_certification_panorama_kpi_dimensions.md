@@ -114,6 +114,51 @@ Depois da materialização, a rodada completa das dez opções registrou:
 O fallback com filtro de rede levou 1,525 s. Esses números são evidência do
 ambiente local e não representam SLA de produção.
 
+## Controles locais iguais à organização da referência Power BI
+
+A versão atual inclui um **novo chart de controles** no topo da seção
+`Comparativo de KPIs por dimensão`: `Ano / Mês` fica à esquerda e
+`Visualização por` fica à direita, acima das três barras. As opções do
+controle são consultadas pelo dataset governado
+`nr_panorama_kpi_filter_options`, respeitando RLS por `id_customer`.
+
+O frontend `KpiFilterBar.jsx` usa o mesmo estado Redux `dataMask` dos três
+filtros nativos que já alimentam as consultas. Selecionar um KPI ou período
+dentro da seção atualiza **simultaneamente** os três gráficos, sem criar
+cálculos paralelos no navegador. Os filtros têm escopo restrito aos três charts
+de KPI, e o chart de opções não recebe os próprios filtros que criaria, para
+evitar que opções desapareçam ao escolher outro ano.
+
+**Diferença ainda intencional:** o seletor visual de Ano permite um ano por
+vez, com múltiplos meses dentro dele (e "Todos os meses"). O PBIX permite
+combinar vários anos, mas não foi habilitado aqui porque o mart anual e a
+métrica atual de chart usam `MAX(kpi_value)` ao agrupar; combinar anos sem
+uma agregação matemática específica geraria valores incorretos. Essa evolução
+exige uma certificação separada.
+
+O novo toolbar é frontend do Superset, compilado na imagem `superset`;
+portanto não basta apenas executar o bootstrap Python. Para usar a alteração
+na worktree local:
+
+```powershell
+git pull --ff-only origin feat/panorama-stock-certification
+docker run --rm -v "${PWD}:/repo" -w /repo neoretail-v9-multitenant-local-engine python -m pytest local-engine/tests/test_panorama_kpi_dimension_contracts.py -q
+docker compose build superset
+docker compose up -d --no-deps superset
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_panorama_kpi_dimensions.py
+```
+
+Se `superset-init` ou outros serviços não estiverem ativos, subir o ambiente
+normalmente antes dos comandos de bootstrap. **Não executar**
+`docker compose down -v`, porque isso apagaria os volumes locais.
+
+A validação frontend completa deve incluir: abrir os dois menus locais,
+alterar de Venda R$ para %OSA e Estoque qtd; escolher janeiro e fevereiro;
+confirmar atualização nos três gráficos; retornar a Todos os meses e verificar
+a restauração do caminho anual rápido. A consulta de opções deve funcionar
+também com Guest Token sob RLS (não confundir admin local com embed).
+
 ## Estado após a inclusão do ano/mês e UF/Cidade
 
 As 30 reconciliações e os números de performance acima pertencem à rodada
@@ -128,9 +173,10 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_p
 
 O filtro Mês usa o caminho detalhado; seu tempo ainda não foi medido. A
 barra nativa de filtros deve estar expandida no Superset. O Embedded SDK já
-a configura com `visible: true, expanded: true`. A reprodução visual exata
-do slicer hierárquico dentro do cartão do Power BI exigiria um controle
-customizado adicional, não implementado nesta atualização.
+a configura com `visible: true, expanded: true`. O controle hierárquico dentro da seção agora foi implementado no frontend,
+com um ano de cada vez e múltiplos meses. É necessário compilar a imagem
+Superset e homologar o resultado visual no ambiente local; o PBI original
+continua sendo a referência de aparência.
 
 Comparação de **valores absolutos** com as capturas depende do mesmo
 `id_customer`, do mesmo conjunto de arquivos (a POC pode estar com apenas
@@ -138,7 +184,6 @@ Comparação de **valores absolutos** com as capturas depende do mesmo
 que o conteúdo da captura represente outra indústria, o teste de contrato
 com fonte bruta do tenant 142 permanece válido.
 
-**Status:** patch de código e teste atualizado no GitHub; ainda pendente
-de execução no Docker e homologação visual após o pull. As 15 matrizes,
+**Status:** controles locais implementados e testes estáticos atualizados no GitHub; pendentes build frontend, validação runtime após o pull e homologação visual. As 15 matrizes,
 a Análise detalhada e os marts anteriores foram preservados.
 
