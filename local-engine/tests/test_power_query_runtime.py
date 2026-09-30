@@ -36,7 +36,7 @@ def contract():
 def test_monthly_fact_recreates_power_query_date_and_types(spark):
     source = spark.createDataFrame([{
         "vl_month": "9", "vl_year": "2026", "id_item": 10,
-        "ID_LOCATION": 20, "QTD_PERDA_OSA": "1.5", "QTD_PROBLEMAS_OSA": "2",
+        "ID_LOCATION": 20, "QTD_PERDA_OSA": "1.5", "VL_PERDA_OSA": "9.75", "QTD_PROBLEMAS_OSA": "2",
         "QTD_ITENS_ATIVOS": "3", "VOLUME_UNIDADES": "4.5", "FATURAMENTO": "5.5",
         "PRECO_MEDIO": "6.5", "CAUSA_OSA": "causa", "MOTIVO_OSA": "motivo",
     }])
@@ -47,6 +47,7 @@ def test_monthly_fact_recreates_power_query_date_and_types(spark):
     assert str(row.data) == "2026-09-01"
     assert row.id_item == "10"
     assert row.qtd_problemas_osa == 2
+    assert row.vl_perda_osa == 9.75
     assert "vl_month" not in result.columns
 
 
@@ -152,3 +153,7 @@ def test_partitioned_customer_daily_builds_dashboard_contracts(spark):
     opportunity = result["calculo_oportunidades"].first()
     assert str(opportunity.tvd) == "5.0000"
     assert opportunity.regra_critico == "F"
+    osa = result["fato_mensal_causa_osa"].first()
+    assert osa.vl_perda_osa == 10.0
+    assert osa.qtd_perda_osa == 1.0
+    assert osa.motivo_osa == "Ruptura na loja"
