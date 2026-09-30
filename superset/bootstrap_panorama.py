@@ -1642,6 +1642,14 @@ def comparison_pivot_params(dataset, rows, metrics):
         "showRowTotals": True,
         "showColTotals": False,
         "expandRows": False,
+        # Pivot v2 accepts per-metric columnFormats. Keep SMART_NUMBER as
+        # fallback, but preserve the Power BI percentage/currency formats for
+        # mixed matrices such as Sell out + Markup and Estoque + ROI.
+        "columnFormats": {
+            item["label"]: item.get("d3Format")
+            for item in metrics
+            if isinstance(item, dict) and item.get("label") and item.get("d3Format")
+        },
         "valueFormat": "SMART_NUMBER",
         "date_format": "%m/%Y",
     }
