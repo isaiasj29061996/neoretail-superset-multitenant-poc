@@ -79,6 +79,17 @@ def test_runtime_gate_compares_source_mart_and_actual_chartdata():
     assert "ChartDataCommand" in validator
     assert "source-mart:" in validator
     assert "source-chart:" in validator
+
+
+def test_comparison_pivots_keep_individual_metric_formats():
+    bootstrap = read("superset/bootstrap_panorama.py")
+    # A single SMART_NUMBER formatter was flattening ratios such as Markup
+    # into 1.17 instead of the Power BI-style 117%. Pivot v2 supports
+    # per-metric columnFormats, so the semantic value remains a ratio.
+    assert '"columnFormats": {' in bootstrap
+    assert 'item["label"]: item.get("d3Format")' in bootstrap
+    assert 'formatted_metric("Markup",' in bootstrap
+    assert '".2%"' in bootstrap
     assert "filtered-source-chart:" in validator
 
 
