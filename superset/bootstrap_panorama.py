@@ -1932,7 +1932,16 @@ def main():
             db.session.add(dashboard)
         dashboard.published = True
         dashboard.position_json = json.dumps(layout.nodes, ensure_ascii=False)
-        dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
+        dashboard.css = (
+            ".dashboard-content { background: #e7f0f5 !important; } "
+            ".dashboard-component-chart-holder { border-radius: 8px; background: #fff; } "
+            ".dashboard-component-chart-holder > .header { display: none !important; } "
+            ".dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; } "
+            # The local selector chart has its own business heading; only
+            # suppress Superset's duplicate outer chart title for this variant.
+            ".dashboard-component-chart-holder:has([data-neoretail-variant='kpifilters']) .chart-header "
+            "{ display: none !important; }"
+        )
         filter_targets = {column: filter_options.id for column in WEEKLY_FILTER_COLUMNS}
         filter_targets["nm_measure"] = conversion_options.id
         comparison_dataset_ids = [
