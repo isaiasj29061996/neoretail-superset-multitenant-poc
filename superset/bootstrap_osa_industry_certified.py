@@ -127,7 +127,7 @@ WITH history_filtered AS (
 {cause_predicates}
 ), measures AS (
   SELECT DISTINCT id_customer,nm_measure
-  FROM gold.nr_conversion_options
+  FROM gold.nr_conversion_options m
   WHERE 1=1
 {measure_filter}
 ), hist_month AS (
@@ -215,8 +215,12 @@ LEFT JOIN cause_factor cf
 
 def weekly_overview_sql() -> str:
     """Weekly OSA timeline; the latest 13 filtered CD_WEEK values are returned."""
+    weekly_overrides = {
+        **DIMENSION_OVERRIDES,
+        "tp_activity_level": "o.max_tp_activity_level",
+    }
     weekly_predicates = _jinja_filter_predicates(
-        "w", "status_item_geral", DIMENSION_OVERRIDES,
+        "w", "o.max_tp_activity_level", weekly_overrides,
     )
     opportunity_overrides = {
         **DIMENSION_OVERRIDES,
@@ -238,6 +242,10 @@ WITH weekly_filtered AS (
     ON l.id_customer=w.id_customer AND l.id_location=w.id_location
   LEFT JOIN gold.dim_itens i
     ON i.id_customer=w.id_customer AND i.id_item=w.id_item
+  LEFT JOIN gold.calculo_oportunidades o
+    ON o.id_customer=w.id_customer
+   AND o.id_location::text=w.id_location::text
+   AND o.id_item::text=w.id_item::text
   WHERE 1=1
 {weekly_predicates}
 ), ranked_weeks AS (
@@ -263,7 +271,7 @@ WITH weekly_filtered AS (
 {opportunity_predicates}
 ), measures AS (
   SELECT DISTINCT id_customer,nm_measure
-  FROM gold.nr_conversion_options
+  FROM gold.nr_conversion_options m
   WHERE 1=1
 {measure_filter}
 ), weekly AS (
@@ -341,7 +349,7 @@ WITH latest AS (
   GROUP BY id_customer
 ), measures AS (
   SELECT DISTINCT id_customer,nm_measure
-  FROM gold.nr_conversion_options
+  FROM gold.nr_conversion_options m
   WHERE 1=1
 {measure_filter}
 ), base AS (
