@@ -37,6 +37,14 @@ dashboards:
     embedded_id: 4d51036e-bb25-56b9-925d-96b367e521bb
     required_module: visao_industria
     embedded_height: 2050
+  osa_certified:
+    title: Panorama — OSA — Certificada
+    menu_label: OSA (nova)
+    section: panorama
+    slug: neoretail-v9-osa-industria-certified
+    embedded_id: f4517451-297b-4f6f-bd03-5bd818b057cd
+    required_module: visao_industria
+    embedded_height: 2600
   tasks:
     title: Tarefas do dia — Pré-ruptura / Excesso
     menu_label: Pré-ruptura / Excesso
