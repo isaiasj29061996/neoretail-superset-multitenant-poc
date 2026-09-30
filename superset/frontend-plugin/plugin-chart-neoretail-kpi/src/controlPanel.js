@@ -68,6 +68,7 @@ export default {
                 ['panorama', t('Evolutivo panorama')],
                 ['panoramasummary', t('Resumo do evolutivo panorama')],
                 ['rankbars', t('Ranking em barras')],
+                ['hierarchyrank', t('Barras hierárquicas')],
                 ['stacked', t('Colunas empilhadas')],
                 ['verticalbars', t('Barras verticais')],
                 ['headlinearea', t('Indicador com área')],

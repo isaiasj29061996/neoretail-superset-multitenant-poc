@@ -137,6 +137,12 @@ export default function transformProps(chartProps) {
   const metricLabels = metrics.map(metricLabel);
   const dateColumn = columnName(formData.x_axis) || 'data';
   const groupColumn = columnName(asArray(formData.groupby)[0]);
+  const hierarchyColumns = splitConfig(
+    formData.hierarchy_columns,
+    asArray(formData.groupby).map(columnName).filter(column => column && ![
+      'drill_level', 'comparison_kpi', 'kpi_format',
+    ].includes(column)),
+  );
   const labels = splitConfig(formData.metric_labels, metricLabels);
   const formats = splitConfig(formData.metric_formats, [formData.number_format_type || 'currency']);
   const directions = splitConfig(formData.metric_directions, [formData.lower_is_better === false ? 'higher' : 'lower']);
@@ -185,6 +191,13 @@ export default function transformProps(chartProps) {
     values: metricLabels.map(label => numeric(row[label])),
   })).sort((left, right) => right.values.reduce((sum, value) => sum + Math.abs(value), 0)
     - left.values.reduce((sum, value) => sum + Math.abs(value), 0));
+  const hierarchyRows = (queriesData[0]?.data || []).map(row => ({
+    level: numeric(row.drill_level),
+    path: hierarchyColumns.map(column => row[column] == null ? null : String(row[column])),
+    value: numeric(row[metricLabels[0]]),
+    kpi: row.comparison_kpi == null ? null : String(row.comparison_kpi),
+    format: row.kpi_format == null ? null : String(row.kpi_format),
+  })).filter(row => row.level !== null && row.value !== null);
   const grouped = normalize(queriesData[groupedQueryIndex]?.data || [], true).map(applySemanticProfile);
   const monthlyLastNonBlank = formData.semantic_period === 'month_last_nonblank';
   const collapseMonthly = rows => [...rows.reduce(
@@ -307,6 +320,11 @@ export default function transformProps(chartProps) {
       }),
     rankItems,
     rankSeries,
-    hasData: ['rankbars', 'verticalbars', 'stackedrank'].includes(variant) ? rankItems.length > 0 : timeline.length > 0,
+    hierarchyRows,
+    hierarchyColumns,
+    hierarchyFormat: hierarchyRows[0]?.format || formats[0] || 'number',
+    hierarchyKpi: hierarchyRows[0]?.kpi || labels[0] || '',
+    hasData: variant === 'hierarchyrank' ? hierarchyRows.length > 0
+      : ['rankbars', 'verticalbars', 'stackedrank'].includes(variant) ? rankItems.length > 0 : timeline.length > 0,
   };
 }

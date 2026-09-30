@@ -24,8 +24,8 @@ def test_giro_roi_matches_report_and_tmdl_contracts():
 def test_giro_semantics_preserve_monthly_positive_filter_and_latest_week_blank():
     mart = read("analytics-db/marts/43_panorama_inventory_semantic.sql")
     compact = "".join(mart.split())
-    assert "SUM(h.giro)FILTER(WHEREh.giro>0)::doubleprecisionASgiro_num" in compact
-    assert "COUNT(h.giro)FILTER(WHEREh.giro>0)::bigintASgiro_den" in compact
+    assert "SUM(f.giro)FILTER(WHEREf.giro>0)::doubleprecisionASgiro_num" in compact
+    assert "COUNT(f.giro)FILTER(WHEREf.giro>0)::bigintASgiro_den" in compact
     assert "CASEWHENw.cd_week=w.latest_cd_weekTHENNULLELSEw.giro_num_rawEND" in compact
     assert "CASEWHENw.cd_week=w.latest_cd_weekTHENNULLELSEw.giro_den_rawEND" in compact
 

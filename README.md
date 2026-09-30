@@ -340,6 +340,14 @@ A auditoria da pagina de quantidade, com formulas, reconciliacao numerica e
 pendencias de dados/calendario, esta em
 [docs/metric_certification_overview_quantity.md](docs/metric_certification_overview_quantity.md).
 
+A auditoria dos comparativos do Panorama, incluindo o mapeamento PBIP/TMDL,
+reconciliação fonte → mart → ChartData e medições antes/depois, está em
+[docs/metric_certification_panorama_comparisons.md](docs/metric_certification_panorama_comparisons.md).
+
+O contrato do seletor `AP_KPI_INDUSTRIA`, os três gráficos horizontais com
+drill, a reconciliação das dez opções e a otimização do caminho padrão estão em
+[docs/metric_certification_panorama_kpi_dimensions.md](docs/metric_certification_panorama_kpi_dimensions.md).
+
 ---
 
 ## Performance

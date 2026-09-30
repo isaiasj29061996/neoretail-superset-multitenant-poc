@@ -88,6 +88,120 @@ P = {
 GAP_TVD = metric("TVD", "SUM(COALESCE(tvd, 0))")
 GAP_IVD = metric("IVD", "SUM(COALESCE(ivd, 0))")
 
+COMPARISON_SCOPES = {
+    "region": ("regiao", "uf", "cidade"),
+    "retail": ("rede", "bandeira", "loja"),
+    "hierarchy": ("hierarquia_1", "hierarquia_2", "item"),
+}
+
+KPI_DIMENSION_SCOPES = {
+    "region": ("regiao", "uf", "cidade"),
+    "retail": ("rede", "bandeira", "loja"),
+    "hierarchy": ("hierarquia_1", "descricao_marca", "item"),
+}
+
+KPI_INDUSTRY_OPTIONS = (
+    ("Venda R$", "currency"),
+    ("Estoque qtd", "quantity"),
+    ("%OSA", "percent"),
+    ("%Ruptura", "percent"),
+    ("%Item sem Venda", "percent"),
+    ("Cobertura de estoque", "number"),
+    ("Giro de estoque", "number"),
+    ("%ROI", "percent"),
+    ("TVD - Pré-Ruptura", "currency"),
+    ("IVD - Excesso de estoque", "currency"),
+)
+
+def formatted_metric(label: str, expression: str, d3_format: str) -> dict:
+    result = metric(label, expression)
+    result["d3Format"] = d3_format
+    return result
+
+
+KPI_DIMENSION_VALUE = formatted_metric("KPI valor", "MAX(kpi_value)", ",.2f")
+KPI_ORDER_METRIC_NAME = "AP KPI ordem"
+
+
+_COMPARISON_SELLOUT = (
+    "CASE WHEN SUM(faturamento_sum)>0 THEN SUM(faturamento_sum) ELSE NULL END"
+)
+_COMPARISON_SALES_QTY = (
+    "CASE WHEN MAX(nm_measure)='valor' THEN SUM(faturamento_sum) "
+    "WHEN MAX(conversion_factor) IS NULL THEN NULL "
+    "ELSE SUM(volume_sum)*MAX(conversion_factor) END"
+)
+_COMPARISON_LOSS_QTY = (
+    "CASE WHEN MAX(conversion_factor) IS NULL THEN NULL "
+    "ELSE SUM(loss_sum)*MAX(conversion_factor) END"
+)
+_COMPARISON_PRICE = (
+    "CASE WHEN MAX(conversion_factor) IS NULL OR SUM(price_count)=0 THEN NULL "
+    "ELSE (SUM(price_sum)/SUM(price_count))*MAX(conversion_factor) END"
+)
+_COMPARISON_STOCK_QTY = (
+    "CASE WHEN MAX(conversion_factor) IS NULL THEN NULL ELSE "
+    "(ARRAY_AGG(stock_qty_base_sum ORDER BY data DESC))[1]*MAX(conversion_factor) END"
+)
+
+COMPARISON_METRICS = {
+    "value": [
+        formatted_metric("Sell out venda", _COMPARISON_SELLOUT, "$,.2f"),
+        formatted_metric("Sell out custo", "SUM(sales_cost_sum)", "$,.2f"),
+        formatted_metric(
+            "Markup",
+            f"CASE WHEN ({_COMPARISON_SELLOUT}) IS NULL OR SUM(sales_cost_sum)=0 "
+            f"THEN 0 ELSE ({_COMPARISON_SELLOUT})/SUM(sales_cost_sum) END",
+            ".2%",
+        ),
+    ],
+    "quantity": [
+        formatted_metric("Qtd venda", _COMPARISON_SALES_QTY, ",.2f"),
+        formatted_metric("Qtd Perda OSA", _COMPARISON_LOSS_QTY, ",.2f"),
+        formatted_metric("Preço Médio", _COMPARISON_PRICE, "$,.2f"),
+    ],
+    "stock": [
+        formatted_metric("Estoque custo", "SUM(stock_cost_sum)", "$,.2f"),
+        formatted_metric("Estoque qtd", _COMPARISON_STOCK_QTY, ",.2f"),
+        formatted_metric(
+            "ROI",
+            f"CASE WHEN ({_COMPARISON_SELLOUT}) IS NULL OR SUM(sales_cost_sum)=0 "
+            f"THEN 0 ELSE (({_COMPARISON_SELLOUT})-SUM(sales_cost_sum))"
+            "/NULLIF(SUM(stock_cost_sum),0) END",
+            ".2%",
+        ),
+        formatted_metric(
+            "Giro", "SUM(giro_num)/NULLIF(SUM(giro_den),0)", ",.0f"
+        ),
+    ],
+    "osa": [
+        formatted_metric(
+            "% OSA",
+            "1-SUM(osa_problem_sum)/NULLIF(SUM(osa_active_sum),0)",
+            ".2%",
+        ),
+        formatted_metric(
+            "% RUP", "SUM(rupture_sum)/NULLIF(SUM(status_sum),0)", ".2%"
+        ),
+        formatted_metric(
+            "% ISV", "SUM(isv_sum)/NULLIF(SUM(status_sum),0)", ".2%"
+        ),
+    ],
+}
+
+COMPARISON_GAP_METRICS = [
+    formatted_metric(
+        "R$ Pré-ruptura",
+        "(ARRAY_AGG(tvd ORDER BY data DESC) FILTER (WHERE tvd IS NOT NULL))[1]",
+        "$,.2f",
+    ),
+    formatted_metric(
+        "R$ Excesso",
+        "(ARRAY_AGG(ivd ORDER BY data DESC) FILTER (WHERE ivd IS NOT NULL))[1]",
+        "$,.2f",
+    ),
+]
+
 _WEEKLY_SELLOUT = (
     "CASE WHEN SUM(faturamento_sum) > 0 "
     "THEN SUM(faturamento_sum) ELSE SUM(fallback_sellout_sum) END"
@@ -129,6 +243,372 @@ WEEKLY_FILTER_COLUMNS = (
     "tp_activity_level", "activity_level", "item", "descricao_marca",
     "hierarquia_1", "hierarquia_2", "hierarquia_3",
 )
+
+
+def _comparison_dimension_projection(scope_columns: tuple[str, ...]) -> str:
+    return ",\n    ".join(
+        column if column in scope_columns else f"NULL::text AS {column}"
+        for column in WEEKLY_FILTER_COLUMNS
+        if column not in ("tp_activity_level", "activity_level")
+    )
+
+
+def comparison_history_sql(scope: str) -> str:
+    """PBIP comparison matrix over a physical history serving mart."""
+    scope_columns = COMPARISON_SCOPES[scope]
+    predicates = _jinja_filter_predicates("h")
+    group_columns = ",".join(scope_columns)
+    dimensions = _comparison_dimension_projection(scope_columns)
+    return f"""
+{{% set time_filter = get_time_filter('data', remove_filter=True) %}}
+{{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}}
+WITH history_filtered AS (
+  SELECT h.*
+  FROM gold.nr_panorama_comparison_history_detail h
+  WHERE 1=1
+{predicates}
+  {{% if time_filter.from_expr %}} AND h.data >= {{{{ time_filter.from_expr }}}} {{% endif %}}
+  {{% if time_filter.to_expr %}} AND h.data < {{{{ time_filter.to_expr }}}} {{% endif %}}
+  {{% if not time_filter.from_expr and not time_filter.to_expr %}}
+    AND h.data >= DATE_TRUNC('year', CURRENT_DATE)
+  {{% endif %}}
+), expanded AS (
+  SELECT h.*,o.nm_measure,c.conversion_rate
+  FROM history_filtered h
+  JOIN gold.nr_conversion_options o ON o.id_customer=h.id_customer
+  LEFT JOIN gold.dim_conversao c
+    ON c.id_customer=h.id_customer
+   AND c.id_item::text=h.id_item::text
+   AND c.nm_measure=o.nm_measure
+  WHERE 1=1
+  {{% if measure_filters|length == 0 %}} AND o.nm_measure='unidade' {{% endif %}}
+  {{% for filter in measure_filters %}}
+  {{% if filter.get('op') == 'IN' %}}
+    AND o.nm_measure IN {{{{ filter.get('val') | where_in }}}}
+  {{% elif filter.get('op') == 'NOT IN' %}}
+    AND o.nm_measure NOT IN {{{{ filter.get('val') | where_in }}}}
+  {{% endif %}}
+  {{% endfor %}}
+), monthly AS (
+  SELECT
+    data,id_customer,nm_measure,{group_columns},
+    SUM(COALESCE(faturamento,0))::float8 AS faturamento_sum,
+    SUM(COALESCE(volume_unidades,0))::float8 AS volume_sum,
+    SUM(COALESCE(qtd_perda_osa,0))::float8 AS loss_sum,
+    SUM(avg_sales_price) FILTER (WHERE faturamento>0)::float8 AS price_sum,
+    COUNT(avg_sales_price) FILTER (WHERE faturamento>0)::bigint AS price_count,
+    SUM(COALESCE(volume_unidades,0)*COALESCE(avg_price_cost,0))::float8 AS sales_cost_sum,
+    SUM(COALESCE(estoque_medio,0)*COALESCE(avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(estoque_unidades,0))::float8 AS stock_qty_base_sum,
+    SUM(giro) FILTER (WHERE giro>0)::float8 AS giro_num,
+    COUNT(giro) FILTER (WHERE giro>0)::bigint AS giro_den,
+    SUM(COALESCE(qtd_problemas_osa,0))::float8 AS osa_problem_sum,
+    SUM(COALESCE(qtd_item_ativo_osa,0))::float8 AS osa_active_sum,
+    SUM(COALESCE(rup,0))::float8 AS rupture_sum,
+    SUM(COALESCE(status_item_geral,0))::float8 AS status_sum,
+    SUM(COALESCE(est_virtual,0))::float8 AS isv_sum,
+    MAX(conversion_rate)::float8 AS conversion_factor
+  FROM expanded
+  GROUP BY data,id_customer,nm_measure,{group_columns}
+)
+SELECT
+    data,id_customer,nm_measure,'{scope}'::text AS comparison_scope,
+    NULL::text AS tp_activity_level,NULL::text AS activity_level,
+    {dimensions},
+    faturamento_sum,volume_sum,loss_sum,price_sum,price_count,
+    sales_cost_sum,stock_cost_sum,stock_qty_base_sum,giro_num,giro_den,
+    osa_problem_sum,osa_active_sum,rupture_sum,status_sum,isv_sum,
+    conversion_factor
+FROM monthly
+""".strip()
+
+
+def comparison_gap_sql(scope: str) -> str:
+    """PBIP LASTNONBLANK matrix with a compact default and filtered fallback."""
+    scope_columns = COMPARISON_SCOPES[scope]
+    predicates = _jinja_filter_predicates("o")
+    checks = " or ".join(
+        f"get_filters('{column}')"
+        for column in WEEKLY_FILTER_COLUMNS
+        if column != "activity_level"
+    )
+    group_columns = ",".join(scope_columns)
+    dimensions = _comparison_dimension_projection(scope_columns)
+    return f"""
+{{% set time_filter = get_time_filter('data', remove_filter=True) %}}
+{{% set has_dimension_filter = {checks} %}}
+{{% if has_dimension_filter %}}
+WITH filtered AS (
+  SELECT o.*
+  FROM gold.nr_panorama_opportunities o
+  WHERE 1=1
+{predicates}
+  {{% if time_filter.from_expr %}} AND o.data >= {{{{ time_filter.from_expr }}}} {{% endif %}}
+  {{% if time_filter.to_expr %}} AND o.data < {{{{ time_filter.to_expr }}}} {{% endif %}}
+  {{% if not time_filter.from_expr and not time_filter.to_expr %}}
+    AND o.data >= DATE_TRUNC('year', CURRENT_DATE)
+  {{% endif %}}
+), daily AS (
+  SELECT data,id_customer,{group_columns},
+         SUM(tvd_simplificado)::float8 AS tvd,
+         SUM(ivd_simplificado)::float8 AS ivd
+  FROM filtered
+  GROUP BY data,id_customer,{group_columns}
+)
+SELECT
+    data,id_customer,'{scope}'::text AS comparison_scope,
+    NULL::text AS tp_activity_level,NULL::text AS activity_level,
+    {dimensions},tvd,ivd
+FROM daily
+{{% else %}}
+SELECT
+    o.data,o.id_customer,o.comparison_scope,
+    NULL::text AS tp_activity_level,NULL::text AS activity_level,
+    {dimensions},o.tvd,o.ivd
+FROM gold.nr_panorama_comparison_gap_daily o
+WHERE o.comparison_scope='{scope}'
+{predicates}
+  {{% if time_filter.from_expr %}} AND o.data >= {{{{ time_filter.from_expr }}}} {{% endif %}}
+  {{% if time_filter.to_expr %}} AND o.data < {{{{ time_filter.to_expr }}}} {{% endif %}}
+  {{% if not time_filter.from_expr and not time_filter.to_expr %}}
+    AND o.data >= DATE_TRUNC('year', CURRENT_DATE)
+  {{% endif %}}
+{{% endif %}}
+""".strip()
+
+
+def _kpi_dimension_projection(scope_columns: tuple[str, ...]) -> str:
+    return ",\n  ".join(
+        column if column in scope_columns else f"NULL::text AS {column}"
+        for column in WEEKLY_FILTER_COLUMNS
+    )
+
+
+def _kpi_default_projection(scope_columns: tuple[str, ...]) -> str:
+    positions = {column: index + 1 for index, column in enumerate(scope_columns)}
+    return ",\n  ".join(
+        f"d.dimension_{positions[column]} AS {column}"
+        if column in positions else f"NULL::text AS {column}"
+        for column in WEEKLY_FILTER_COLUMNS
+    )
+
+
+def kpi_dimension_sql(scope: str) -> str:
+    """AP_KPI_INDUSTRIA contract over history and opportunity marts."""
+    first, second, third = KPI_DIMENSION_SCOPES[scope]
+    history_predicates = _jinja_filter_predicates("h")
+    opportunity_predicates = _jinja_filter_predicates("o")
+    projection = _kpi_dimension_projection(KPI_DIMENSION_SCOPES[scope])
+    default_projection = _kpi_default_projection(KPI_DIMENSION_SCOPES[scope])
+    filter_checks = " or ".join(
+        f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS
+    )
+    allowed = [label for label, _ in KPI_INDUSTRY_OPTIONS]
+    allowed_json = json.dumps(allowed, ensure_ascii=False)
+    return f"""
+{{% set kpi_filters = get_filters('comparison_kpi', remove_filter=True) %}}
+{{% set year_filters = get_filters('comparison_year', remove_filter=True) %}}
+{{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}}
+{{% set selected_kpi = kpi_filters[0].get('val')[0] if kpi_filters|length and kpi_filters[0].get('val')|length else 'Venda R$' %}}
+{{% set allowed_kpis = {allowed_json} %}}
+{{% if selected_kpi not in allowed_kpis %}}{{% set selected_kpi = 'Venda R$' %}}{{% endif %}}
+{{% set selected_measure = measure_filters[0].get('val')[0] if measure_filters|length and measure_filters[0].get('val')|length else 'unidade' %}}
+{{% set has_dimension_filter = {filter_checks} %}}
+{{% if selected_kpi in ['TVD - Pré-Ruptura','IVD - Excesso de estoque'] %}}
+{{% if not has_dimension_filter %}}
+SELECT
+  d.data,d.comparison_year,d.id_customer,'unidade'::text AS nm_measure,
+  {default_projection},d.drill_level,
+  '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
+  'currency'::text AS kpi_format,
+  CASE WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='TVD - Pré-Ruptura' THEN d.tvd ELSE d.ivd END::float8 AS kpi_value
+FROM gold.nr_panorama_kpi_dimension_gap_default d
+WHERE d.comparison_scope='{scope}'
+  {{% for filter in year_filters %}}
+  {{% if filter.get('op') == 'IN' %}} AND d.comparison_year IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% endfor %}}
+{{% else %}}
+WITH filtered AS (
+  SELECT o.*
+  FROM gold.nr_panorama_opportunities o
+  WHERE 1=1
+{opportunity_predicates}
+  {{% for filter in year_filters %}}
+  {{% if filter.get('op') == 'IN' %}} AND EXTRACT(YEAR FROM o.data)::int IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% endfor %}}
+), daily_nodes AS (
+  SELECT
+    o.data,EXTRACT(YEAR FROM o.data)::int AS comparison_year,o.id_customer,
+    o.{first},o.{second},o.{third},
+    CASE WHEN GROUPING(o.{second})=1 THEN 0 WHEN GROUPING(o.{third})=1 THEN 1 ELSE 2 END::int AS drill_level,
+    SUM(o.tvd_simplificado)::float8 AS tvd,
+    SUM(o.ivd_simplificado)::float8 AS ivd
+  FROM filtered o
+  GROUP BY o.data,EXTRACT(YEAR FROM o.data),o.id_customer,GROUPING SETS (
+    (o.{first}),(o.{first},o.{second}),(o.{first},o.{second},o.{third})
+  )
+), latest AS (
+  SELECT DISTINCT ON (comparison_year,id_customer,drill_level,{first},{second},{third}) *
+  FROM daily_nodes
+  ORDER BY comparison_year,id_customer,drill_level,{first},{second},{third},data DESC
+)
+SELECT
+  l.data,l.comparison_year,l.id_customer,'unidade'::text AS nm_measure,
+  {projection},l.drill_level,
+  '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
+  'currency'::text AS kpi_format,
+  CASE WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='TVD - Pré-Ruptura' THEN l.tvd ELSE l.ivd END::float8 AS kpi_value
+FROM latest l
+{{% endif %}}
+{{% else %}}
+{{% if not has_dimension_filter and (selected_kpi != 'Estoque qtd' or selected_measure == 'unidade') %}}
+SELECT
+  d.data,d.comparison_year,d.id_customer,
+  '{{{{ selected_measure | replace("'", "''") }}}}'::text AS nm_measure,
+  {default_projection},d.drill_level,
+  '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
+  CASE
+    WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='Venda R$' THEN 'currency'
+    WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='Estoque qtd' THEN 'quantity'
+    WHEN '{{{{ selected_kpi | replace("'", "''") }}}}' IN ('%OSA','%Ruptura','%Item sem Venda','%ROI') THEN 'percent'
+    ELSE 'number'
+  END::text AS kpi_format,
+  CASE '{{{{ selected_kpi | replace("'", "''") }}}}'
+    WHEN 'Venda R$' THEN d.sales_value
+    WHEN 'Estoque qtd' THEN d.stock_quantity
+    WHEN '%OSA' THEN d.osa_percent
+    WHEN '%Ruptura' THEN d.rupture_percent
+    WHEN '%Item sem Venda' THEN d.no_sales_percent
+    WHEN 'Cobertura de estoque' THEN d.coverage
+    WHEN 'Giro de estoque' THEN d.inventory_turnover
+    WHEN '%ROI' THEN d.roi_percent
+  END::float8 AS kpi_value
+FROM gold.nr_panorama_kpi_dimension_history_default d
+WHERE d.comparison_scope='{scope}'
+  {{% for filter in year_filters %}}
+  {{% if filter.get('op') == 'IN' %}} AND d.comparison_year IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% endfor %}}
+{{% else %}}
+WITH filtered AS (
+  SELECT h.*,c.conversion_rate
+  FROM gold.nr_panorama_comparison_history_detail h
+  LEFT JOIN gold.dim_conversao c
+    ON c.id_customer=h.id_customer AND c.id_item::text=h.id_item::text
+   AND c.nm_measure='{{{{ selected_measure | replace("'", "''") }}}}'
+  WHERE 1=1
+{history_predicates}
+  {{% for filter in year_filters %}}
+  {{% if filter.get('op') == 'IN' %}} AND EXTRACT(YEAR FROM h.data)::int IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% endfor %}}
+), monthly_nodes AS (
+  SELECT
+    h.data,EXTRACT(YEAR FROM h.data)::int AS comparison_year,h.id_customer,
+    h.{first},h.{second},h.{third},
+    CASE WHEN GROUPING(h.{second})=1 THEN 0 WHEN GROUPING(h.{third})=1 THEN 1 ELSE 2 END::int AS drill_level,
+    SUM(COALESCE(h.faturamento,0))::float8 AS sellout_sum,
+    SUM(COALESCE(h.volume_unidades,0))::float8 AS volume_sum,
+    SUM(h.avg_sales_price)::float8 AS price_sum,
+    COUNT(h.avg_sales_price)::bigint AS price_count,
+    SUM(COALESCE(h.volume_unidades,0)*COALESCE(h.avg_price_cost,0))::float8 AS sales_cost_sum,
+    SUM(COALESCE(h.estoque_medio,0)*COALESCE(h.avg_price_cost,0))::float8 AS stock_cost_sum,
+    SUM(COALESCE(h.estoque_unidades,0))::float8 AS stock_qty_sum,
+    SUM(COALESCE(h.demanda_media,0))::float8 AS demand_sum,
+    SUM(h.giro) FILTER (WHERE h.giro>0)::float8 AS giro_sum,
+    COUNT(h.giro) FILTER (WHERE h.giro>0)::bigint AS giro_count,
+    SUM(COALESCE(h.qtd_problemas_osa,0))::float8 AS osa_problem_sum,
+    SUM(COALESCE(h.qtd_item_ativo_osa,0))::float8 AS osa_active_sum,
+    SUM(COALESCE(h.rup,0))::float8 AS rupture_sum,
+    SUM(COALESCE(h.status_item_geral,0))::float8 AS status_sum,
+    SUM(COALESCE(h.est_virtual,0))::float8 AS isv_sum,
+    MAX(h.conversion_rate)::float8 AS conversion_factor
+  FROM filtered h
+  GROUP BY h.data,EXTRACT(YEAR FROM h.data),h.id_customer,GROUPING SETS (
+    (h.{first}),(h.{first},h.{second}),(h.{first},h.{second},h.{third})
+  )
+), annual_nodes AS (
+  SELECT
+    MAKE_DATE(comparison_year,1,1) AS data,comparison_year,id_customer,
+    {first},{second},{third},drill_level,
+    SUM(sellout_sum)::float8 AS sellout_sum,
+    SUM(volume_sum)::float8 AS volume_sum,
+    SUM(price_sum)::float8 AS price_sum,
+    SUM(price_count)::bigint AS price_count,
+    SUM(sales_cost_sum)::float8 AS sales_cost_sum,
+    SUM(stock_cost_sum)::float8 AS stock_cost_sum,
+    SUM(stock_qty_sum)::float8 AS stock_qty_period_sum,
+    SUM(demand_sum)::float8 AS demand_sum,
+    SUM(giro_sum)::float8 AS giro_sum,
+    SUM(giro_count)::bigint AS giro_count,
+    SUM(osa_problem_sum)::float8 AS osa_problem_sum,
+    SUM(osa_active_sum)::float8 AS osa_active_sum,
+    SUM(rupture_sum)::float8 AS rupture_sum,
+    SUM(status_sum)::float8 AS status_sum,
+    SUM(isv_sum)::float8 AS isv_sum,
+    (ARRAY_AGG(stock_qty_sum ORDER BY data DESC))[1]::float8 AS latest_stock_qty,
+    (ARRAY_AGG(conversion_factor ORDER BY data DESC))[1]::float8 AS latest_conversion_factor,
+    MAX(conversion_factor)::float8 AS conversion_factor
+  FROM monthly_nodes
+  GROUP BY comparison_year,id_customer,{first},{second},{third},drill_level
+)
+SELECT
+  a.data,a.comparison_year,a.id_customer,
+  '{{{{ selected_measure | replace("'", "''") }}}}'::text AS nm_measure,
+  {projection},a.drill_level,
+  '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
+  CASE
+    WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='Venda R$' THEN 'currency'
+    WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='Estoque qtd' THEN 'quantity'
+    WHEN '{{{{ selected_kpi | replace("'", "''") }}}}' IN ('%OSA','%Ruptura','%Item sem Venda','%ROI') THEN 'percent'
+    ELSE 'number'
+  END::text AS kpi_format,
+  CASE '{{{{ selected_kpi | replace("'", "''") }}}}'
+    WHEN 'Venda R$' THEN CASE WHEN a.sellout_sum>0 THEN a.sellout_sum WHEN a.latest_conversion_factor IS NOT NULL AND a.price_count>0 THEN (a.volume_sum*a.latest_conversion_factor)*(a.price_sum/a.price_count*a.latest_conversion_factor) END
+    WHEN 'Estoque qtd' THEN a.latest_stock_qty*a.latest_conversion_factor
+    WHEN '%OSA' THEN 100.0*(1-a.osa_problem_sum/NULLIF(a.osa_active_sum,0))
+    WHEN '%Ruptura' THEN 100.0*a.rupture_sum/NULLIF(a.status_sum,0)
+    WHEN '%Item sem Venda' THEN 100.0*a.isv_sum/NULLIF(a.status_sum,0)
+    WHEN 'Cobertura de estoque' THEN a.stock_qty_period_sum/NULLIF(a.demand_sum,0)
+    WHEN 'Giro de estoque' THEN a.giro_sum/NULLIF(a.giro_count,0)
+    WHEN '%ROI' THEN CASE WHEN a.sellout_sum=0 OR a.sales_cost_sum=0 THEN 0 ELSE 100.0*(a.sellout_sum-a.sales_cost_sum)/NULLIF(a.stock_cost_sum,0) END
+  END::float8 AS kpi_value
+FROM annual_nodes a
+{{% endif %}}
+{{% endif %}}
+""".strip()
+
+
+def kpi_filter_options_sql() -> str:
+    rows = ",\n      ".join(
+        f"({index},'{label.replace(chr(39), chr(39) * 2)}','{fmt}')"
+        for index, (label, fmt) in enumerate(KPI_INDUSTRY_OPTIONS, 1)
+    )
+    return f"""
+WITH years AS (
+  SELECT DISTINCT EXTRACT(YEAR FROM data)::int AS comparison_year
+  FROM gold.nr_panorama_comparison_history_detail
+), kpis(kpi_order,comparison_kpi,kpi_format) AS (
+  VALUES {rows}
+)
+SELECT years.comparison_year,kpis.kpi_order,kpis.comparison_kpi,kpis.kpi_format
+FROM years CROSS JOIN kpis
+""".strip()
+
+
+def kpi_dimension_params(dataset, title: str, columns: tuple[str, ...]) -> dict:
+    return custom_params(
+        dataset,title,[KPI_DIMENSION_VALUE],formats="number",
+        groupby=[*columns,"drill_level","comparison_kpi","kpi_format"],
+        variant="hierarchyrank",row_limit=10000,
+        hierarchy_columns="|".join(columns),labels="KPI valor",
+    )
+
+
+def kpi_native_filters(filter_dataset_id: int) -> list[dict]:
+    common = {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": False, "searchAllOptions": True, "inverseSelection": False}
+    return [
+        {"id": "NATIVE_FILTER-panorama-kpi-year", "controlValues": common, "name": "Ano", "filterType": "filter_select", "targets": [{"datasetId": filter_dataset_id, "column": {"name": "comparison_year"}}], "defaultDataMask": {"extraFormData": {"filters": [{"col": "comparison_year", "op": "IN", "val": [2026]}]}, "filterState": {"label": "2026", "value": [2026]}, "ownState": {}}, "cascadeParentIds": [], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]}, "type": "NATIVE_FILTER", "description": ""},
+        {"id": "NATIVE_FILTER-panorama-kpi-selector", "controlValues": {**common, "sortAscending": True, "sortMetric": KPI_ORDER_METRIC_NAME}, "sortMetric": KPI_ORDER_METRIC_NAME, "name": "Visualização por", "filterType": "filter_select", "targets": [{"datasetId": filter_dataset_id, "column": {"name": "comparison_kpi"}}], "defaultDataMask": {"extraFormData": {"filters": [{"col": "comparison_kpi", "op": "IN", "val": ["Venda R$"]}]}, "filterState": {"label": "Venda R$", "value": ["Venda R$"]}, "ownState": {}}, "cascadeParentIds": [], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]}, "type": "NATIVE_FILTER", "description": ""},
+    ]
 
 
 def weekly_semantic_sql() -> str:
@@ -789,11 +1269,17 @@ def sql_filter(expression):
     }
 
 
-def upsert_chart(session, Slice, dataset, title, params, viz_type="neoretail-kpi-card"):
+def upsert_chart(
+    session, Slice, dataset, title, params, viz_type="neoretail-kpi-card",
+    legacy_titles=(),
+):
     chart = session.query(Slice).filter(Slice.slice_name == title).one_or_none()
+    if chart is None and legacy_titles:
+        chart = session.query(Slice).filter(Slice.slice_name.in_(legacy_titles)).one_or_none()
     if chart is None:
         chart = Slice(slice_name=title)
         session.add(chart)
+    chart.slice_name = title
     chart.datasource_type = "table"
     chart.datasource_id = dataset.id
     chart.viz_type = viz_type
@@ -823,6 +1309,34 @@ def table_params(dataset, groupby, metrics, page_length=12):
         "row_limit": 1000, "page_length": page_length, "include_search": True,
         "server_pagination": False, "order_desc": True, "table_timestamp_format": "%d/%m/%Y",
         "percent_metrics": [], "align_pn": False, "color_pn": False, "show_cell_bars": False,
+    }
+
+
+def comparison_pivot_params(dataset, rows, metrics):
+    """Power BI matrix equivalent: hierarchy rows and mixed semantic metrics."""
+    return {
+        "datasource": f"{dataset.id}__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": list(rows),
+        "groupbyColumns": [],
+        "metrics": metrics,
+        "adhoc_filters": [],
+        "time_range": "Current year",
+        # The AMBEV retail hierarchy has more than 2,000 leaf rows.  The PBIP
+        # matrix has no Top N filter, so the Superset contract must not silently
+        # truncate it at the former 1,000-row default.
+        "row_limit": 10000,
+        "order_desc": True,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": False,
+        "combineMetric": False,
+        "showRowTotals": True,
+        "showColTotals": False,
+        "expandRows": False,
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y",
     }
 
 
@@ -884,7 +1398,7 @@ def main():
     app = create_app()
     with app.app_context():
         from superset import db
-        from superset.connectors.sqla.models import SqlaTable
+        from superset.connectors.sqla.models import SqlaTable, SqlMetric
         from superset.models.core import Database
         from superset.models.dashboard import Dashboard
         from superset.models.slice import Slice
@@ -927,6 +1441,56 @@ def main():
             db.session, SqlaTable, database, "nr_panorama_gap_weekly_card_interactive",
             sql=weekly_gap_card_semantic_sql(),
         )
+        comparison_history = {
+            scope: upsert_dataset(
+                db.session,
+                SqlaTable,
+                database,
+                f"nr_panorama_comparison_{scope}_history",
+                sql=comparison_history_sql(scope),
+            )
+            for scope in COMPARISON_SCOPES
+        }
+        comparison_gap = {
+            scope: upsert_dataset(
+                db.session,
+                SqlaTable,
+                database,
+                f"nr_panorama_comparison_{scope}_gap",
+                sql=comparison_gap_sql(scope),
+            )
+            for scope in COMPARISON_SCOPES
+        }
+        kpi_dimensions = {
+            scope: upsert_dataset(
+                db.session, SqlaTable, database,
+                f"nr_panorama_kpi_dimension_{scope}",
+                sql=kpi_dimension_sql(scope),
+            )
+            for scope in KPI_DIMENSION_SCOPES
+        }
+        kpi_filter_options = upsert_dataset(
+            db.session, SqlaTable, database,
+            "nr_panorama_kpi_filter_options",
+            sql=kpi_filter_options_sql(),
+        )
+        kpi_order_metric = db.session.query(SqlMetric).filter(
+            SqlMetric.table_id == kpi_filter_options.id,
+            SqlMetric.metric_name == KPI_ORDER_METRIC_NAME,
+        ).one_or_none()
+        if kpi_order_metric is None:
+            kpi_order_metric = SqlMetric(
+                table_id=kpi_filter_options.id,
+                metric_name=KPI_ORDER_METRIC_NAME,
+                expression="MIN(kpi_order)",
+                metric_type="MIN",
+                d3format=",d",
+            )
+            db.session.add(kpi_order_metric)
+        else:
+            kpi_order_metric.expression = "MIN(kpi_order)"
+            kpi_order_metric.metric_type = "MIN"
+            kpi_order_metric.d3format = ",d"
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
         mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
         opportunities = mart
@@ -955,8 +1519,18 @@ def main():
         )] if weekly_max_date else []
 
         charts = {}
-        def add(key, dataset, title, params, viz="neoretail-kpi-card"):
-            charts[key] = upsert_chart(db.session, Slice, dataset, f"[Panorama] {title}", params, viz)
+        def add(
+            key, dataset, title, params, viz="neoretail-kpi-card", legacy_titles=(),
+        ):
+            charts[key] = upsert_chart(
+                db.session,
+                Slice,
+                dataset,
+                f"[Panorama] {title}",
+                params,
+                viz,
+                tuple(f"[Panorama] {item}" for item in legacy_titles),
+            )
 
         value_semantics = "direct_average:0:1|direct_average:1:1|markup_blank:0:2"
         quantity_semantics = "direct_average:0:1|direct_sum:1:1|weighted_average:2:2"
@@ -1175,22 +1749,61 @@ def main():
         )
         add("gap_semanal", gap_weekly_card, "Evolutivo de estoque — Falta x Excesso semanal", params)
 
-        dimensions = (("regiao", "Região"), ("rede", "Varejo"), ("hierarquia_1", "Hierarquia de item"))
-        for column, label in dimensions:
-            add(f"compare_{column}", latest, f"Comparativo — {label}", custom_params(latest, label, [P["sellout"]], groupby=[column], variant="rankbars", formats="currency", row_limit=10))
+        kpi_dimension_labels = (
+            ("region", "Região"),
+            ("retail", "Varejo"),
+            ("hierarchy", "Hierarquia de item"),
+        )
+        for scope, dimension_label in kpi_dimension_labels:
+            add(
+                f"kpi_dimension_{scope}",
+                kpi_dimensions[scope],
+                f"Comparativo de KPIs — {dimension_label}",
+                kpi_dimension_params(
+                    kpi_dimensions[scope], dimension_label,
+                    KPI_DIMENSION_SCOPES[scope],
+                ),
+            )
 
-        ranking_sets = {
-            "Valor": [P["sellout"], P["cost"], P["markup"]],
-            "Quantidade": [P["sales_qty"], P["loss_qty"], P["price"]],
-            "R$ Estoque": [P["stock_cost"], P["stock_qty"], P["roi"], P["giro"]],
-            "OSA": [P["osa"], P["rup"], P["isv"]],
-            "Falta x Excesso": [P["tvd"], P["ivd"]],
-        }
-        for tab, metrics in ranking_sets.items():
-            for column, label in dimensions:
-                key = f"rank_{tab}_{column}"
-                source = opportunities_latest if tab == "Falta x Excesso" else latest
-                add(key, source, f"Ranking {tab} — {label}", table_params(source, column, metrics), "table")
+        comparison_dimensions = (
+            ("region", "Região"),
+            ("retail", "Varejo"),
+            ("hierarchy", "Hierarquia de item"),
+        )
+        comparison_tabs = (
+            ("Valor", "value", COMPARISON_METRICS["value"]),
+            ("Quantidade", "quantity", COMPARISON_METRICS["quantity"]),
+            ("R$ Estoque", "stock", COMPARISON_METRICS["stock"]),
+            ("OSA", "osa", COMPARISON_METRICS["osa"]),
+            ("Falta x Excesso", "gap", COMPARISON_GAP_METRICS),
+        )
+        for tab_label, tab_key, metrics in comparison_tabs:
+            for scope, dimension_label in comparison_dimensions:
+                dataset = (
+                    comparison_gap[scope]
+                    if tab_key == "gap"
+                    else comparison_history[scope]
+                )
+                title = (
+                    f"Comparativo — {dimension_label}"
+                    if tab_key == "value"
+                    else f"Comparativo {tab_label} — {dimension_label}"
+                )
+                legacy = (
+                    ()
+                    if tab_key == "value"
+                    else (f"Ranking {tab_label} — {dimension_label}",)
+                )
+                add(
+                    f"compare_{tab_key}_{scope}",
+                    dataset,
+                    title,
+                    comparison_pivot_params(
+                        dataset, COMPARISON_SCOPES[scope], metrics
+                    ),
+                    "pivot_table_v2",
+                    legacy,
+                )
 
         detail_metrics = [P["sales_qty"], P["sellout"], P["cost"], P["markup"], P["price"], P["stock_cost"], P["stock_qty"], P["roi"], P["roi_annual"], P["giro"], P["osa"], P["rup"], P["isv"], P["osa_loss"]]
         detail_dims = (("regiao", "Região"), ("rede", "Rede"), ("hierarquia_1", "Categoria"), ("item", "Produto"), ("activity_level", "Nível de atividade"))
@@ -1207,9 +1820,18 @@ def main():
             (section, [(period, charts[f"{key}_{period}"]) for period in ("mensal", "semanal")])
             for section, key in (("Estoque", "stock"), ("Giro x ROI", "giro_roi"), ("OSA", "osa"), ("Falta x Excesso", "gap"))
         ], 58)
-        layout.row("GRID_ID", grid_parents, [charts[f"compare_{column}"] for column, _ in dimensions], 48)
-        layout.tabs("GRID_ID", grid_parents, "Ranking de oportunidades", [
-            (tab, [[charts[f"rank_{tab}_{column}"] for column, _ in dimensions]]) for tab in ranking_sets
+        layout.tabs("GRID_ID", grid_parents, "Comparativo de KPIs por dimensão", [
+            (
+                "KPIs",
+                [[charts[f"kpi_dimension_{scope}"] for scope, _ in kpi_dimension_labels]],
+            )
+        ], 52)
+        layout.tabs("GRID_ID", grid_parents, "Comparativos", [
+            (
+                tab_label,
+                [[charts[f"compare_{tab_key}_{scope}"] for scope, _ in comparison_dimensions]],
+            )
+            for tab_label, tab_key, _ in comparison_tabs
         ], 48)
         layout.tabs("GRID_ID", grid_parents, "Análise detalhada", [
             (label, [[charts[f"detail_{column}"]]]) for column, label in detail_dims
@@ -1224,10 +1846,23 @@ def main():
         dashboard.css = ".dashboard-content { background: #e7f0f5 !important; } .dashboard-component-chart-holder { border-radius: 8px; background: #fff; } .dashboard-component-chart-holder > .header { display: none !important; } .dashboard-component-tabs .dashboard-component-tabs .ant-tabs-nav-list { margin-left: auto !important; }"
         filter_targets = {column: filter_options.id for column in WEEKLY_FILTER_COLUMNS}
         filter_targets["nm_measure"] = conversion_options.id
-        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": overview_native_filters([history.id, weekly.id, weekly_sales.id, weekly_sales_card.id, monthly_sales.id, monthly_quantity.id, monthly_inventory.id, weekly_inventory_card.id, gap_monthly.id, gap_weekly_card.id], filter_targets), "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
+        comparison_dataset_ids = [
+            dataset.id
+            for dataset in (*comparison_history.values(), *comparison_gap.values())
+        ]
+        kpi_dimension_dataset_ids = [dataset.id for dataset in kpi_dimensions.values()]
+        native_filters = overview_native_filters(
+            [history.id, weekly.id, weekly_sales.id, weekly_sales_card.id,
+             monthly_sales.id, monthly_quantity.id, monthly_inventory.id,
+             weekly_inventory_card.id, gap_monthly.id, gap_weekly_card.id,
+             *comparison_dataset_ids, *kpi_dimension_dataset_ids],
+            filter_targets,
+        )
+        native_filters.extend(kpi_native_filters(kpi_filter_options.id))
+        dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters, "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
-        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "monthly_inventory": monthly_inventory.id, "weekly_inventory_card": weekly_inventory_card.id, "gap_monthly": gap_monthly.id, "gap_weekly_card": gap_weekly_card.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
+        print(json.dumps({"dashboard_id": dashboard.id, "slug": dashboard.slug, "industry": {"id_customer": 142, "label": "AMBEV"}, "datasets": {"history": history.id, "weekly": weekly.id, "monthly_inventory": monthly_inventory.id, "weekly_inventory_card": weekly_inventory_card.id, "gap_monthly": gap_monthly.id, "gap_weekly_card": gap_weekly_card.id, "comparison_history": {key: value.id for key, value in comparison_history.items()}, "comparison_gap": {key: value.id for key, value in comparison_gap.items()}, "kpi_dimensions": {key: value.id for key, value in kpi_dimensions.items()}, "kpi_filter_options": kpi_filter_options.id, "latest": latest.id, "mart": mart.id, "opportunities": opportunities.id, "opportunities_latest": opportunities_latest.id, "gap_periodic": gap_periodic.id}, "chart_count": len(charts)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

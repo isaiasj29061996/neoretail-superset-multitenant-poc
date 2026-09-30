@@ -117,7 +117,7 @@ def build_queries(form, dashboard_default_filters=None):
             "time_range": form.get("time_range", "No filter"),
             "row_limit": limit,
         }
-        if variant in {"rankbars", "verticalbars", "stackedrank"} and groupby:
+        if variant in {"rankbars", "verticalbars", "stackedrank", "hierarchyrank"} and groupby:
             query = {
                 **common,
                 "columns": groupby,

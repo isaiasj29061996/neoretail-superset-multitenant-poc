@@ -17,7 +17,7 @@ export default function buildQuery(formData, options) {
         row_limit: baseQueryObject.row_limit ?? 10000,
         extras: { ...baseQueryObject.extras, time_grain_sqla: baseQueryObject.extras?.time_grain_sqla ?? 'P1M' },
       };
-      if (['rankbars', 'verticalbars', 'stackedrank'].includes(formData.card_variant) && groupby.length) {
+      if (['rankbars', 'verticalbars', 'stackedrank', 'hierarchyrank'].includes(formData.card_variant) && groupby.length) {
         return [{ ...common, columns: groupby, orderby: metrics[0] ? [[metrics[0], false]] : [], row_limit: baseQueryObject.row_limit ?? 10 }];
       }
       const timelineScope = String(formData.timeline_query_scope || '').trim();

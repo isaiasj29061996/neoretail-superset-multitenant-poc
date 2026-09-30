@@ -108,8 +108,11 @@ Semanal:
 - `superset/validate_panorama_inventory_tabs.py`: reconcilia fonte → mart, valida TOP 13, chart.params e executa as queries reais dos seis charts.
 - `superset/frontend-plugin/plugin-chart-neoretail-kpi/tests/runtime-panorama-inventory.mjs`: valida as props finais do renderer e recompõe ROI, Giro, OSA, Ruptura e ISV.
 
+
 ## Status
 
-A implementação e os gates estão versionados na branch `feat/panorama-stock-certification`.
+A implementação e os gates estão versionados na branch eat/panorama-stock-certification.
 
-A certificação de runtime permanece **PENDENTE DE EXECUÇÃO no Docker local** até rodar o mart, rebuild do plugin, bootstrap e os validadores. Não declarar os seis charts como certificados em runtime antes desse gate.
+O gate de runtime foi executado no Docker local para o tenant 142. Fonte, mart e ChartData concordaram nos seis charts. As séries semanais possuem exatamente 13 períodos; a série mensal de Falta x Excesso possui sete meses porque esse é todo o histórico disponível no snapshot. 	imeline_limit=13 é limite máximo visual, não uma exigência para fabricar meses ausentes.
+
+Evidências: 24 testes Python, 81 checks JS de regressão e 68 checks sobre ChartData real aprovados. Ruptura do último mês permaneceu em 307,7138885%, literalmente conforme o DAX e sem limite artificial em 100%.

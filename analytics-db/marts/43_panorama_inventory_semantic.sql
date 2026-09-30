@@ -17,7 +17,249 @@ DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_weekly_card_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_gap_monthly_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_inventory_weekly_card_default;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_inventory_monthly_default;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_kpi_dimension_gap_default;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_kpi_dimension_history_default;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_comparison_gap_daily;
+DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_comparison_history_detail;
 DROP MATERIALIZED VIEW IF EXISTS gold.nr_panorama_inventory_weekly_detail;
+
+-- Supports the filtered fallback used by comparison matrices.  The base mart
+-- already has a retail index, but adding the date makes the current-year
+-- predicate selective before the daily aggregation.
+CREATE INDEX IF NOT EXISTS ix_nr_panorama_opportunities_customer_rede_data
+    ON gold.nr_panorama_opportunities (id_customer, rede, data);
+
+CREATE MATERIALIZED VIEW gold.nr_panorama_comparison_history_detail AS
+SELECT
+    f.mes_ano::date AS data,
+    f.id_customer,
+    f.id_item,
+    f.id_location,
+    f.volume_unidades::double precision AS volume_unidades,
+    f.faturamento::double precision AS faturamento,
+    f.estoque_unidades::double precision AS estoque_unidades,
+    f.estoque_medio::double precision AS estoque_medio,
+    f.demanda_media::double precision AS demanda_media,
+    f.qtd_perda_osa::double precision AS qtd_perda_osa,
+    f.qtd_problemas_osa::double precision AS qtd_problemas_osa,
+    f.qtd_item_ativo_osa::double precision AS qtd_item_ativo_osa,
+    f.rup::double precision AS rup,
+    f.est_virtual::double precision AS est_virtual,
+    f.giro::double precision AS giro,
+    f.avg_sales_price::double precision AS avg_sales_price,
+    f.avg_price_cost::double precision AS avg_price_cost,
+    f.status_item_geral::double precision AS status_item_geral,
+    f.tp_activity_level,
+    CASE f.tp_activity_level
+      WHEN 'F' THEN 'Fast Mover'
+      WHEN 'S' THEN 'Slow Mover'
+      WHEN 'US' THEN 'Ultra Slow Mover'
+      WHEN 'N' THEN 'New Mover'
+      ELSE COALESCE(f.tp_activity_level, 'Outros')
+    END AS activity_level,
+    l.rede,
+    l.bandeira,
+    l.uf,
+    l.cidade,
+    l.tipo_local,
+    l.loja,
+    l.regiao,
+    i.item,
+    i.descricao_marca,
+    i.hierarquia_1,
+    i.hierarquia_2,
+    i.hierarquia_3
+FROM gold.fato_historico f
+LEFT JOIN gold.dim_local l
+  ON l.id_customer=f.id_customer AND l.id_location=f.id_location
+LEFT JOIN gold.dim_itens i
+  ON i.id_customer=f.id_customer AND i.id_item=f.id_item;
+
+CREATE INDEX ix_nr_panorama_comparison_history_customer_data
+    ON gold.nr_panorama_comparison_history_detail (id_customer, data);
+CREATE INDEX ix_nr_panorama_comparison_history_item
+    ON gold.nr_panorama_comparison_history_detail (id_customer, id_item, data);
+CREATE INDEX ix_nr_panorama_comparison_history_retail
+    ON gold.nr_panorama_comparison_history_detail (id_customer, rede, bandeira, loja);
+CREATE INDEX ix_nr_panorama_comparison_history_place
+    ON gold.nr_panorama_comparison_history_detail (id_customer, regiao, uf, cidade, tipo_local);
+CREATE INDEX ix_nr_panorama_comparison_history_product
+    ON gold.nr_panorama_comparison_history_detail (
+        id_customer, descricao_marca, hierarquia_1, hierarquia_2, hierarquia_3, item
+    );
+
+CREATE MATERIALIZED VIEW gold.nr_panorama_comparison_gap_daily AS
+SELECT
+    o.data,
+    o.id_customer,
+    'region'::text AS comparison_scope,
+    o.regiao,
+    o.uf,
+    o.cidade,
+    NULL::text AS rede,
+    NULL::text AS bandeira,
+    NULL::text AS loja,
+    NULL::text AS hierarquia_1,
+    NULL::text AS hierarquia_2,
+    NULL::text AS item,
+    SUM(o.tvd_simplificado)::double precision AS tvd,
+    SUM(o.ivd_simplificado)::double precision AS ivd
+FROM gold.nr_panorama_opportunities o
+GROUP BY o.data,o.id_customer,o.regiao,o.uf,o.cidade
+UNION ALL
+SELECT
+    o.data,o.id_customer,'retail'::text,
+    NULL::text,NULL::text,NULL::text,
+    o.rede,o.bandeira,o.loja,
+    NULL::text,NULL::text,NULL::text,
+    SUM(o.tvd_simplificado)::double precision,
+    SUM(o.ivd_simplificado)::double precision
+FROM gold.nr_panorama_opportunities o
+GROUP BY o.data,o.id_customer,o.rede,o.bandeira,o.loja
+UNION ALL
+SELECT
+    o.data,o.id_customer,'hierarchy'::text,
+    NULL::text,NULL::text,NULL::text,
+    NULL::text,NULL::text,NULL::text,
+    o.hierarquia_1,o.hierarquia_2,o.item,
+    SUM(o.tvd_simplificado)::double precision,
+    SUM(o.ivd_simplificado)::double precision
+FROM gold.nr_panorama_opportunities o
+GROUP BY o.data,o.id_customer,o.hierarquia_1,o.hierarquia_2,o.item;
+
+CREATE INDEX ix_nr_panorama_comparison_gap_customer_scope_data
+    ON gold.nr_panorama_comparison_gap_daily (id_customer, comparison_scope, data);
+CREATE INDEX ix_nr_panorama_comparison_gap_region
+    ON gold.nr_panorama_comparison_gap_daily (id_customer, comparison_scope, regiao, uf, cidade);
+CREATE INDEX ix_nr_panorama_comparison_gap_retail
+    ON gold.nr_panorama_comparison_gap_daily (id_customer, comparison_scope, rede, bandeira, loja);
+CREATE INDEX ix_nr_panorama_comparison_gap_product
+    ON gold.nr_panorama_comparison_gap_daily (
+        id_customer, comparison_scope, hierarquia_1, hierarquia_2, item
+    );
+
+-- Compact default path for AP_KPI_INDUSTRIA.  It preserves every hierarchy
+-- level, but intentionally excludes the optional dashboard dimensions.  When
+-- one of those dimensions is filtered the virtual dataset falls back to the
+-- detailed mart so the predicate is applied before aggregation.
+CREATE MATERIALIZED VIEW gold.nr_panorama_kpi_dimension_history_default AS
+WITH monthly_nodes AS (
+    SELECT h.data,EXTRACT(YEAR FROM h.data)::int AS comparison_year,h.id_customer,
+           'region'::text AS comparison_scope,
+           h.regiao::text AS dimension_1,h.uf::text AS dimension_2,h.cidade::text AS dimension_3,
+           CASE WHEN GROUPING(h.uf)=1 THEN 0 WHEN GROUPING(h.cidade)=1 THEN 1 ELSE 2 END::int AS drill_level,
+           SUM(COALESCE(h.faturamento,0))::float8 AS sellout_sum,
+           SUM(COALESCE(h.volume_unidades,0))::float8 AS volume_sum,
+           SUM(h.avg_sales_price)::float8 AS price_sum,COUNT(h.avg_sales_price)::bigint AS price_count,
+           SUM(COALESCE(h.volume_unidades,0)*COALESCE(h.avg_price_cost,0))::float8 AS sales_cost_sum,
+           SUM(COALESCE(h.estoque_medio,0)*COALESCE(h.avg_price_cost,0))::float8 AS stock_cost_sum,
+           SUM(COALESCE(h.estoque_unidades,0))::float8 AS stock_qty_sum,
+           SUM(COALESCE(h.demanda_media,0))::float8 AS demand_sum,
+           SUM(h.giro) FILTER (WHERE h.giro>0)::float8 AS giro_sum,
+           COUNT(h.giro) FILTER (WHERE h.giro>0)::bigint AS giro_count,
+           SUM(COALESCE(h.qtd_problemas_osa,0))::float8 AS osa_problem_sum,
+           SUM(COALESCE(h.qtd_item_ativo_osa,0))::float8 AS osa_active_sum,
+           SUM(COALESCE(h.rup,0))::float8 AS rupture_sum,
+           SUM(COALESCE(h.status_item_geral,0))::float8 AS status_sum,
+           SUM(COALESCE(h.est_virtual,0))::float8 AS isv_sum
+    FROM gold.nr_panorama_comparison_history_detail h
+    GROUP BY h.data,EXTRACT(YEAR FROM h.data),h.id_customer,GROUPING SETS (
+        (h.regiao),(h.regiao,h.uf),(h.regiao,h.uf,h.cidade)
+    )
+    UNION ALL
+    SELECT h.data,EXTRACT(YEAR FROM h.data)::int,h.id_customer,'retail'::text,
+           h.rede::text,h.bandeira::text,h.loja::text,
+           CASE WHEN GROUPING(h.bandeira)=1 THEN 0 WHEN GROUPING(h.loja)=1 THEN 1 ELSE 2 END::int,
+           SUM(COALESCE(h.faturamento,0))::float8,SUM(COALESCE(h.volume_unidades,0))::float8,
+           SUM(h.avg_sales_price)::float8,COUNT(h.avg_sales_price)::bigint,
+           SUM(COALESCE(h.volume_unidades,0)*COALESCE(h.avg_price_cost,0))::float8,
+           SUM(COALESCE(h.estoque_medio,0)*COALESCE(h.avg_price_cost,0))::float8,
+           SUM(COALESCE(h.estoque_unidades,0))::float8,SUM(COALESCE(h.demanda_media,0))::float8,
+           SUM(h.giro) FILTER (WHERE h.giro>0)::float8,COUNT(h.giro) FILTER (WHERE h.giro>0)::bigint,
+           SUM(COALESCE(h.qtd_problemas_osa,0))::float8,SUM(COALESCE(h.qtd_item_ativo_osa,0))::float8,
+           SUM(COALESCE(h.rup,0))::float8,SUM(COALESCE(h.status_item_geral,0))::float8,
+           SUM(COALESCE(h.est_virtual,0))::float8
+    FROM gold.nr_panorama_comparison_history_detail h
+    GROUP BY h.data,EXTRACT(YEAR FROM h.data),h.id_customer,GROUPING SETS (
+        (h.rede),(h.rede,h.bandeira),(h.rede,h.bandeira,h.loja)
+    )
+    UNION ALL
+    SELECT h.data,EXTRACT(YEAR FROM h.data)::int,h.id_customer,'hierarchy'::text,
+           h.hierarquia_1::text,h.descricao_marca::text,h.item::text,
+           CASE WHEN GROUPING(h.descricao_marca)=1 THEN 0 WHEN GROUPING(h.item)=1 THEN 1 ELSE 2 END::int,
+           SUM(COALESCE(h.faturamento,0))::float8,SUM(COALESCE(h.volume_unidades,0))::float8,
+           SUM(h.avg_sales_price)::float8,COUNT(h.avg_sales_price)::bigint,
+           SUM(COALESCE(h.volume_unidades,0)*COALESCE(h.avg_price_cost,0))::float8,
+           SUM(COALESCE(h.estoque_medio,0)*COALESCE(h.avg_price_cost,0))::float8,
+           SUM(COALESCE(h.estoque_unidades,0))::float8,SUM(COALESCE(h.demanda_media,0))::float8,
+           SUM(h.giro) FILTER (WHERE h.giro>0)::float8,COUNT(h.giro) FILTER (WHERE h.giro>0)::bigint,
+           SUM(COALESCE(h.qtd_problemas_osa,0))::float8,SUM(COALESCE(h.qtd_item_ativo_osa,0))::float8,
+           SUM(COALESCE(h.rup,0))::float8,SUM(COALESCE(h.status_item_geral,0))::float8,
+           SUM(COALESCE(h.est_virtual,0))::float8
+    FROM gold.nr_panorama_comparison_history_detail h
+    GROUP BY h.data,EXTRACT(YEAR FROM h.data),h.id_customer,GROUPING SETS (
+        (h.hierarquia_1),(h.hierarquia_1,h.descricao_marca),(h.hierarquia_1,h.descricao_marca,h.item)
+    )
+), annual_nodes AS (
+    SELECT comparison_year,id_customer,comparison_scope,dimension_1,dimension_2,dimension_3,drill_level,
+           SUM(sellout_sum)::float8 AS sellout_sum,SUM(volume_sum)::float8 AS volume_sum,
+           SUM(price_sum)::float8 AS price_sum,SUM(price_count)::bigint AS price_count,
+           SUM(sales_cost_sum)::float8 AS sales_cost_sum,SUM(stock_cost_sum)::float8 AS stock_cost_sum,
+           SUM(stock_qty_sum)::float8 AS stock_qty_period_sum,SUM(demand_sum)::float8 AS demand_sum,
+           SUM(giro_sum)::float8 AS giro_sum,SUM(giro_count)::bigint AS giro_count,
+           SUM(osa_problem_sum)::float8 AS osa_problem_sum,SUM(osa_active_sum)::float8 AS osa_active_sum,
+           SUM(rupture_sum)::float8 AS rupture_sum,SUM(status_sum)::float8 AS status_sum,
+           SUM(isv_sum)::float8 AS isv_sum,
+           (ARRAY_AGG(stock_qty_sum ORDER BY data DESC))[1]::float8 AS latest_stock_qty
+    FROM monthly_nodes
+    GROUP BY comparison_year,id_customer,comparison_scope,dimension_1,dimension_2,dimension_3,drill_level
+)
+SELECT MAKE_DATE(comparison_year,1,1) AS data,a.*,
+       CASE WHEN sellout_sum>0 THEN sellout_sum
+            WHEN price_count>0 THEN volume_sum*(price_sum/price_count) END::float8 AS sales_value,
+       latest_stock_qty::float8 AS stock_quantity,
+       (100.0*(1-osa_problem_sum/NULLIF(osa_active_sum,0)))::float8 AS osa_percent,
+       (100.0*rupture_sum/NULLIF(status_sum,0))::float8 AS rupture_percent,
+       (100.0*isv_sum/NULLIF(status_sum,0))::float8 AS no_sales_percent,
+       (stock_qty_period_sum/NULLIF(demand_sum,0))::float8 AS coverage,
+       (giro_sum/NULLIF(giro_count,0))::float8 AS inventory_turnover,
+       (CASE WHEN sellout_sum=0 OR sales_cost_sum=0 THEN 0
+             ELSE 100.0*(sellout_sum-sales_cost_sum)/NULLIF(stock_cost_sum,0) END)::float8 AS roi_percent
+FROM annual_nodes a;
+
+CREATE INDEX ix_nr_panorama_kpi_history_customer_scope_year
+    ON gold.nr_panorama_kpi_dimension_history_default (id_customer,comparison_scope,comparison_year,drill_level);
+
+CREATE MATERIALIZED VIEW gold.nr_panorama_kpi_dimension_gap_default AS
+WITH daily_nodes AS (
+    SELECT o.data,EXTRACT(YEAR FROM o.data)::int AS comparison_year,o.id_customer,
+           'region'::text AS comparison_scope,o.regiao::text AS dimension_1,o.uf::text AS dimension_2,o.cidade::text AS dimension_3,
+           CASE WHEN GROUPING(o.uf)=1 THEN 0 WHEN GROUPING(o.cidade)=1 THEN 1 ELSE 2 END::int AS drill_level,
+           SUM(o.tvd_simplificado)::float8 AS tvd,SUM(o.ivd_simplificado)::float8 AS ivd
+    FROM gold.nr_panorama_opportunities o
+    GROUP BY o.data,EXTRACT(YEAR FROM o.data),o.id_customer,GROUPING SETS ((o.regiao),(o.regiao,o.uf),(o.regiao,o.uf,o.cidade))
+    UNION ALL
+    SELECT o.data,EXTRACT(YEAR FROM o.data)::int,o.id_customer,'retail'::text,
+           o.rede::text,o.bandeira::text,o.loja::text,
+           CASE WHEN GROUPING(o.bandeira)=1 THEN 0 WHEN GROUPING(o.loja)=1 THEN 1 ELSE 2 END::int,
+           SUM(o.tvd_simplificado)::float8,SUM(o.ivd_simplificado)::float8
+    FROM gold.nr_panorama_opportunities o
+    GROUP BY o.data,EXTRACT(YEAR FROM o.data),o.id_customer,GROUPING SETS ((o.rede),(o.rede,o.bandeira),(o.rede,o.bandeira,o.loja))
+    UNION ALL
+    SELECT o.data,EXTRACT(YEAR FROM o.data)::int,o.id_customer,'hierarchy'::text,
+           o.hierarquia_1::text,o.descricao_marca::text,o.item::text,
+           CASE WHEN GROUPING(o.descricao_marca)=1 THEN 0 WHEN GROUPING(o.item)=1 THEN 1 ELSE 2 END::int,
+           SUM(o.tvd_simplificado)::float8,SUM(o.ivd_simplificado)::float8
+    FROM gold.nr_panorama_opportunities o
+    GROUP BY o.data,EXTRACT(YEAR FROM o.data),o.id_customer,GROUPING SETS ((o.hierarquia_1),(o.hierarquia_1,o.descricao_marca),(o.hierarquia_1,o.descricao_marca,o.item))
+)
+SELECT DISTINCT ON (comparison_year,id_customer,comparison_scope,drill_level,dimension_1,dimension_2,dimension_3)
+       data,comparison_year,id_customer,comparison_scope,dimension_1,dimension_2,dimension_3,drill_level,tvd,ivd
+FROM daily_nodes
+ORDER BY comparison_year,id_customer,comparison_scope,drill_level,dimension_1,dimension_2,dimension_3,data DESC;
+
+CREATE INDEX ix_nr_panorama_kpi_gap_customer_scope_year
+    ON gold.nr_panorama_kpi_dimension_gap_default (id_customer,comparison_scope,comparison_year,drill_level);
 
 CREATE MATERIALIZED VIEW gold.nr_panorama_inventory_weekly_detail AS
 SELECT
@@ -427,7 +669,19 @@ COMMENT ON MATERIALIZED VIEW gold.nr_panorama_gap_monthly_default IS
 'LASTNONBLANK-equivalent monthly TVD/IVD snapshots for Panorama.';
 COMMENT ON MATERIALIZED VIEW gold.nr_panorama_gap_weekly_card_default IS
 'LASTNONBLANK-equivalent TOP-13 weekly TVD/IVD timeline plus monthly summary rows.';
+COMMENT ON MATERIALIZED VIEW gold.nr_panorama_comparison_history_detail IS
+'Physical history detail for PBIP-equivalent Panorama comparison matrices.';
+COMMENT ON MATERIALIZED VIEW gold.nr_panorama_comparison_gap_daily IS
+'Daily TVD/IVD aggregates for the three PBIP Panorama comparison hierarchies.';
+COMMENT ON MATERIALIZED VIEW gold.nr_panorama_kpi_dimension_history_default IS
+'Compact annual AP_KPI_INDUSTRIA history path for the three drill hierarchies.';
+COMMENT ON MATERIALIZED VIEW gold.nr_panorama_kpi_dimension_gap_default IS
+'Compact LASTNONBLANK TVD/IVD path for the three AP_KPI_INDUSTRIA hierarchies.';
 
+ANALYZE gold.nr_panorama_comparison_history_detail;
+ANALYZE gold.nr_panorama_comparison_gap_daily;
+ANALYZE gold.nr_panorama_kpi_dimension_history_default;
+ANALYZE gold.nr_panorama_kpi_dimension_gap_default;
 ANALYZE gold.nr_panorama_inventory_weekly_detail;
 ANALYZE gold.nr_panorama_inventory_monthly_default;
 ANALYZE gold.nr_panorama_inventory_weekly_card_default;

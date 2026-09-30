@@ -419,4 +419,25 @@ const camelOverridesRaw = transform({
   queriesData: [{ data: [{ data: '2026-05-01', sellout: 120, cost: 100 }] }],
 });
 equal([camelOverridesRaw.indicators.length, camelOverridesRaw.timelineLimit], [2, 13], 'Explicit camelCase controls take precedence over raw persisted values');
+const hierarchyRank = transform({
+  rawFormData: {
+    x_axis: 'data', metrics: ['KPI valor'], metric_labels: 'KPI valor',
+    metric_formats: 'number', card_variant: 'hierarchyrank',
+    hierarchy_columns: 'regiao|uf|cidade',
+    groupby: ['regiao', 'uf', 'cidade', 'drill_level', 'comparison_kpi', 'kpi_format'],
+  },
+  queriesData: [{ data: [
+    { regiao: 'Sudeste', uf: null, cidade: null, drill_level: 0, comparison_kpi: '%OSA', kpi_format: 'percent', 'KPI valor': 74.13 },
+    { regiao: 'Sudeste', uf: 'SP', cidade: null, drill_level: 1, comparison_kpi: '%OSA', kpi_format: 'percent', 'KPI valor': 75.5 },
+    { regiao: 'Sudeste', uf: 'SP', cidade: 'Campinas', drill_level: 2, comparison_kpi: '%OSA', kpi_format: 'percent', 'KPI valor': 0 },
+    { regiao: 'Sul', uf: null, cidade: null, drill_level: 0, comparison_kpi: '%OSA', kpi_format: 'percent', 'KPI valor': null },
+  ] }],
+});
+equal(hierarchyRank.hierarchyColumns, ['regiao', 'uf', 'cidade'], 'Hierarchy ranking preserves the configured drill path');
+equal(hierarchyRank.hierarchyRows, [
+  { level: 0, path: ['Sudeste', null, null], value: 74.13, kpi: '%OSA', format: 'percent' },
+  { level: 1, path: ['Sudeste', 'SP', null], value: 75.5, kpi: '%OSA', format: 'percent' },
+  { level: 2, path: ['Sudeste', 'SP', 'Campinas'], value: 0, kpi: '%OSA', format: 'percent' },
+], 'Hierarchy ranking preserves levels, BLANK and legitimate zero values');
+equal([hierarchyRank.hierarchyFormat, hierarchyRank.hierarchyKpi, hierarchyRank.hasData], ['percent', '%OSA', true], 'Hierarchy ranking receives dynamic selector metadata');
 console.log(`${checks} regression checks passed (Superset dependency doubles).`);
