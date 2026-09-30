@@ -43,10 +43,10 @@ def test_weekly_value_quantity_and_osa_contracts_are_explicit():
 
 def test_power_bi_period_selector_contexts_are_materialized():
     bootstrap = read("superset/bootstrap_osa_industry_certified.py")
-    for token in ("'MTD'","'M-1'","'U3M'","'Ano'"):
+    for token in ("'MTD'","'Mês Anterior'","'U3M'","'YTD'"):
         assert token in bootstrap
     assert "NATIVE_FILTER-osa-certified-period" in bootstrap
-    assert '"val": ["MTD"]' in bootstrap
+    assert '"val": ["Mês Anterior"]' in bootstrap
     assert "DATE_TRUNC('month',b.data)" in bootstrap
 
 
