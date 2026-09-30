@@ -52,15 +52,20 @@ def test_power_bi_period_selector_contexts_are_materialized():
 
 def test_value_and_quantity_dashboard_isolated_from_legacy_page():
     bootstrap = read("superset/bootstrap_osa_industry_certified.py")
+    matrices = read("superset/osa_certified_matrices.py")
     tenants = read("config/tenants.yaml")
     assert 'DASHBOARD_SLUG = "neoretail-v9-osa-industria-certified"' in bootstrap
     assert 'PREFIX = "[OSA Certificada]"' in bootstrap
     assert '("Valor",[' in bootstrap
     assert '("Quantidade",[' in bootstrap
     assert "comparison_pivot_params" in bootstrap
-    assert '("regiao","uf","cidade")' in bootstrap
-    assert '("rede","bandeira","loja")' in bootstrap
-    assert '("hierarquia_1","hierarquia_2","item")' in bootstrap
+    assert '"region": ("Região", "regiao")' in matrices
+    assert '"retail": ("Varejo", "rede")' in matrices
+    assert '"item": ("Hierarquia de item", "hierarquia_1")' in matrices
+    assert "SUM(loss_value)" in matrices
+    assert "SUM(loss_qty)" in matrices
+    assert "SUM(problem_qty)" in matrices
+    assert "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)" in matrices
     assert "osa_certified:" in tenants
     assert "neoretail-v9-osa-industria-certified" in tenants
     # Legacy key remains available for side-by-side homologation.
