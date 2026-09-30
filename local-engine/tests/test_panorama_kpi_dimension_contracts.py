@@ -122,3 +122,39 @@ def test_kpi_region_opens_at_uf_without_changing_matrix_region_hierarchy():
     assert '"Região": ("region", "uf", "l.uf")' in validator
     assert "selected-month-source-chart" in validator
     assert "report[\"available_months\"]" in validator
+
+
+def test_kpi_controls_are_located_inside_section_and_share_real_native_masks():
+    bootstrap = read("superset/bootstrap_panorama.py")
+    query = read("superset/frontend-plugin/plugin-chart-neoretail-kpi/src/buildQuery.js")
+    transform = read("superset/frontend-plugin/plugin-chart-neoretail-kpi/src/transformProps.js")
+    router = read("superset/frontend-plugin/plugin-chart-neoretail-kpi/src/NeoRetailKpiRouter.jsx")
+    controls = read("superset/frontend-plugin/plugin-chart-neoretail-kpi/src/KpiFilterBar.jsx")
+
+    assert 'variant="kpifilters"' in bootstrap
+    assert 'params["x_axis"] = None' in bootstrap
+    assert '"kpi_control_bar", kpi_filter_options' in bootstrap
+    assert '{"charts": [charts["kpi_control_bar"]], "height": 15}' in bootstrap
+    assert 'kpi_targets = {' in bootstrap
+    assert 'chart.id not in kpi_targets' in bootstrap
+    assert 'nf["scope"] = {"rootPath": ["ROOT_ID"], "excluded": kpi_excluded}' in bootstrap
+    assert 'nf["scope"].get("excluded", []), toolbar_id' in bootstrap
+
+    assert "variant === 'kpifilters'" in query
+    assert "comparison_year_month" in query
+    assert "row_limit: 2000" in query
+    assert "filterOptions: variant === 'kpifilters'" in transform
+    assert "if (props.variant === 'kpifilters')" in router
+    assert 'from \'src/dataMask/actions\'' in controls
+    assert "useSelector(state => state.dataMask || {})" in controls
+    assert "dispatch(updateDataMask(" in controls
+    assert "KPIs por dimensão" in controls
+    assert "Ano / Mês" in controls
+    assert "Visualização por" in controls
+    assert "createPortal" in controls
+    for label in (
+        "Venda R$", "Estoque qtd", "%OSA", "%Ruptura",
+        "%Item sem Venda", "Cobertura de estoque", "Giro de estoque",
+        "%ROI", "TVD - Pré-Ruptura", "IVD - Excesso de estoque",
+    ):
+        assert label in controls
