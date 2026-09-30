@@ -639,6 +639,28 @@ def kpi_dimension_params(dataset, title: str, columns: tuple[str, ...]) -> dict:
     )
 
 
+def kpi_filter_bar_params(dataset) -> dict:
+    """First-class chart row for Power BI-style local filters.
+
+    Its own options query is not limited by the KPI native filter selections,
+    so clearing or changing the year does not make options disappear.
+    """
+    params = custom_params(
+        dataset, "Comparativo de KPIs por dimensão",
+        [metric("AP KPI ordem", "MIN(kpi_order)")],
+        groupby=[
+            "comparison_year", "comparison_month",
+            "comparison_year_month", "comparison_kpi",
+        ],
+        variant="kpifilters",
+        row_limit=2000,
+    )
+    # Unlike all analytical charts, selector options are not temporal.
+    params["x_axis"] = None
+    params.pop("time_grain_sqla", None)
+    return params
+
+
 def kpi_native_filters(filter_dataset_id: int) -> list[dict]:
     common = {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": False, "searchAllOptions": True, "inverseSelection": False}
     return [
@@ -1399,7 +1421,11 @@ class Layout:
             tab_ids.append(tab_id)
             self.nodes[tab_id] = {"id": tab_id, "type": "TAB", "parents": [*parents, tabs_id], "children": [], "meta": {"text": label}}
             for row_charts in chart_rows:
-                self.row(tab_id, [*parents, tabs_id, tab_id], row_charts, height)
+                # A compact, full-width control bar precedes the tall KPI
+                # hierarchy charts. All other layouts retain their heights.
+                row_height = row_charts.get("height", height) if isinstance(row_charts, dict) else height
+                content = row_charts["charts"] if isinstance(row_charts, dict) else row_charts
+                self.row(tab_id, [*parents, tabs_id, tab_id], content, row_height)
         return tabs_id
 
     def period_tabs(self, parent, parents, title, entries, height=52):
@@ -1803,6 +1829,11 @@ def main():
         )
         add("gap_semanal", gap_weekly_card, "Evolutivo de estoque — Falta x Excesso semanal", params)
 
+        add(
+            "kpi_control_bar", kpi_filter_options, "Controles dos KPIs",
+            kpi_filter_bar_params(kpi_filter_options),
+        )
+
         kpi_dimension_labels = (
             ("region", "Região"),
             ("retail", "Varejo"),
@@ -1878,7 +1909,10 @@ def main():
         layout.tabs("GRID_ID", grid_parents, "Comparativo de KPIs por dimensão", [
             (
                 "KPIs",
-                [[charts[f"kpi_dimension_{scope}"] for scope, _ in kpi_dimension_labels]],
+                [
+                    {"charts": [charts["kpi_control_bar"]], "height": 15},
+                    [charts[f"kpi_dimension_{scope}"] for scope, _ in kpi_dimension_labels],
+                ],
             )
         ], 52)
         layout.tabs("GRID_ID", grid_parents, "Comparativos", [
@@ -1913,7 +1947,30 @@ def main():
              *comparison_dataset_ids, *kpi_dimension_dataset_ids],
             filter_targets,
         )
+        # General NeoRetail filters (rede, UF etc.) still govern the three KPI
+        # charts, but must not be applied to their control bar, whose options
+        # dataset deliberately contains only year/month/KPI columns.
+        toolbar_id = charts["kpi_control_bar"].id
+        for nf in native_filters:
+            nf["scope"]["excluded"] = [
+                *nf["scope"].get("excluded", []), toolbar_id,
+            ]
+
         native_filters.extend(kpi_native_filters(kpi_filter_options.id))
+        # KPI-only controls must not affect the other 32 business charts or
+        # the toolbar itself. Superset's native filter scope uses numeric
+        # chart ids, not CHART-* layout node ids.
+        kpi_targets = {
+            charts[f"kpi_dimension_{scope}"].id
+            for scope, _ in kpi_dimension_labels
+        }
+        kpi_excluded = [
+            chart.id for chart in charts.values()
+            if chart.id not in kpi_targets
+        ]
+        for nf in native_filters[-3:]:
+            nf["scope"] = {"rootPath": ["ROOT_ID"], "excluded": kpi_excluded}
+
         dashboard.json_metadata = json.dumps({"timed_refresh_immune_slices": [], "expanded_slices": {}, "refresh_frequency": 0, "color_scheme": "supersetColors", "native_filter_configuration": native_filters, "filter_bar_orientation": "HORIZONTAL"}, ensure_ascii=False)
         dashboard.slices = list(charts.values())
         db.session.commit()
