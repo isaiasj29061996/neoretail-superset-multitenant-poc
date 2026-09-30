@@ -31,6 +31,14 @@ from bootstrap_panorama import (
     formatted_metric,
     upsert_chart,
 )
+from osa_certified_matrices import (
+    MATRIX_SCOPES,
+    TABLE_OSA as MATRIX_OSA,
+    TABLE_PROBLEMS as MATRIX_PROBLEMS,
+    TABLE_QTY as MATRIX_QTY,
+    TABLE_VALUE as MATRIX_VALUE,
+    matrix_period_sql,
+)
 
 
 DASHBOARD_TITLE = "NeoRetail V9 — OSA Indústria — Certificada"
@@ -557,6 +565,13 @@ def main():
             db.session,SqlaTable,database,"nr_osa_causes_certified",
             sql=cause_period_sql(),
         )
+        matrix_datasets = {
+            key: upsert_dataset(
+                db.session,SqlaTable,database,f"nr_osa_matrix_{key}_certified",
+                sql=matrix_period_sql(group_column),
+            )
+            for key,(_,group_column) in MATRIX_SCOPES.items()
+        }
         period_options = upsert_dataset(
             db.session,SqlaTable,database,"nr_osa_period_options",
             sql=period_options_sql(),
@@ -613,18 +628,15 @@ def main():
                 ),
             )
 
-        hierarchies = {
-            "region": ("Região",("regiao","uf","cidade")),
-            "retail": ("Varejo",("rede","bandeira","loja")),
-            "item": ("Hierarquia de item",("hierarquia_1","hierarquia_2","item")),
-        }
-        for mode, loss_metric in (("value",TABLE_VALUE),("qty",TABLE_QTY)):
+        for mode, loss_metric in (("value",MATRIX_VALUE),("qty",MATRIX_QTY)):
             label = "Valor" if mode=="value" else "Quantidade"
-            for key,(title,rows) in hierarchies.items():
+            for key,(title,group_column) in MATRIX_SCOPES.items():
+                dataset = matrix_datasets[key]
                 add(
-                    f"{mode}_matrix_{key}",causes,f"{title} — {label}",
+                    f"{mode}_matrix_{key}",dataset,f"{title} — {label}",
                     _matrix_params(
-                        causes,rows,[loss_metric,TABLE_PROBLEMS,TABLE_OSA],
+                        dataset,(group_column,),
+                        [loss_metric,MATRIX_PROBLEMS,MATRIX_OSA],
                     ),
                     "pivot_table_v2",
                 )
@@ -698,7 +710,10 @@ def main():
         # Common slicers mirror the PBI location/activity/brand/category/item/
         # measure selectors. The period control applies only to cause/matrix
         # charts because the top timeline needs its full temporal window.
-        dataset_ids = [monthly.id,weekly.id,causes.id]
+        dataset_ids = [
+            monthly.id,weekly.id,causes.id,
+            *[dataset.id for dataset in matrix_datasets.values()],
+        ]
         native = overview_native_filters(dataset_ids,filter_options.id)
         top_ids = {
             charts["value_month"].id,charts["value_week"].id,
@@ -726,6 +741,7 @@ def main():
                 "monthly":monthly.id,
                 "weekly":weekly.id,
                 "causes":causes.id,
+                "matrices":{key:dataset.id for key,dataset in matrix_datasets.items()},
                 "period_options":period_options.id,
             },
             "charts": {key:chart.id for key,chart in charts.items()},
