@@ -5,13 +5,20 @@
 Esta entrega adiciona três gráficos horizontais ao **Panorama Indústria**, entre
 o Evolutivo de Estoque e as 15 matrizes comparativas existentes:
 
-- Região: `regiao → uf → cidade`;
+- Região: o visual abre em `UF → Cidade` como na captura do Power BI; o mart físico preserva `regiao → uf → cidade`, sem afetar as matrizes.
 - Varejo: `rede → bandeira → loja`;
 - Hierarquia de item: `hierarquia_1 → descricao_marca → item`.
 
-Os três gráficos compartilham o seletor **Visualização por**, o filtro de ano,
-o filtro de medida e os filtros dimensionais compatíveis. `id_customer` continua
-protegido por RLS e também está presente em ambos os marts físicos novos.
+Os três gráficos compartilham o seletor **Visualização por**, o filtro **Ano**,
+o filtro **Mês** (em cascata com Ano), o filtro de medida e os filtros
+dimensionais compatíveis. O filtro Mês apresenta opções como
+`2026-01 · janeiro`; sem selecionar nenhum mês, considera todos os meses
+do ano escolhido. Os controles são filtros nativos do Superset: aparecem na
+barra de filtros, não fisicamente dentro do cartão como no Power BI.
+
+`id_customer` continua protegido por RLS, está presente nos dois marts
+físicos novos e agora também no dataset de opções dos seletores. Isso impede
+que um filtro sem a coluna de tenant quebre a consulta sob o Guest Token.
 
 Esta seção não usa `AP_KPI_MERCADO` nem `FATO_MERCADO`.
 
@@ -52,11 +59,14 @@ O caminho padrão usa:
 - `gold.nr_panorama_kpi_dimension_gap_default`, com 3.720 linhas.
 
 Os marts armazenam ano, tenant, escopo, nível de drill e caminho hierárquico.
-Quando um filtro de rede, loja, localização, atividade ou produto está ativo, o
-dataset troca para `gold.nr_panorama_comparison_history_detail` ou
-`gold.nr_panorama_opportunities` e aplica o predicado antes da agregação. Para
-`Estoque qtd`, medidas diferentes de `unidade` também usam o caminho detalhado
-para preservar o fator real de `gold.dim_conversao`.
+Quando um filtro de rede, loja, localização, atividade, produto **ou mês**
+está ativo, o dataset usa o detalhe
+`gold.nr_panorama_comparison_history_detail` ou
+`gold.nr_panorama_opportunities` e aplica o predicado **antes** de calcular
+somas, taxas, fotografia de estoque e LASTNONBLANK. O mart padrão é anual
+e não pode responder à seleção parcial de meses sem introduzir erro.
+Para `Estoque qtd`, medidas diferentes de `unidade` também seguem esse
+caminho detalhado, preservando `gold.dim_conversao`.
 
 Essa separação mantém a abertura padrão rápida sem pré-agregar filtros que o
 usuário ainda precisa aplicar.
@@ -71,8 +81,9 @@ AMBEV (`id_customer = 142`) e ano 2026:
 2. os dois marts compactos;
 3. a resposta real do `ChartDataCommand` do Superset.
 
-Foram reconciliadas as dez opções nas três dimensões, totalizando 30 caminhos
-de ChartData. As quantidades no primeiro nível foram:
+Na versão anterior à inclusão do filtro Mês e à mudança de apresentação
+UF/Cidade, foram reconciliadas as dez opções nas três dimensões, totalizando
+30 caminhos de ChartData. As contagens antigas no primeiro nível foram:
 
 | Dimensão | Histórico | TVD/IVD |
 |---|---:|---:|
@@ -80,8 +91,11 @@ de ChartData. As quantidades no primeiro nível foram:
 | Varejo | 36 | 34 |
 | Hierarquia de item | 5 | 5 |
 
-Um teste adicional aplicou `rede = CENCOSUD` ao gráfico de Região e confirmou
-que o fallback filtrado corresponde à fonte bruta.
+Um teste adicional da versão anterior aplicou `rede = CENCOSUD` ao gráfico
+de Região e confirmou que o fallback filtrado correspondia à fonte bruta.
+O gate atualizado também compara as saídas por **UF** e verifica mês selecionado
+para Venda R$, OSA, estoque e TVD, além de consultar as opções de filtros
+com `id_customer` explícito.
 
 ## Performance observada
 
@@ -100,10 +114,31 @@ Depois da materialização, a rodada completa das dez opções registrou:
 O fallback com filtro de rede levou 1,525 s. Esses números são evidência do
 ambiente local e não representam SLA de produção.
 
-## Estado
+## Estado após a inclusão do ano/mês e UF/Cidade
 
-O contrato técnico está reconciliado para a versão de dados AMBEV avaliada. A
-homologação de negócio das medidas continua sendo uma atividade separada. A
-implementação preserva as 15 matrizes comparativas, a Análise detalhada e os
-marts anteriores.
+As 30 reconciliações e os números de performance acima pertencem à rodada
+**anterior** a estas alterações. Para considerar a nova versão certificada,
+é obrigatório executar novamente, no Docker local:
+
+```powershell
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_panorama_kpi_dimensions.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/validate_panorama_comparisons.py
+```
+
+O filtro Mês usa o caminho detalhado; seu tempo ainda não foi medido. A
+barra nativa de filtros deve estar expandida no Superset. O Embedded SDK já
+a configura com `visible: true, expanded: true`. A reprodução visual exata
+do slicer hierárquico dentro do cartão do Power BI exigiria um controle
+customizado adicional, não implementado nesta atualização.
+
+Comparação de **valores absolutos** com as capturas depende do mesmo
+`id_customer`, do mesmo conjunto de arquivos (a POC pode estar com apenas
+35% da origem), da mesma seleção de meses, unidade e demais filtros. Mesmo
+que o conteúdo da captura represente outra indústria, o teste de contrato
+com fonte bruta do tenant 142 permanece válido.
+
+**Status:** patch de código e teste atualizado no GitHub; ainda pendente
+de execução no Docker e homologação visual após o pull. As 15 matrizes,
+a Análise detalhada e os marts anteriores foram preservados.
 
