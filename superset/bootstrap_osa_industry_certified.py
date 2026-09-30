@@ -39,9 +39,9 @@ PREFIX = "[OSA Certificada]"
 
 PERIODS = (
     ("MTD", 1),
-    ("M-1", 2),
+    ("Mês Anterior", 2),
     ("U3M", 3),
-    ("Ano", 5),
+    ("YTD", 5),
 )
 
 DIMENSION_OVERRIDES = {
@@ -380,14 +380,14 @@ WITH latest AS (
     SELECT 'MTD'::text AS osa_period,1::int AS osa_period_order
       WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)
     UNION ALL
-    SELECT 'M-1',2
+    SELECT 'Mês Anterior',2
       WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')
     UNION ALL
     SELECT 'U3M',3
       WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'
         AND b.data<=x.latest_data
     UNION ALL
-    SELECT 'Ano',5
+    SELECT 'YTD',5
       WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)
   ) p
 ), converted AS (
@@ -437,15 +437,15 @@ def _period_filter(period_dataset_id: int, excluded: list[int]) -> dict:
         }],
         "defaultDataMask": {
             "extraFormData": {
-                "filters": [{"col": "osa_period", "op": "IN", "val": ["MTD"]}],
+                "filters": [{"col": "osa_period", "op": "IN", "val": ["Mês Anterior"]}],
             },
-            "filterState": {"label": "MTD", "value": ["MTD"]},
+            "filterState": {"label": "Mês Anterior", "value": ["Mês Anterior"]},
             "ownState": {},
         },
         "cascadeParentIds": [],
         "scope": {"excluded": excluded, "rootPath": ["ROOT_ID"]},
         "type": "NATIVE_FILTER",
-        "description": "MTD, mês anterior, U3M ou ano corrente como no seletor do Power BI.",
+        "description": "MTD, Mês Anterior, U3M ou YTD. O padrão reproduz o estado observado no Power BI.",
     }
 
 
