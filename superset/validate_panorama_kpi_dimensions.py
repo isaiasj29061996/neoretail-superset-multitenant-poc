@@ -16,6 +16,7 @@ from profile_dashboard_performance import build_queries
 CUSTOMER_ID = 142
 YEAR = 2026
 DASHBOARD = "neoretail-v9-panorama-industria"
+MONTH_NAMES = ("janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro")
 SCOPES = {
     "Região": ("region", "regiao", "l.regiao"),
     "Varejo": ("retail", "rede", "l.rede"),
@@ -209,7 +210,10 @@ def main():
             queries=[{
                 "columns": ["comparison_kpi"],
                 "metrics": ["AP KPI ordem"],
-                "filters": [{"col": "comparison_year", "op": "IN", "val": [YEAR]}],
+                "filters": [
+                    {"col": "id_customer", "op": "IN", "val": [CUSTOMER_ID]},
+                    {"col": "comparison_year", "op": "IN", "val": [YEAR]},
+                ],
                 "orderby": [["AP KPI ordem", True]],
                 "row_limit": 100,
                 "time_range": "No filter",
@@ -223,6 +227,31 @@ def main():
         if selector_order != expected_order:
             raise AssertionError({"selector_order": selector_order, "expected": expected_order})
         report["selector_order"] = selector_order
+
+        # Check that RLS has a concrete id_customer column on the selector
+        # dataset. Without it, guest-token filtering breaks these controls.
+        month_result = ChartDataCommand(factory.create(
+            datasource={"id": filter_dataset.id, "type": "table"},
+            queries=[{
+                "columns": ["comparison_year_month"],
+                "metrics": ["AP Mês ordem"],
+                "filters": [
+                    {"col": "id_customer", "op": "IN", "val": [CUSTOMER_ID]},
+                    {"col": "comparison_year", "op": "IN", "val": [YEAR]},
+                ],
+                "orderby": [["AP Mês ordem", True]],
+                "row_limit": 100,
+                "time_range": "No filter",
+            }],
+            form_data={"force": True, "native_filter_id": "NATIVE_FILTER-panorama-kpi-month"},
+        )).run()["queries"][0]
+        if month_result.get("error"):
+            raise AssertionError({"month_selector_error": month_result["error"]})
+        report["available_months"] = [
+            row["comparison_year_month"] for row in month_result.get("data") or []
+        ]
+        if not report["available_months"]:
+            raise AssertionError("Nenhum mês selecionável para a AMBEV no ano testado")
 
         with database.get_sqla_engine() as engine, engine.connect() as connection:
             for label, (scope, first, source_dimension) in SCOPES.items():
@@ -274,6 +303,84 @@ def main():
             actual = {row.get("regiao"): row.get("KPI valor") for row in rows if int(row.get("drill_level", -1)) == 0}
             compare(mapped(source_filtered, "sales_value"), actual, "filtered-source-chart:Região:Venda R$")
             report["filtered_fallback"] = {"rede": rede, "elapsed_ms": round(elapsed, 2), "rows": len(rows)}
+
+            # The year-only pre-aggregation cannot answer a month slicer.
+            # Selected months must route to the source-detail fallback BEFORE
+            # computing additive, ratio, stock snapshot and latest-day KPIs.
+            months = list(connection.execute(text("""
+                SELECT DISTINCT EXTRACT(MONTH FROM data)::int AS month
+                FROM gold.nr_panorama_inventory_monthly_default
+                WHERE id_customer=:customer AND EXTRACT(YEAR FROM data)::int=:year
+                ORDER BY month LIMIT 2
+            """), {"customer": CUSTOMER_ID, "year": YEAR}).scalars())
+            selected_labels = [
+                f"{YEAR}-{month:02d} · {MONTH_NAMES[month - 1]}" for month in months
+            ]
+            month_extra = (
+                {"col": "comparison_year_month", "op": "IN", "val": selected_labels},
+            )
+            history_filter = (
+                "AND EXTRACT(MONTH FROM h.mes_ano::date)::int IN ("
+                + ",".join(str(month) for month in months) + ")"
+            )
+            month_source = list(connection.execute(
+                history_source_sql("l.regiao", history_filter),
+                {"customer": CUSTOMER_ID, "year": YEAR},
+            ).mappings())
+            monthly_report = {
+                "selected": selected_labels,
+                "history_checks": {},
+            }
+            for selector, measure in (
+                ("Venda R$", "sales_value"),
+                ("%OSA", "osa_percent"),
+                ("Estoque qtd", "stock_quantity"),
+            ):
+                month_rows, month_ms = execute_chart(
+                    factory, ChartDataCommand, charts[titles["Região"]],
+                    selector, month_extra,
+                )
+                month_actual = {
+                    row.get("regiao"): row.get("KPI valor")
+                    for row in month_rows
+                    if int(row.get("drill_level", -1)) == 0
+                }
+                compare(
+                    mapped(month_source, measure), month_actual,
+                    f"selected-month-source-chart:Região:{selector}",
+                )
+                monthly_report["history_checks"][selector] = {
+                    "elapsed_ms": round(month_ms, 2),
+                    "rows": len(month_rows),
+                }
+            # Validate LASTNONBLANK against the same selected month window,
+            # but only if opportunities exist there.
+            gap_source = list(connection.execute(
+                gap_source_sql(
+                    "l.regiao",
+                    "AND EXTRACT(MONTH FROM h.id_time::date)::int IN ("
+                    + ",".join(str(month) for month in months) + ")",
+                ),
+                {"customer": CUSTOMER_ID, "year": YEAR},
+            ).mappings())
+            if gap_source:
+                gap_rows, gap_ms = execute_chart(
+                    factory, ChartDataCommand, charts[titles["Região"]],
+                    "TVD - Pré-Ruptura", month_extra,
+                )
+                gap_actual = {
+                    row.get("regiao"): row.get("KPI valor")
+                    for row in gap_rows
+                    if int(row.get("drill_level", -1)) == 0
+                }
+                compare(
+                    mapped(gap_source, "tvd"), gap_actual,
+                    "selected-month-source-chart:Região:TVD",
+                )
+                monthly_report["tvd_elapsed_ms"] = round(gap_ms, 2)
+            else:
+                monthly_report["tvd_skipped"] = "Sem fato TVD/IVD nos meses selecionados"
+            report["month_filter"] = monthly_report
 
         print(json.dumps(report, ensure_ascii=False, indent=2))
 
