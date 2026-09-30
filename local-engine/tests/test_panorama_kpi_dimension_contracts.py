@@ -94,3 +94,31 @@ def test_runtime_gate_reconciles_raw_source_compact_mart_and_chartdata():
     assert "source-chart:" in validator
     assert "filtered-source-chart:" in validator
 
+
+
+def test_tenant_scoped_cascading_year_month_controls_and_detail_fallback():
+    bootstrap = read("superset/bootstrap_panorama.py")
+    assert "SELECT ym.id_customer, ym.comparison_year, ym.comparison_month" in bootstrap
+    assert "gold.nr_panorama_inventory_monthly_default" in bootstrap
+    assert "get_filters('comparison_year_month', remove_filter=True)" in bootstrap
+    assert "NATIVE_FILTER-panorama-kpi-month" in bootstrap
+    assert '"cascadeParentIds": ["NATIVE_FILTER-panorama-kpi-year"]' in bootstrap
+    assert 'KPI_MONTH_ORDER_METRIC_NAME = "AP Mês ordem"' in bootstrap
+    assert 'expression="MIN(comparison_year_month_sort)"' in bootstrap
+    assert "not has_dimension_filter and not has_month_filter" in bootstrap
+    assert "{history_month_expr} IN" in bootstrap
+    assert "{opportunity_month_expr} IN" in bootstrap
+    # Selected months cannot use the precomputed annual mart; they are
+    # applied before additive/ratio aggregation, stock snapshot or LASTNONBLANK.
+    assert "NULL::text AS comparison_year_month" in bootstrap
+
+
+def test_kpi_region_opens_at_uf_without_changing_matrix_region_hierarchy():
+    bootstrap = read("superset/bootstrap_panorama.py")
+    validator = read("superset/validate_panorama_kpi_dimensions.py")
+    assert 'KPI_DIMENSION_SCOPES[scope][1:] if scope == "region"' in bootstrap
+    assert 'display_d_level = "d.drill_level-1" if scope == "region"' in bootstrap
+    assert '"region": ("regiao", "uf", "cidade")' in bootstrap
+    assert '"Região": ("region", "uf", "l.uf")' in validator
+    assert "selected-month-source-chart" in validator
+    assert "report[\"available_months\"]" in validator
