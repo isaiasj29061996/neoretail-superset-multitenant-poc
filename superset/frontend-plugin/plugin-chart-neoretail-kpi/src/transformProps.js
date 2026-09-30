@@ -322,6 +322,19 @@ export default function transformProps(chartProps) {
     rankSeries,
     hierarchyRows,
     hierarchyColumns,
+    // Each distinct row is tenant-scoped by the dataset's id_customer RLS.
+    // Redundancy across KPI and month is intentional in the SQL: deduplicate
+    // in the small toolbar component for independent year/month/KPI controls.
+    filterOptions: variant === 'kpifilters'
+      ? (queriesData[0]?.data || []).map(row => ({
+        year: Number(row.comparison_year),
+        month: Number(row.comparison_month),
+        monthKey: String(row.comparison_year_month || ''),
+        kpi: String(row.comparison_kpi || ''),
+        kpiOrder: Number(row['AP KPI ordem'] ?? row.kpi_order),
+      })).filter(row => Number.isFinite(row.year)
+        && Number.isFinite(row.month) && row.monthKey && row.kpi)
+      : [],
     hierarchyFormat: hierarchyRows[0]?.format || formats[0] || 'number',
     hierarchyKpi: hierarchyRows[0]?.kpi || labels[0] || '',
     hasData: variant === 'hierarchyrank' ? hierarchyRows.length > 0
