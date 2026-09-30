@@ -80,3 +80,41 @@ def test_runtime_gate_compares_source_mart_and_actual_chartdata():
     assert "source-mart:" in validator
     assert "source-chart:" in validator
     assert "filtered-source-chart:" in validator
+
+
+def test_detail_analysis_matches_power_bi_dax_contract_and_uses_raw_status_denominator():
+    bootstrap = read("superset/bootstrap_panorama.py")
+    validator = read("superset/validate_panorama_details.py")
+
+    # Power BI current-snapshot formulas.
+    assert "def detail_semantic_sql(group_column: str)" in bootstrap
+    assert "SUM(COALESCE(h.status_item_geral,0))::float8 AS status_sum" in bootstrap
+    assert "(c.rupture_sum/NULLIF(c.status_sum,0))::float8 AS rupture_value" in bootstrap
+    assert "(c.isv_sum/NULLIF(c.status_sum,0))::float8 AS isv_value" in bootstrap
+    assert "SUM(COALESCE(h.avg_sales_price,0)) FILTER (WHERE h.faturamento>0)" in bootstrap
+    assert "(m.price_sum/m.price_count)*m.conversion_factor" in bootstrap
+    assert "ELSE m.loss_qty_sum*m.conversion_factor END::float8 AS osa_loss_value" in bootstrap
+
+    # ROI Anual is SUMX(month, ROI) over the trailing 12-month window,
+    # not current ROI * 12.
+    assert "SUM(r.roi_value) FILTER" in bootstrap
+    assert "r.data > l.latest_data - INTERVAL '12 months'" in bootstrap
+    assert "1200.0 *" in bootstrap  # legacy P dict remains for unrelated callers
+    assert 'formatted_metric("ROI anual", "MAX(roi_annual_value)", ".2%")' in bootstrap
+
+    # All five visual tabs now use governed virtual datasets rather than the
+    # former latest-only physical table.
+    for dimension in ("regiao", "rede", "hierarquia_1", "item", "activity_level"):
+        assert f'nr_panorama_detail_{{column}}' in bootstrap
+    assert "detail_table_params(detail_dataset, column, 20)" in bootstrap
+
+    # Percent display metadata is explicit.
+    for metric in ("Markup", "ROI", "ROI anual", "OSA", "Ruptura", "Item sem venda"):
+        assert f'"{metric}": {{"d3NumberFormat": ".2%"}}' in bootstrap
+
+    # Runtime gate independently queries fato_historico and ChartData.
+    assert "gold.fato_historico" in validator
+    assert "ChartDataCommand" in validator
+    assert "status_item_geral" in validator
+    assert "SUM(roi_value)" in validator
+    assert "source-chart:" in validator
