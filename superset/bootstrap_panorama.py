@@ -121,6 +121,7 @@ def formatted_metric(label: str, expression: str, d3_format: str) -> dict:
 
 KPI_DIMENSION_VALUE = formatted_metric("KPI valor", "MAX(kpi_value)", ",.2f")
 KPI_ORDER_METRIC_NAME = "AP KPI ordem"
+KPI_MONTH_ORDER_METRIC_NAME = "AP Mês ordem"
 
 
 _COMPARISON_SELLOUT = (
@@ -403,21 +404,28 @@ def kpi_dimension_sql(scope: str) -> str:
     filter_checks = " or ".join(
         f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS
     )
+    # 'Ano' and 'Mês' are separate cascading filters. Month labels include
+    # the year, so selecting January 2025 and March 2026 is unambiguous.
+    month_labels = "ARRAY['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']"
+    history_month_expr = f"TO_CHAR(h.data,'YYYY-MM') || ' · ' || ({month_labels})[EXTRACT(MONTH FROM h.data)::int]"
+    opportunity_month_expr = f"TO_CHAR(o.data,'YYYY-MM') || ' · ' || ({month_labels})[EXTRACT(MONTH FROM o.data)::int]"
     allowed = [label for label, _ in KPI_INDUSTRY_OPTIONS]
     allowed_json = json.dumps(allowed, ensure_ascii=False)
     return f"""
 {{% set kpi_filters = get_filters('comparison_kpi', remove_filter=True) %}}
 {{% set year_filters = get_filters('comparison_year', remove_filter=True) %}}
+{{% set month_filters = get_filters('comparison_year_month', remove_filter=True) %}}
 {{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}}
 {{% set selected_kpi = kpi_filters[0].get('val')[0] if kpi_filters|length and kpi_filters[0].get('val')|length else 'Venda R$' %}}
 {{% set allowed_kpis = {allowed_json} %}}
 {{% if selected_kpi not in allowed_kpis %}}{{% set selected_kpi = 'Venda R$' %}}{{% endif %}}
 {{% set selected_measure = measure_filters[0].get('val')[0] if measure_filters|length and measure_filters[0].get('val')|length else 'unidade' %}}
 {{% set has_dimension_filter = {filter_checks} %}}
+{{% set has_month_filter = month_filters|length > 0 %}}
 {{% if selected_kpi in ['TVD - Pré-Ruptura','IVD - Excesso de estoque'] %}}
-{{% if not has_dimension_filter %}}
+{{% if not has_dimension_filter and not has_month_filter %}}
 SELECT
-  d.data,d.comparison_year,d.id_customer,'unidade'::text AS nm_measure,
+  d.data,d.comparison_year,d.id_customer,NULL::text AS comparison_year_month,'unidade'::text AS nm_measure,
   {default_projection},d.drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
   'currency'::text AS kpi_format,
@@ -436,6 +444,10 @@ WITH filtered AS (
   {{% for filter in year_filters %}}
   {{% if filter.get('op') == 'IN' %}} AND EXTRACT(YEAR FROM o.data)::int IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
   {{% endfor %}}
+  {{% for filter in month_filters %}}
+  {{% if filter.get('op') == 'IN' %}} AND {opportunity_month_expr} IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% if filter.get('op') == 'NOT IN' %}} AND {opportunity_month_expr} NOT IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% endfor %}}
 ), daily_nodes AS (
   SELECT
     o.data,EXTRACT(YEAR FROM o.data)::int AS comparison_year,o.id_customer,
@@ -453,7 +465,7 @@ WITH filtered AS (
   ORDER BY comparison_year,id_customer,drill_level,{first},{second},{third},data DESC
 )
 SELECT
-  l.data,l.comparison_year,l.id_customer,'unidade'::text AS nm_measure,
+  l.data,l.comparison_year,l.id_customer,NULL::text AS comparison_year_month,'unidade'::text AS nm_measure,
   {projection},l.drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
   'currency'::text AS kpi_format,
@@ -461,9 +473,9 @@ SELECT
 FROM latest l
 {{% endif %}}
 {{% else %}}
-{{% if not has_dimension_filter and (selected_kpi != 'Estoque qtd' or selected_measure == 'unidade') %}}
+{{% if not has_dimension_filter and not has_month_filter and (selected_kpi != 'Estoque qtd' or selected_measure == 'unidade') %}}
 SELECT
-  d.data,d.comparison_year,d.id_customer,
+  d.data,d.comparison_year,d.id_customer,NULL::text AS comparison_year_month,
   '{{{{ selected_measure | replace("'", "''") }}}}'::text AS nm_measure,
   {default_projection},d.drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
@@ -499,6 +511,10 @@ WITH filtered AS (
 {history_predicates}
   {{% for filter in year_filters %}}
   {{% if filter.get('op') == 'IN' %}} AND EXTRACT(YEAR FROM h.data)::int IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% endfor %}}
+  {{% for filter in month_filters %}}
+  {{% if filter.get('op') == 'IN' %}} AND {history_month_expr} IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
+  {{% if filter.get('op') == 'NOT IN' %}} AND {history_month_expr} NOT IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
   {{% endfor %}}
 ), monthly_nodes AS (
   SELECT
@@ -551,7 +567,7 @@ WITH filtered AS (
   GROUP BY comparison_year,id_customer,{first},{second},{third},drill_level
 )
 SELECT
-  a.data,a.comparison_year,a.id_customer,
+  a.data,a.comparison_year,a.id_customer,NULL::text AS comparison_year_month,
   '{{{{ selected_measure | replace("'", "''") }}}}'::text AS nm_measure,
   {projection},a.drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
@@ -583,14 +599,22 @@ def kpi_filter_options_sql() -> str:
         for index, (label, fmt) in enumerate(KPI_INDUSTRY_OPTIONS, 1)
     )
     return f"""
-WITH years AS (
-  SELECT DISTINCT EXTRACT(YEAR FROM data)::int AS comparison_year
-  FROM gold.nr_panorama_comparison_history_detail
+WITH year_months AS (
+  SELECT DISTINCT id_customer,
+    EXTRACT(YEAR FROM data)::int AS comparison_year,
+    EXTRACT(MONTH FROM data)::int AS comparison_month
+  FROM gold.nr_panorama_inventory_monthly_default
 ), kpis(kpi_order,comparison_kpi,kpi_format) AS (
   VALUES {rows}
 )
-SELECT years.comparison_year,kpis.kpi_order,kpis.comparison_kpi,kpis.kpi_format
-FROM years CROSS JOIN kpis
+SELECT ym.id_customer, ym.comparison_year, ym.comparison_month,
+  (ym.comparison_year::text || '-' || LPAD(ym.comparison_month::text,2,'0')
+   || ' · ' || (ARRAY['janeiro','fevereiro','março','abril','maio','junho',
+     'julho','agosto','setembro','outubro','novembro','dezembro'])[ym.comparison_month]
+  )::text AS comparison_year_month,
+  (ym.comparison_year * 100 + ym.comparison_month)::int AS comparison_year_month_sort,
+  kpis.kpi_order,kpis.comparison_kpi,kpis.kpi_format
+FROM year_months ym CROSS JOIN kpis
 """.strip()
 
 
@@ -607,6 +631,7 @@ def kpi_native_filters(filter_dataset_id: int) -> list[dict]:
     common = {"enableEmptyFilter": False, "defaultToFirstItem": False, "creatable": False, "multiSelect": False, "searchAllOptions": True, "inverseSelection": False}
     return [
         {"id": "NATIVE_FILTER-panorama-kpi-year", "controlValues": common, "name": "Ano", "filterType": "filter_select", "targets": [{"datasetId": filter_dataset_id, "column": {"name": "comparison_year"}}], "defaultDataMask": {"extraFormData": {"filters": [{"col": "comparison_year", "op": "IN", "val": [2026]}]}, "filterState": {"label": "2026", "value": [2026]}, "ownState": {}}, "cascadeParentIds": [], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]}, "type": "NATIVE_FILTER", "description": ""},
+        {"id": "NATIVE_FILTER-panorama-kpi-month", "controlValues": {**common, "multiSelect": True, "sortAscending": True, "sortMetric": KPI_MONTH_ORDER_METRIC_NAME}, "sortMetric": KPI_MONTH_ORDER_METRIC_NAME, "name": "Mês", "filterType": "filter_select", "targets": [{"datasetId": filter_dataset_id, "column": {"name": "comparison_year_month"}}], "defaultDataMask": {"extraFormData": {}, "filterState": {}, "ownState": {}}, "cascadeParentIds": ["NATIVE_FILTER-panorama-kpi-year"], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]}, "type": "NATIVE_FILTER", "description": "Selecione meses específicos dentro do ano. Sem seleção, considera todos os meses."},
         {"id": "NATIVE_FILTER-panorama-kpi-selector", "controlValues": {**common, "sortAscending": True, "sortMetric": KPI_ORDER_METRIC_NAME}, "sortMetric": KPI_ORDER_METRIC_NAME, "name": "Visualização por", "filterType": "filter_select", "targets": [{"datasetId": filter_dataset_id, "column": {"name": "comparison_kpi"}}], "defaultDataMask": {"extraFormData": {"filters": [{"col": "comparison_kpi", "op": "IN", "val": ["Venda R$"]}]}, "filterState": {"label": "Venda R$", "value": ["Venda R$"]}, "ownState": {}}, "cascadeParentIds": [], "scope": {"excluded": [], "rootPath": ["ROOT_ID"]}, "type": "NATIVE_FILTER", "description": ""},
     ]
 
@@ -1491,6 +1516,23 @@ def main():
             kpi_order_metric.expression = "MIN(kpi_order)"
             kpi_order_metric.metric_type = "MIN"
             kpi_order_metric.d3format = ",d"
+        month_order_metric = db.session.query(SqlMetric).filter(
+            SqlMetric.table_id == kpi_filter_options.id,
+            SqlMetric.metric_name == KPI_MONTH_ORDER_METRIC_NAME,
+        ).one_or_none()
+        if month_order_metric is None:
+            month_order_metric = SqlMetric(
+                table_id=kpi_filter_options.id,
+                metric_name=KPI_MONTH_ORDER_METRIC_NAME,
+                expression="MIN(comparison_year_month_sort)",
+                metric_type="MIN",
+                d3format=",d",
+            )
+            db.session.add(month_order_metric)
+        else:
+            month_order_metric.expression = "MIN(comparison_year_month_sort)"
+            month_order_metric.metric_type = "MIN"
+            month_order_metric.d3format = ",d"
         latest = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_latest", table_name="nr_panorama_latest")
         mart = upsert_dataset(db.session, SqlaTable, database, "nr_panorama_opportunities", table_name="nr_panorama_opportunities")
         opportunities = mart
