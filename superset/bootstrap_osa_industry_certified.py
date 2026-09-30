@@ -306,10 +306,18 @@ WITH weekly_filtered AS (
    AND cv.id_item::text=s.id_item::text
    AND cv.nm_measure=m.nm_measure
   GROUP BY s.data,s.id_customer,m.nm_measure
+), week_locations AS (
+  SELECT DISTINCT data,id_customer,id_location
+  FROM scoped
 ), demand AS (
-  SELECT id_customer,SUM(COALESCE(demanda_media,0))::float8 AS demand_sum
-  FROM opportunities_filtered
-  GROUP BY id_customer
+  SELECT
+    wl.data,wl.id_customer,
+    SUM(COALESCE(o.demanda_media,0))::float8 AS demand_sum
+  FROM week_locations wl
+  JOIN opportunities_filtered o
+    ON o.id_customer=wl.id_customer
+   AND o.id_location::text=wl.id_location::text
+  GROUP BY wl.data,wl.id_customer
 )
 SELECT
   w.data,w.cd_week,w.id_customer,f.nm_measure,
@@ -335,7 +343,7 @@ SELECT
   {dims}
 FROM weekly w
 JOIN factor f USING(data,id_customer)
-LEFT JOIN demand d USING(id_customer)
+LEFT JOIN demand d USING(data,id_customer)
 ORDER BY w.data
 """.strip()
 
