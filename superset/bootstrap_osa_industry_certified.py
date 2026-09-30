@@ -138,8 +138,8 @@ WITH history_filtered AS (
     SUM(COALESCE(h.qtd_perda_osa,0))::float8 AS loss_qty_sum,
     SUM(COALESCE(h.qtd_problemas_osa,0))::float8 AS problem_sum,
     SUM(COALESCE(h.qtd_item_ativo_osa,0))::float8 AS active_sum,
-    SUM(h.avg_sales_price) FILTER (WHERE h.faturamento>0)::float8 AS sales_price_sum,
-    COUNT(h.avg_sales_price) FILTER (WHERE h.faturamento>0)::bigint AS sales_price_count
+    SUM(h.avg_sales_price)::float8 AS sales_price_sum,
+    COUNT(h.avg_sales_price)::bigint AS sales_price_count
   FROM history_filtered h
   GROUP BY h.data,h.id_customer
 ), cause_month AS (
