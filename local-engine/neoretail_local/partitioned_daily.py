@@ -153,12 +153,40 @@ def build_partitioned_daily_facts(frame: DataFrame, id_customer: int) -> dict[st
         F.col("tp_osa_root_cause").cast("string").alias("causa_osa"),
     ).agg(
         F.sum(_double("vl_quantity_osa_lost_sales")).alias("qtd_perda_osa"),
+        # Power BI's monthly value-loss measures read VL_PERDA_OSA directly.
+        # The daily partitioned source exposes the same semantic field as
+        # VL_VALUE_OSA_LOST_SALES; keep it through Silver/Gold instead of
+        # reconstructing value as quantity * price.
+        F.sum(_double("vl_value_osa_lost_sales")).alias("vl_perda_osa"),
         F.sum(_long("bl_osa_issue")).alias("qtd_problemas_osa"),
         F.sum(_long("quantity_valid_item")).alias("qtd_itens_ativos"),
         F.sum(_double("vl_quantity_sold")).alias("volume_unidades"),
         F.sum(_double("vl_sales_total_value")).alias("faturamento"),
         F.avg(_double("vl_sales_price")).alias("preco_medio"),
-    ).withColumn("motivo_osa", F.col("causa_osa")).withColumn(
+    ).withColumn(
+        "motivo_osa",
+        F.when(
+            F.lower(F.col("causa_osa")).rlike(
+                r"estoque virtual|estoque n.o informado|perda de estoque"
+            ),
+            F.lit("Estoque virtual"),
+        ).when(
+            F.lower(F.col("causa_osa")).rlike(
+                r"exposi|g.ndola|ruptura parcial"
+            ),
+            F.lit("Falta de Exposição"),
+        ).when(
+            F.lower(F.col("causa_osa")).rlike(
+                r"performance|n.o identificado"
+            ),
+            F.lit("Falta de performance"),
+        ).when(
+            F.lower(F.col("causa_osa")).rlike(
+                r"ruptura na loja|ruptura no cd|pedido"
+            ),
+            F.lit("Ruptura na loja"),
+        ).otherwise(F.lit("Não identificado")),
+    ).withColumn(
         "data", F.make_date("vl_year", "vl_month", F.lit(1))
     ).drop("vl_year", "vl_month")
     price = base.groupBy(
