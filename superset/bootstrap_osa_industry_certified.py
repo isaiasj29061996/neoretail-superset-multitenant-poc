@@ -476,28 +476,6 @@ CAUSE_QTY = metric(
     "Perda OSA qtd",
     "SUM(qtd_perda_osa) * MAX(conversion_rate)",
 )
-TABLE_VALUE = formatted_metric(
-    "Perda R$ OSA",
-    "SUM(vl_perda_osa) * MAX(conversion_rate)",
-    "$,.2f",
-)
-TABLE_QTY = formatted_metric(
-    "Perda OSA qtd",
-    "SUM(qtd_perda_osa) * MAX(conversion_rate)",
-    ",.2f",
-)
-TABLE_PROBLEMS = formatted_metric(
-    "Qtd Problema OSA",
-    "SUM(qtd_problemas_osa) * MAX(conversion_rate)",
-    ",.2f",
-)
-TABLE_OSA = formatted_metric(
-    "% OSA",
-    "1 - SUM(qtd_problemas_osa)/NULLIF(SUM(qtd_itens_ativos),0)",
-    ".2%",
-)
-
-
 def _top_params(dataset, title: str, metrics: list[dict], *, weekly: bool, quantity: bool):
     params = custom_params(
         dataset,
