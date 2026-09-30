@@ -397,6 +397,14 @@ def _kpi_default_projection(scope_columns: tuple[str, ...]) -> str:
 def kpi_dimension_sql(scope: str) -> str:
     """AP_KPI_INDUSTRIA contract over history and opportunity marts."""
     first, second, third = KPI_DIMENSION_SCOPES[scope]
+    # The PBI 'Região' bar opens at UF, then drills into Cidade. Keep the
+    # existing region/UF/city mart intact: only shift the chart presentation.
+    display_d_level = "d.drill_level-1" if scope == "region" else "d.drill_level"
+    display_l_level = "l.drill_level-1" if scope == "region" else "l.drill_level"
+    display_a_level = "a.drill_level-1" if scope == "region" else "a.drill_level"
+    display_d_where = "AND d.drill_level>=1" if scope == "region" else ""
+    display_l_where = "WHERE l.drill_level>=1" if scope == "region" else ""
+    display_a_where = "WHERE a.drill_level>=1" if scope == "region" else ""
     history_predicates = _jinja_filter_predicates("h")
     opportunity_predicates = _jinja_filter_predicates("o")
     projection = _kpi_dimension_projection(KPI_DIMENSION_SCOPES[scope])
@@ -426,12 +434,13 @@ def kpi_dimension_sql(scope: str) -> str:
 {{% if not has_dimension_filter and not has_month_filter %}}
 SELECT
   d.data,d.comparison_year,d.id_customer,NULL::text AS comparison_year_month,'unidade'::text AS nm_measure,
-  {default_projection},d.drill_level,
+  {default_projection},{display_d_level} AS drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
   'currency'::text AS kpi_format,
   CASE WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='TVD - Pré-Ruptura' THEN d.tvd ELSE d.ivd END::float8 AS kpi_value
 FROM gold.nr_panorama_kpi_dimension_gap_default d
 WHERE d.comparison_scope='{scope}'
+  {display_d_where}
   {{% for filter in year_filters %}}
   {{% if filter.get('op') == 'IN' %}} AND d.comparison_year IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
   {{% endfor %}}
@@ -466,18 +475,19 @@ WITH filtered AS (
 )
 SELECT
   l.data,l.comparison_year,l.id_customer,NULL::text AS comparison_year_month,'unidade'::text AS nm_measure,
-  {projection},l.drill_level,
+  {projection},{display_l_level} AS drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
   'currency'::text AS kpi_format,
   CASE WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='TVD - Pré-Ruptura' THEN l.tvd ELSE l.ivd END::float8 AS kpi_value
 FROM latest l
+{display_l_where}
 {{% endif %}}
 {{% else %}}
 {{% if not has_dimension_filter and not has_month_filter and (selected_kpi != 'Estoque qtd' or selected_measure == 'unidade') %}}
 SELECT
   d.data,d.comparison_year,d.id_customer,NULL::text AS comparison_year_month,
   '{{{{ selected_measure | replace("'", "''") }}}}'::text AS nm_measure,
-  {default_projection},d.drill_level,
+  {default_projection},{display_d_level} AS drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
   CASE
     WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='Venda R$' THEN 'currency'
@@ -497,6 +507,7 @@ SELECT
   END::float8 AS kpi_value
 FROM gold.nr_panorama_kpi_dimension_history_default d
 WHERE d.comparison_scope='{scope}'
+  {display_d_where}
   {{% for filter in year_filters %}}
   {{% if filter.get('op') == 'IN' %}} AND d.comparison_year IN {{{{ filter.get('val') | where_in }}}} {{% endif %}}
   {{% endfor %}}
@@ -569,7 +580,7 @@ WITH filtered AS (
 SELECT
   a.data,a.comparison_year,a.id_customer,NULL::text AS comparison_year_month,
   '{{{{ selected_measure | replace("'", "''") }}}}'::text AS nm_measure,
-  {projection},a.drill_level,
+  {projection},{display_a_level} AS drill_level,
   '{{{{ selected_kpi | replace("'", "''") }}}}'::text AS comparison_kpi,
   CASE
     WHEN '{{{{ selected_kpi | replace("'", "''") }}}}'='Venda R$' THEN 'currency'
@@ -588,6 +599,7 @@ SELECT
     WHEN '%ROI' THEN CASE WHEN a.sellout_sum=0 OR a.sales_cost_sum=0 THEN 0 ELSE 100.0*(a.sellout_sum-a.sales_cost_sum)/NULLIF(a.stock_cost_sum,0) END
   END::float8 AS kpi_value
 FROM annual_nodes a
+{display_a_where}
 {{% endif %}}
 {{% endif %}}
 """.strip()
@@ -1803,7 +1815,8 @@ def main():
                 f"Comparativo de KPIs — {dimension_label}",
                 kpi_dimension_params(
                     kpi_dimensions[scope], dimension_label,
-                    KPI_DIMENSION_SCOPES[scope],
+                    KPI_DIMENSION_SCOPES[scope][1:] if scope == "region"
+                    else KPI_DIMENSION_SCOPES[scope],
                 ),
             )
 
