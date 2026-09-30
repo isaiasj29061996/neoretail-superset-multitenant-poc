@@ -18,7 +18,7 @@ YEAR = 2026
 DASHBOARD = "neoretail-v9-panorama-industria"
 MONTH_NAMES = ("janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro")
 SCOPES = {
-    "Região": ("region", "regiao", "l.regiao"),
+    "Região": ("region", "uf", "l.uf"),
     "Varejo": ("retail", "rede", "l.rede"),
     "Hierarquia de item": ("hierarchy", "hierarquia_1", "i.hierarquia_1"),
 }
@@ -112,11 +112,13 @@ FROM annual
 
 def history_mart_sql(scope):
     return text("""
-SELECT dimension_1,sales_value,stock_quantity,osa_percent,rupture_percent,
+SELECT CASE WHEN :scope='region' THEN dimension_2 ELSE dimension_1 END AS dimension_1,
+       sales_value,stock_quantity,osa_percent,rupture_percent,
        no_sales_percent,coverage,inventory_turnover,roi_percent
 FROM gold.nr_panorama_kpi_dimension_history_default
 WHERE id_customer=:customer AND comparison_year=:year
-  AND comparison_scope=:scope AND drill_level=0
+  AND comparison_scope=:scope
+  AND drill_level=CASE WHEN :scope='region' THEN 1 ELSE 0 END
 """)
 
 
@@ -139,10 +141,12 @@ FROM daily ORDER BY dimension_1,data DESC
 
 def gap_mart_sql(scope):
     return text("""
-SELECT dimension_1,tvd,ivd
+SELECT CASE WHEN :scope='region' THEN dimension_2 ELSE dimension_1 END AS dimension_1,
+       tvd,ivd
 FROM gold.nr_panorama_kpi_dimension_gap_default
 WHERE id_customer=:customer AND comparison_year=:year
-  AND comparison_scope=:scope AND drill_level=0
+  AND comparison_scope=:scope
+  AND drill_level=CASE WHEN :scope='region' THEN 1 ELSE 0 END
 """)
 
 
@@ -293,14 +297,14 @@ def main():
                 GROUP BY rede ORDER BY COUNT(*) DESC LIMIT 1
             """), {"customer": CUSTOMER_ID}).scalar_one()
             source_filtered = list(connection.execute(
-                history_source_sql("l.regiao", "AND l.rede=:rede"),
+                history_source_sql("l.uf", "AND l.rede=:rede"),
                 {"customer": CUSTOMER_ID, "year": YEAR, "rede": rede},
             ).mappings())
             rows, elapsed = execute_chart(
                 factory, ChartDataCommand, charts[titles["Região"]], "Venda R$",
                 ({"col": "rede", "op": "IN", "val": [rede]},),
             )
-            actual = {row.get("regiao"): row.get("KPI valor") for row in rows if int(row.get("drill_level", -1)) == 0}
+            actual = {row.get("uf"): row.get("KPI valor") for row in rows if int(row.get("drill_level", -1)) == 0}
             compare(mapped(source_filtered, "sales_value"), actual, "filtered-source-chart:Região:Venda R$")
             report["filtered_fallback"] = {"rede": rede, "elapsed_ms": round(elapsed, 2), "rows": len(rows)}
 
@@ -324,7 +328,7 @@ def main():
                 + ",".join(str(month) for month in months) + ")"
             )
             month_source = list(connection.execute(
-                history_source_sql("l.regiao", history_filter),
+                history_source_sql("l.uf", history_filter),
                 {"customer": CUSTOMER_ID, "year": YEAR},
             ).mappings())
             monthly_report = {
@@ -341,7 +345,7 @@ def main():
                     selector, month_extra,
                 )
                 month_actual = {
-                    row.get("regiao"): row.get("KPI valor")
+                    row.get("uf"): row.get("KPI valor")
                     for row in month_rows
                     if int(row.get("drill_level", -1)) == 0
                 }
@@ -357,7 +361,7 @@ def main():
             # but only if opportunities exist there.
             gap_source = list(connection.execute(
                 gap_source_sql(
-                    "l.regiao",
+                    "l.uf",
                     "AND EXTRACT(MONTH FROM h.id_time::date)::int IN ("
                     + ",".join(str(month) for month in months) + ")",
                 ),
@@ -369,7 +373,7 @@ def main():
                     "TVD - Pré-Ruptura", month_extra,
                 )
                 gap_actual = {
-                    row.get("regiao"): row.get("KPI valor")
+                    row.get("uf"): row.get("KPI valor")
                     for row in gap_rows
                     if int(row.get("drill_level", -1)) == 0
                 }
