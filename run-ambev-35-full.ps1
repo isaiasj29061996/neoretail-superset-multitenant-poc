@@ -120,6 +120,7 @@ $bootstraps = @(
     "bootstrap_overview_quantity.py",
     "bootstrap_panorama.py",
     "bootstrap_osa_industry.py",
+    "bootstrap_osa_industry_certified.py",
     "bootstrap_stock_optimization.py",
     "bootstrap_export.py",
     "bootstrap_embedded.py"
