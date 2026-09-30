@@ -40,6 +40,20 @@ equal(query.time_range, baseQuery.time_range, 'Preserve time range');
 equal(query.extras, baseQuery.extras, 'Preserve SQL extras and daily grain');
 equal(query.row_limit, 5000, 'Preserve effective row limit');
 equal(query.orderby, [['data', true]], 'Order daily observations');
+const toolbar = buildQuery({
+  card_variant: 'kpifilters',
+  metrics: ['AP KPI ordem'],
+  groupby: ['comparison_year'],
+}, { ownState: { marker: true } }).queries[0];
+equal(toolbar.columns, [
+  'comparison_year', 'comparison_month',
+  'comparison_year_month', 'comparison_kpi',
+], 'KPI toolbar queries all governed selector dimensions');
+equal(toolbar.metrics, ['AP KPI ordem'], 'KPI toolbar uses registered selector-order metric');
+equal(toolbar.row_limit, 2000, 'KPI toolbar limits the tiny options query');
+equal(toolbar.time_range, 'No filter', 'KPI toolbar must not inherit a dashboard time range');
+equal(toolbar.filters, baseQuery.filters, 'KPI toolbar preserves RLS/native query filters');
+
 const bars = buildQuery({ ...raw, card_variant: 'bars', groupby: ['activity_level'] }, { ownState: { marker: true } }).queries;
 equal(bars.length, 2, 'Bar cards request summary and grouped series');
 equal(bars[1].columns, ['data', 'activity_level'], 'Group bars by activity');
