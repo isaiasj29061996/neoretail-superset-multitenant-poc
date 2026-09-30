@@ -182,7 +182,7 @@ def build_partitioned_daily_facts(frame: DataFrame, id_customer: int) -> dict[st
             F.lit("Falta de performance"),
         ).when(
             F.lower(F.col("causa_osa")).rlike(
-                r"ruptura na loja|ruptura no cd|pedido"
+                r"ruptura|pedido"
             ),
             F.lit("Ruptura na loja"),
         ).otherwise(F.lit("Não identificado")),
