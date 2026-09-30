@@ -3,6 +3,26 @@ import { buildQueryContext } from '@superset-ui/core';
 const asArray = value => (Array.isArray(value) ? value : value ? [value] : []);
 
 export default function buildQuery(formData, options) {
+  const variant = formData.card_variant || formData.cardVariant;
+  if (variant === 'kpifilters') {
+    // The toolbar is a chart only to make it a first-class dashboard layout
+    // component. Its dataset is tenant/RLS-scoped and returns selector options,
+    // not numeric KPIs. It must ignore its own native filters (see bootstrap).
+    return buildQueryContext(formData, {
+      ...options,
+      buildQuery: base => [{
+        ...base,
+        columns: [
+          'comparison_year', 'comparison_month',
+          'comparison_year_month', 'comparison_kpi',
+        ],
+        metrics: asArray(formData.metrics),
+        orderby: [],
+        row_limit: 2000,
+        time_range: 'No filter',
+      }],
+    });
+  }
   const xAxis = formData.x_axis;
   if (!xAxis) throw new Error('Selecione a coluna temporal no eixo X do NeoRetail KPI Card.');
   const metrics = [...asArray(formData.metrics), formData.metric, formData.critical_metric, formData.risk_metric].filter(Boolean);
