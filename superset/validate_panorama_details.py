@@ -1,7 +1,7 @@
 """Reconcile Panorama detailed-analysis tables with Power BI DAX semantics.
 
-The gate checks all five tabs against gold.fato_historico and then compares the
-same expected values with Superset ChartData.  It intentionally uses the
+The gate checks all five tabs against the prejoined Gold history mart, reconciles
+the compact detail mart, and then compares the same values with Superset ChartData.  It intentionally uses the
 default conversion measure 'unidade', which is the dashboard default.
 """
 from __future__ import annotations
@@ -30,13 +30,13 @@ SCOPES = {
     "Produto": ("item", "h.item"),
     "Nível de atividade": (
         "activity_level",
-        """CASE f.tp_activity_level
+        """CASE h.tp_activity_level
              WHEN 'F' THEN 'Fast Mover'
              WHEN 'S' THEN 'Slow Mover'
              WHEN 'US' THEN 'Ultra Slow Mover'
              WHEN 'U' THEN 'Ultra Slow Mover'
              WHEN 'N' THEN 'New Mover'
-             ELSE COALESCE(f.tp_activity_level, 'Outros')
+             ELSE COALESCE(h.tp_activity_level, 'Outros')
            END""",
     ),
 }
