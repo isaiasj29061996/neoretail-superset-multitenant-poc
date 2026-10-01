@@ -152,7 +152,8 @@ SELECT
   c.isv_value AS "Item sem venda",
   c.osa_loss_value AS "Perda OSA"
 FROM current_rows c
-LEFT JOIN annual a USING (dimension_value)
+LEFT JOIN annual a
+  ON a.dimension_value IS NOT DISTINCT FROM c.dimension_value
 ORDER BY c.dimension_value
 """)
 
