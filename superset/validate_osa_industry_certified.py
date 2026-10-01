@@ -20,9 +20,6 @@ from flask import g
 from flask_login import login_user
 from sqlalchemy import text
 from superset.app import create_app
-from superset.commands.chart.data.get_data_command import ChartDataCommand
-from superset.common.query_context_factory import QueryContextFactory
-from superset.models.dashboard import Dashboard
 
 from profile_dashboard_performance import build_queries
 
@@ -41,7 +38,7 @@ def close(left, right):
         return left == right
 
 
-def chart_data(factory, chart, *, period=None):
+def chart_data(factory, command, chart, *, period=None):
     form = json.loads(chart.params)
     queries, _ = build_queries(form)
     filters = [
@@ -54,7 +51,7 @@ def chart_data(factory, chart, *, period=None):
         query["filters"] = [*query.get("filters", []), *filters]
     g.form_data = {"extra_filters": filters}
     started = perf_counter()
-    result = ChartDataCommand(factory.create(
+    result = command(factory.create(
         datasource={"id": chart.datasource_id, "type": "table"},
         queries=queries,
         form_data={**form, "force": True, "extra_filters": filters},
@@ -281,6 +278,9 @@ def main():
     app = create_app()
     with app.test_request_context("/"):
         from superset import db,security_manager
+        from superset.commands.chart.data.get_data_command import ChartDataCommand
+        from superset.common.query_context_factory import QueryContextFactory
+        from superset.models.dashboard import Dashboard
 
         admin = security_manager.find_user(username="admin") or db.session.query(
             security_manager.user_model
@@ -336,14 +336,12 @@ def main():
             ):
                 if title not in charts:
                     raise AssertionError({"missing_chart":title})
-                rows,elapsed = chart_data(factory,charts[title],period=period)
+                rows,elapsed = chart_data(factory, ChartDataCommand, charts[title],period=period)
                 report["charts"][title] = {
                     "rows":len(rows),"elapsed_ms":round(elapsed,2),
                 }
 
-            row = latest_row(report_rows := chart_data(
-                factory,charts[f"{PREFIX} Visão geral — Valor mensal"]
-            )[0])
+            row = latest_row(report_rows := chart_data(factory, ChartDataCommand, charts[f"{PREFIX} Visão geral — Valor mensal"])[0])
             assert_metric(
                 row,monthly_expected,"monthly-value",
                 {
@@ -355,9 +353,7 @@ def main():
             )
             report["reconciliations"].append("monthly-value:source=ChartData")
 
-            row = latest_row(chart_data(
-                factory,charts[f"{PREFIX} Visão geral — Quantidade mensal"]
-            )[0])
+            row = latest_row(chart_data(factory, ChartDataCommand, charts[f"{PREFIX} Visão geral — Quantidade mensal"])[0])
             assert_metric(
                 row,monthly_expected,"monthly-quantity",
                 {
@@ -369,9 +365,7 @@ def main():
             )
             report["reconciliations"].append("monthly-quantity:source=ChartData")
 
-            row = latest_row(chart_data(
-                factory,charts[f"{PREFIX} Visão geral — Valor semanal"]
-            )[0])
+            row = latest_row(chart_data(factory, ChartDataCommand, charts[f"{PREFIX} Visão geral — Valor semanal"])[0])
             assert_metric(
                 row,weekly_expected,"weekly-value",
                 {
@@ -383,9 +377,7 @@ def main():
             )
             report["reconciliations"].append("weekly-value:source=ChartData")
 
-            row = latest_row(chart_data(
-                factory,charts[f"{PREFIX} Visão geral — Quantidade semanal"]
-            )[0])
+            row = latest_row(chart_data(factory, ChartDataCommand, charts[f"{PREFIX} Visão geral — Quantidade semanal"])[0])
             assert_metric(
                 row,weekly_expected,"weekly-quantity",
                 {
@@ -400,8 +392,7 @@ def main():
             motive_value_expected = list(connection.execute(
                 MOTIVE_VALUE_EXPECTED,{"customer":CUSTOMER_ID}
             ).mappings())
-            rows,_ = chart_data(
-                factory,charts[f"{PREFIX} Perda OSA por motivo — Valor"],
+            rows,_ = chart_data(factory, ChartDataCommand, charts[f"{PREFIX} Perda OSA por motivo — Valor"],
                 period="MTD",
             )
             compare_categories(
@@ -413,8 +404,7 @@ def main():
             motive_qty_expected = list(connection.execute(
                 MOTIVE_QTY_EXPECTED,{"customer":CUSTOMER_ID}
             ).mappings())
-            rows,_ = chart_data(
-                factory,charts[f"{PREFIX} Perda OSA por motivo — Quantidade"],
+            rows,_ = chart_data(factory, ChartDataCommand, charts[f"{PREFIX} Perda OSA por motivo — Quantidade"],
                 period="MTD",
             )
             compare_categories(
