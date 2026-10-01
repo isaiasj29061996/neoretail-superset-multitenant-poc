@@ -183,7 +183,7 @@ ORDER BY dimension_value
 
 
 
-def chart_rows(factory, chart):
+def chart_rows(factory, command, chart):
     form = json.loads(chart.params)
     queries, _ = build_queries(form)
     filters = [
@@ -194,7 +194,7 @@ def chart_rows(factory, chart):
         query["filters"] = [*query.get("filters", []), *filters]
     g.form_data = {"extra_filters": filters}
     started = perf_counter()
-    result = ChartDataCommand(factory.create(
+    result = command(factory.create(
         datasource={"id": chart.datasource_id, "type": "table"},
         queries=queries,
         form_data={**form, "force": True, "extra_filters": filters},
@@ -260,7 +260,7 @@ def main():
                     {"customer": CUSTOMER_ID, "scope": column},
                 ).mappings())
                 compare(expected, mart, column, f"source-mart:{label}")
-                actual, elapsed = chart_rows(factory, charts[title])
+                actual, elapsed = chart_rows(factory, ChartDataCommand, charts[title])
                 compare(expected, actual, column, f"source-chart:{label}")
                 report["tabs"][label] = {
                     "rows": len(actual),
