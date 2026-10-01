@@ -162,6 +162,34 @@ ORDER BY c.dimension_value
 """)
 
 
+
+def mart_sql(column: str):
+    return text(f"""
+SELECT
+  dimension_value AS "{column}",
+  sales_qty_value AS "Venda qtd",
+  sellout_value AS "Venda sell out",
+  sales_cost_value AS "Venda custo",
+  markup_value AS "Markup",
+  price_value AS "Preço médio",
+  stock_cost_value AS "Estoque custo",
+  stock_qty_value AS "Estoque qtd",
+  roi_value AS "ROI",
+  roi_annual_value AS "ROI anual",
+  giro_value AS "Giro",
+  osa_value AS "OSA",
+  rupture_value AS "Ruptura",
+  isv_value AS "Item sem venda",
+  osa_loss_value AS "Perda OSA"
+FROM gold.nr_panorama_detail_default
+WHERE id_customer=:customer
+  AND detail_scope=:scope
+  AND nm_measure='unidade'
+ORDER BY dimension_value
+""")
+
+
+
 def chart_rows(factory, chart):
     form = json.loads(chart.params)
     queries, _ = build_queries(form)
@@ -231,10 +259,16 @@ def main():
                 expected = list(connection.execute(
                     expected_sql(column, expression), {"customer": CUSTOMER_ID}
                 ).mappings())
+                mart = list(connection.execute(
+                    mart_sql(column),
+                    {"customer": CUSTOMER_ID, "scope": column},
+                ).mappings())
+                compare(expected, mart, column, f"source-mart:{label}")
                 actual, elapsed = chart_rows(factory, charts[title])
                 compare(expected, actual, column, f"source-chart:{label}")
                 report["tabs"][label] = {
                     "rows": len(actual),
+                    "mart_rows": len(mart),
                     "elapsed_ms": round(elapsed, 2),
                     "metrics": list(METRICS),
                 }
