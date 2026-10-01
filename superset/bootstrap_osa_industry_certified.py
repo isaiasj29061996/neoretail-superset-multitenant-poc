@@ -490,7 +490,10 @@ def _top_params(dataset, title: str, metrics: list[dict], *, weekly: bool, quant
         title,
         metrics,
         grain="P1D" if weekly else "P1M",
-        styles="line|bar|line|line",
+        # Power BI uses a line+clustered-column combo here: Venda is the
+        # column, % Perda and %OSA are lines. Perda OSA remains available as
+        # the KPI summary value, but is not an extra timeline series.
+        styles="bar|hidden|line|line",
         formats=(
             "quantity|quantity|percent|percent"
             if quantity else
@@ -627,52 +630,72 @@ def main():
                     "pivot_table_v2",
                 )
 
+        # The Power BI implementation has separate Valor and Quantidade pages.
+        # In Superset we keep one dashboard, but the mode selector owns the
+        # whole analytical canvas. This prevents mixed states such as a Valor
+        # timeline with Quantidade cause/matrix visuals.
         layout = Layout()
         parents = ["ROOT_ID","GRID_ID"]
-        layout.period_tabs(
-            "GRID_ID",parents,"Visão geral OSA",
-            [
-                ("Valor",[
-                    ("mensal",charts["value_month"]),
-                    ("semanal",charts["value_week"]),
-                ]),
-                ("Quantidade",[
-                    ("mensal",charts["qty_month"]),
-                    ("semanal",charts["qty_week"]),
-                ]),
-            ],
-            height=58,
+        mode_tabs_id = layout._id("TABS")
+        mode_tab_ids = []
+        layout.nodes[mode_tabs_id] = {
+            "id": mode_tabs_id,
+            "type": "TABS",
+            "parents": parents,
+            "children": mode_tab_ids,
+            "meta": {"defaultText": "Visão OSA"},
+        }
+        layout.nodes["GRID_ID"]["children"].append(mode_tabs_id)
+
+        mode_specs = (
+            (
+                "Valor",
+                charts["value_month"], charts["value_week"],
+                charts["value_motive"], charts["value_cause"],
+                charts["value_matrix_region"], charts["value_matrix_retail"],
+                charts["value_matrix_item"],
+            ),
+            (
+                "Quantidade",
+                charts["qty_month"], charts["qty_week"],
+                charts["qty_motive"], charts["qty_cause"],
+                charts["qty_matrix_region"], charts["qty_matrix_retail"],
+                charts["qty_matrix_item"],
+            ),
         )
-        layout.tabs(
-            "GRID_ID",parents,"Perdas por causa",
-            [
-                ("Valor",[
-                    [charts["value_motive"]],
-                    [charts["value_cause"]],
-                ]),
-                ("Quantidade",[
-                    [charts["qty_motive"]],
-                    [charts["qty_cause"]],
-                ]),
-            ],
-            height=48,
-        )
-        layout.tabs(
-            "GRID_ID",parents,"Análise por dimensão",
-            [
-                ("Valor",[[
-                    charts["value_matrix_region"],
-                    charts["value_matrix_retail"],
-                    charts["value_matrix_item"],
-                ]]),
-                ("Quantidade",[[
-                    charts["qty_matrix_region"],
-                    charts["qty_matrix_retail"],
-                    charts["qty_matrix_item"],
-                ]]),
-            ],
-            height=52,
-        )
+        for (
+            mode_label, monthly_chart, weekly_chart, motive_chart, cause_chart,
+            region_chart, retail_chart, item_chart,
+        ) in mode_specs:
+            tab_id = layout._id("TAB")
+            mode_tab_ids.append(tab_id)
+            tab_parents = [*parents, mode_tabs_id]
+            layout.nodes[tab_id] = {
+                "id": tab_id,
+                "type": "TAB",
+                "parents": tab_parents,
+                "children": [],
+                "meta": {"text": mode_label},
+            }
+            content_parents = [*tab_parents, tab_id]
+            layout.tabs(
+                tab_id,
+                content_parents,
+                f"Período de {mode_label}",
+                [
+                    ("Mensal", [[monthly_chart]]),
+                    ("Semanal", [[weekly_chart]]),
+                ],
+                height=58,
+            )
+            layout.row(tab_id, content_parents, [motive_chart], 44)
+            layout.row(tab_id, content_parents, [cause_chart], 48)
+            layout.row(
+                tab_id,
+                content_parents,
+                [region_chart, retail_chart, item_chart],
+                52,
+            )
 
         dashboard = db.session.query(Dashboard).filter(
             Dashboard.slug == DASHBOARD_SLUG
