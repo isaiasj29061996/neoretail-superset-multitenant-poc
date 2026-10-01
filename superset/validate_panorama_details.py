@@ -101,7 +101,9 @@ WITH latest AS (
     SUM(COALESCE(r.rup,0))::float8 rupture_sum,
     SUM(COALESCE(r.status_item_geral,0))::float8 status_sum,
     SUM(COALESCE(r.est_virtual,0))::float8 isv_sum
-  FROM raw r LEFT JOIN factor f USING (dimension_value)
+  FROM raw r
+  LEFT JOIN factor f
+    ON f.dimension_value IS NOT DISTINCT FROM r.dimension_value
   GROUP BY r.data,r.dimension_value
 ), calc AS (
   SELECT m.*,
