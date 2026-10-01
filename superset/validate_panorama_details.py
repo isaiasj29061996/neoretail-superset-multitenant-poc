@@ -14,9 +14,6 @@ from flask import g
 from flask_login import login_user
 from sqlalchemy import text
 from superset.app import create_app
-from superset.commands.chart.data.get_data_command import ChartDataCommand
-from superset.common.query_context_factory import QueryContextFactory
-from superset.models.dashboard import Dashboard
 
 from profile_dashboard_performance import build_queries
 
@@ -234,6 +231,9 @@ def main():
     app = create_app()
     with app.test_request_context("/"):
         from superset import db, security_manager
+        from superset.commands.chart.data.get_data_command import ChartDataCommand
+        from superset.common.query_context_factory import QueryContextFactory
+        from superset.models.dashboard import Dashboard
 
         admin = security_manager.find_user(username="admin") or db.session.query(
             security_manager.user_model
