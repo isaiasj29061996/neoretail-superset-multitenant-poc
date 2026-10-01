@@ -70,6 +70,26 @@ padrão.
 Os 15 slices são `pivot_table_v2`. O dashboard continua com RLS por
 `id_customer`; `nm_measure` usa `nr_conversion_options`.
 
+## Análise detalhada: caminho de serving compacto
+
+A análise detalhada usa `analytics-db/marts/44_panorama_detail_semantic.sql`.
+O mart `gold.nr_panorama_detail_default` materializa uma única vez o snapshot
+atual e o ROI móvel de 12 meses para Região, Rede, Categoria, Produto e Nível de
+atividade. O cálculo usa `GROUPING SETS` para evitar cinco varreduras
+independentes da história.
+
+No Superset, o caminho sem filtro dimensional lê esse mart compacto. Quando há
+um filtro de outra dimensão, o dataset volta para
+`gold.nr_panorama_comparison_history_detail`, empurra o filtro para baixo e
+recalcula as métricas no contexto filtrado. Assim o bootstrap não precisa
+executar cinco consultas de 12 meses apenas para descobrir metadata, sem perder
+a semântica dos filtros.
+
+O gate `validate_panorama_details.py` reconcilia
+fonte pré-joined → mart compacto → ChartData. A otimização precisa ser
+reexecutada no ambiente local antes de atualizar os números de performance
+documentados.
+
 ## Reconciliação executada
 
 `superset/validate_panorama_comparisons.py` compara:

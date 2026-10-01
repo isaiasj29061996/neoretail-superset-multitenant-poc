@@ -79,6 +79,7 @@ def test_runtime_gate_compares_source_mart_and_actual_chartdata():
     assert "ChartDataCommand" in validator
     assert "source-mart:" in validator
     assert "source-chart:" in validator
+    assert "filtered-source-chart:" in validator
 
 
 def test_comparison_pivots_keep_individual_metric_formats():
@@ -90,12 +91,12 @@ def test_comparison_pivots_keep_individual_metric_formats():
     assert 'item["label"]: item.get("d3Format")' in bootstrap
     assert 'formatted_metric("Markup",' in bootstrap
     assert '".2%"' in bootstrap
-    assert "filtered-source-chart:" in validator
 
 
 def test_detail_analysis_matches_power_bi_dax_contract_and_uses_raw_status_denominator():
     bootstrap = read("superset/bootstrap_panorama.py")
     validator = read("superset/validate_panorama_details.py")
+    serving = read("analytics-db/marts/44_panorama_detail_semantic.sql")
 
     # Power BI current-snapshot formulas.
     assert "def detail_semantic_sql(group_column: str)" in bootstrap
@@ -113,19 +114,28 @@ def test_detail_analysis_matches_power_bi_dax_contract_and_uses_raw_status_denom
     assert "1200.0 *" in bootstrap  # legacy P dict remains for unrelated callers
     assert 'formatted_metric("ROI anual", "MAX(roi_annual_value)", ".2%")' in bootstrap
 
-    # All five visual tabs now use governed virtual datasets rather than the
-    # former latest-only physical table.
+    # All five tabs keep governed virtual datasets, but the no-filter path is
+    # served by a compact materialized mart. Cross-dimension filters fall back
+    # to the detailed history mart before aggregation.
     for dimension in ("regiao", "rede", "hierarquia_1", "item", "activity_level"):
         assert f'nr_panorama_detail_{{column}}' in bootstrap
     assert "detail_table_params(detail_dataset, column, 20)" in bootstrap
+    assert "has_detail_filter" in bootstrap
+    assert "FROM gold.nr_panorama_detail_default d" in bootstrap
+    assert "FROM gold.nr_panorama_comparison_history_detail h" in bootstrap
+    assert "CREATE MATERIALIZED VIEW gold.nr_panorama_detail_default" in serving
+    assert "GROUPING SETS" in serving
+    assert "SUM(roi_value) OVER" in serving
 
     # Percent display metadata is explicit.
     for metric in ("Markup", "ROI", "ROI anual", "OSA", "Ruptura", "Item sem venda"):
         assert f'"{metric}": {{"d3NumberFormat": ".2%"}}' in bootstrap
 
     # Runtime gate independently queries fato_historico and ChartData.
-    assert "gold.fato_historico" in validator
+    assert "gold.nr_panorama_comparison_history_detail" in validator
+    assert "gold.nr_panorama_detail_default" in validator
     assert "ChartDataCommand" in validator
     assert "status_item_geral" in validator
     assert "SUM(roi_value)" in validator
+    assert "source-mart:" in validator
     assert "source-chart:" in validator

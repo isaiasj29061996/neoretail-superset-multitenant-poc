@@ -1,7 +1,7 @@
 """Reconcile Panorama detailed-analysis tables with Power BI DAX semantics.
 
-The gate checks all five tabs against gold.fato_historico and then compares the
-same expected values with Superset ChartData.  It intentionally uses the
+The gate checks all five tabs against the prejoined Gold history mart, reconciles
+the compact detail mart, and then compares the same values with Superset ChartData.  It intentionally uses the
 default conversion measure 'unidade', which is the dashboard default.
 """
 from __future__ import annotations
@@ -14,9 +14,6 @@ from flask import g
 from flask_login import login_user
 from sqlalchemy import text
 from superset.app import create_app
-from superset.commands.chart.data.get_data_command import ChartDataCommand
-from superset.common.query_context_factory import QueryContextFactory
-from superset.models.dashboard import Dashboard
 
 from profile_dashboard_performance import build_queries
 
@@ -24,19 +21,19 @@ from profile_dashboard_performance import build_queries
 CUSTOMER_ID = 142
 DASHBOARD = "neoretail-v9-panorama-industria"
 SCOPES = {
-    "Região": ("regiao", "l.regiao"),
-    "Rede": ("rede", "l.rede"),
-    "Categoria": ("hierarquia_1", "i.hierarquia_1"),
-    "Produto": ("item", "i.item"),
+    "Região": ("regiao", "h.regiao"),
+    "Rede": ("rede", "h.rede"),
+    "Categoria": ("hierarquia_1", "h.hierarquia_1"),
+    "Produto": ("item", "h.item"),
     "Nível de atividade": (
         "activity_level",
-        """CASE f.tp_activity_level
+        """CASE h.tp_activity_level
              WHEN 'F' THEN 'Fast Mover'
              WHEN 'S' THEN 'Slow Mover'
              WHEN 'US' THEN 'Ultra Slow Mover'
              WHEN 'U' THEN 'Ultra Slow Mover'
              WHEN 'N' THEN 'New Mover'
-             ELSE COALESCE(f.tp_activity_level, 'Outros')
+             ELSE COALESCE(h.tp_activity_level, 'Outros')
            END""",
     ),
 }
@@ -59,27 +56,23 @@ def expected_sql(column: str, dimension_expr: str):
     # column and expression come exclusively from SCOPES above.
     return text(f"""
 WITH latest AS (
-  SELECT MAX(mes_ano)::date AS latest_data
-  FROM gold.fato_historico
+  SELECT MAX(data)::date AS latest_data
+  FROM gold.nr_panorama_comparison_history_detail
   WHERE id_customer=:customer
 ), raw AS (
   SELECT
-    f.mes_ano::date AS data,
-    f.id_customer,
-    f.id_item::text AS id_item,
+    h.data::date AS data,
+    h.id_customer,
+    h.id_item::text AS id_item,
     {dimension_expr}::text AS dimension_value,
-    f.volume_unidades,f.faturamento,f.estoque_unidades,f.qtd_perda_osa,
-    f.rup,f.est_virtual,f.giro,f.qtd_problemas_osa,f.qtd_item_ativo_osa,
-    f.status_item_geral,f.avg_sales_price,f.avg_price_cost,f.estoque_medio
-  FROM gold.fato_historico f
+    h.volume_unidades,h.faturamento,h.estoque_unidades,h.qtd_perda_osa,
+    h.rup,h.est_virtual,h.giro,h.qtd_problemas_osa,h.qtd_item_ativo_osa,
+    h.status_item_geral,h.avg_sales_price,h.avg_price_cost,h.estoque_medio
+  FROM gold.nr_panorama_comparison_history_detail h
   JOIN latest d
-    ON f.mes_ano::date > d.latest_data - INTERVAL '12 months'
-   AND f.mes_ano::date <= d.latest_data
-  LEFT JOIN gold.dim_local l
-    ON l.id_customer=f.id_customer AND l.id_location=f.id_location
-  LEFT JOIN gold.dim_itens i
-    ON i.id_customer=f.id_customer AND i.id_item=f.id_item
-  WHERE f.id_customer=:customer
+    ON h.data::date > d.latest_data - INTERVAL '12 months'
+   AND h.data::date <= d.latest_data
+  WHERE h.id_customer=:customer
 ), factor AS (
   SELECT
     r.dimension_value,
@@ -108,7 +101,9 @@ WITH latest AS (
     SUM(COALESCE(r.rup,0))::float8 rupture_sum,
     SUM(COALESCE(r.status_item_geral,0))::float8 status_sum,
     SUM(COALESCE(r.est_virtual,0))::float8 isv_sum
-  FROM raw r LEFT JOIN factor f USING (dimension_value)
+  FROM raw r
+  LEFT JOIN factor f
+    ON f.dimension_value IS NOT DISTINCT FROM r.dimension_value
   GROUP BY r.data,r.dimension_value
 ), calc AS (
   SELECT m.*,
@@ -157,12 +152,41 @@ SELECT
   c.isv_value AS "Item sem venda",
   c.osa_loss_value AS "Perda OSA"
 FROM current_rows c
-LEFT JOIN annual a USING (dimension_value)
+LEFT JOIN annual a
+  ON a.dimension_value IS NOT DISTINCT FROM c.dimension_value
 ORDER BY c.dimension_value
 """)
 
 
-def chart_rows(factory, chart):
+
+def mart_sql(column: str):
+    return text(f"""
+SELECT
+  dimension_value AS "{column}",
+  sales_qty_value AS "Venda qtd",
+  sellout_value AS "Venda sell out",
+  sales_cost_value AS "Venda custo",
+  markup_value AS "Markup",
+  price_value AS "Preço médio",
+  stock_cost_value AS "Estoque custo",
+  stock_qty_value AS "Estoque qtd",
+  roi_value AS "ROI",
+  roi_annual_value AS "ROI anual",
+  giro_value AS "Giro",
+  osa_value AS "OSA",
+  rupture_value AS "Ruptura",
+  isv_value AS "Item sem venda",
+  osa_loss_value AS "Perda OSA"
+FROM gold.nr_panorama_detail_default
+WHERE id_customer=:customer
+  AND detail_scope=:scope
+  AND nm_measure='unidade'
+ORDER BY dimension_value
+""")
+
+
+
+def chart_rows(factory, command, chart):
     form = json.loads(chart.params)
     queries, _ = build_queries(form)
     filters = [
@@ -173,7 +197,7 @@ def chart_rows(factory, chart):
         query["filters"] = [*query.get("filters", []), *filters]
     g.form_data = {"extra_filters": filters}
     started = perf_counter()
-    result = ChartDataCommand(factory.create(
+    result = command(factory.create(
         datasource={"id": chart.datasource_id, "type": "table"},
         queries=queries,
         form_data={**form, "force": True, "extra_filters": filters},
@@ -210,6 +234,9 @@ def main():
     app = create_app()
     with app.test_request_context("/"):
         from superset import db, security_manager
+        from superset.commands.chart.data.get_data_command import ChartDataCommand
+        from superset.common.query_context_factory import QueryContextFactory
+        from superset.models.dashboard import Dashboard
 
         admin = security_manager.find_user(username="admin") or db.session.query(
             security_manager.user_model
@@ -231,10 +258,16 @@ def main():
                 expected = list(connection.execute(
                     expected_sql(column, expression), {"customer": CUSTOMER_ID}
                 ).mappings())
-                actual, elapsed = chart_rows(factory, charts[title])
+                mart = list(connection.execute(
+                    mart_sql(column),
+                    {"customer": CUSTOMER_ID, "scope": column},
+                ).mappings())
+                compare(expected, mart, column, f"source-mart:{label}")
+                actual, elapsed = chart_rows(factory, ChartDataCommand, charts[title])
                 compare(expected, actual, column, f"source-chart:{label}")
                 report["tabs"][label] = {
                     "rows": len(actual),
+                    "mart_rows": len(mart),
                     "elapsed_ms": round(elapsed, 2),
                     "metrics": list(METRICS),
                 }
