@@ -79,6 +79,7 @@ def test_runtime_gate_compares_source_mart_and_actual_chartdata():
     assert "ChartDataCommand" in validator
     assert "source-mart:" in validator
     assert "source-chart:" in validator
+    assert "filtered-source-chart:" in validator
 
 
 def test_comparison_pivots_keep_individual_metric_formats():
@@ -90,7 +91,6 @@ def test_comparison_pivots_keep_individual_metric_formats():
     assert 'item["label"]: item.get("d3Format")' in bootstrap
     assert 'formatted_metric("Markup",' in bootstrap
     assert '".2%"' in bootstrap
-    assert "filtered-source-chart:" in validator
 
 
 def test_detail_analysis_matches_power_bi_dax_contract_and_uses_raw_status_denominator():
