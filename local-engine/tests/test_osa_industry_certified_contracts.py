@@ -50,6 +50,31 @@ def test_power_bi_period_selector_contexts_are_materialized():
     assert "DATE_TRUNC('month',b.data)" in bootstrap
 
 
+def test_visual_types_match_power_bi_trace_contract():
+    bootstrap = read("superset/bootstrap_osa_industry_certified.py")
+
+    # Power BI top visual is a line + clustered-column combo:
+    # Venda is the column; % Perda and %OSA are lines. Perda OSA remains a
+    # summary KPI but is hidden from the timeline.
+    assert 'styles="bar|hidden|line|line"' in bootstrap
+
+    # Power BI loss-by-motive/cause visuals are clustered columns.
+    assert 'variant="verticalbars"' in bootstrap
+    assert '"motivo_osa"' in bootstrap
+    assert '"causa_osa"' in bootstrap
+
+    # Power BI dimensional analyses are matrices/pivot tables.
+    assert '"pivot_table_v2"' in bootstrap
+
+    # Valor and Quantidade are separate Power BI pages. In Superset the
+    # single global mode tab must own the whole canvas instead of allowing
+    # independent mixed-mode sections.
+    assert '"defaultText": "Visão OSA"' in bootstrap
+    assert 'mode_specs = (' in bootstrap
+    assert '("Mensal", [[monthly_chart]])' in bootstrap
+    assert '("Semanal", [[weekly_chart]])' in bootstrap
+
+
 def test_value_and_quantity_dashboard_isolated_from_legacy_page():
     bootstrap = read("superset/bootstrap_osa_industry_certified.py")
     matrices = read("superset/osa_certified_matrices.py")
