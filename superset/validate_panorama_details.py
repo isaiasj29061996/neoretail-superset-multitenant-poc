@@ -24,10 +24,10 @@ from profile_dashboard_performance import build_queries
 CUSTOMER_ID = 142
 DASHBOARD = "neoretail-v9-panorama-industria"
 SCOPES = {
-    "Região": ("regiao", "l.regiao"),
-    "Rede": ("rede", "l.rede"),
-    "Categoria": ("hierarquia_1", "i.hierarquia_1"),
-    "Produto": ("item", "i.item"),
+    "Região": ("regiao", "h.regiao"),
+    "Rede": ("rede", "h.rede"),
+    "Categoria": ("hierarquia_1", "h.hierarquia_1"),
+    "Produto": ("item", "h.item"),
     "Nível de atividade": (
         "activity_level",
         """CASE f.tp_activity_level
@@ -59,27 +59,23 @@ def expected_sql(column: str, dimension_expr: str):
     # column and expression come exclusively from SCOPES above.
     return text(f"""
 WITH latest AS (
-  SELECT MAX(mes_ano)::date AS latest_data
-  FROM gold.fato_historico
+  SELECT MAX(data)::date AS latest_data
+  FROM gold.nr_panorama_comparison_history_detail
   WHERE id_customer=:customer
 ), raw AS (
   SELECT
-    f.mes_ano::date AS data,
-    f.id_customer,
-    f.id_item::text AS id_item,
+    h.data::date AS data,
+    h.id_customer,
+    h.id_item::text AS id_item,
     {dimension_expr}::text AS dimension_value,
-    f.volume_unidades,f.faturamento,f.estoque_unidades,f.qtd_perda_osa,
-    f.rup,f.est_virtual,f.giro,f.qtd_problemas_osa,f.qtd_item_ativo_osa,
-    f.status_item_geral,f.avg_sales_price,f.avg_price_cost,f.estoque_medio
-  FROM gold.fato_historico f
+    h.volume_unidades,h.faturamento,h.estoque_unidades,h.qtd_perda_osa,
+    h.rup,h.est_virtual,h.giro,h.qtd_problemas_osa,h.qtd_item_ativo_osa,
+    h.status_item_geral,h.avg_sales_price,h.avg_price_cost,h.estoque_medio
+  FROM gold.nr_panorama_comparison_history_detail h
   JOIN latest d
-    ON f.mes_ano::date > d.latest_data - INTERVAL '12 months'
-   AND f.mes_ano::date <= d.latest_data
-  LEFT JOIN gold.dim_local l
-    ON l.id_customer=f.id_customer AND l.id_location=f.id_location
-  LEFT JOIN gold.dim_itens i
-    ON i.id_customer=f.id_customer AND i.id_item=f.id_item
-  WHERE f.id_customer=:customer
+    ON h.data::date > d.latest_data - INTERVAL '12 months'
+   AND h.data::date <= d.latest_data
+  WHERE h.id_customer=:customer
 ), factor AS (
   SELECT
     r.dimension_value,
