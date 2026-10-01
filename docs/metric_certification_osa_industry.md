@@ -98,6 +98,31 @@ As medidas são calculadas **antes** da renderização:
 
 Isso evita somar percentuais previamente calculados.
 
+## Paridade visual com o Power BI
+
+Os traces das páginas `Panorama 01 - osa0 indústria` e
+`Panorama - osa indústria quantidade` foram usados também para validar o tipo
+dos visuais, não apenas as consultas.
+
+- a visão temporal principal é um `lineClusteredColumnComboChart`: Venda em
+  coluna, % Perda e % OSA em linhas; Perda OSA continua disponível no resumo,
+  mas não é desenhada como uma quarta série na timeline;
+- Perda OSA por Motivo e por Causa são `clusteredColumnChart`, reproduzidas no
+  plugin como barras/colunas verticais;
+- Região, Varejo e Hierarquia de item são `pivotTable`, reproduzidas como
+  `pivot_table_v2`;
+- os slicers do Power BI são representados pelos filtros nativos governados do
+  Superset;
+- Valor e Quantidade existem como páginas separadas no Power BI. Na página
+  certificada do Superset, um único seletor global Valor/Quantidade controla
+  toda a tela, evitando combinações incoerentes entre timeline, causas e
+  matrizes;
+- Mensal/Semanal permanece como seletor interno da visão temporal.
+
+Elementos puramente de moldura do PBIX (caixas de texto, imagens, formas e
+HTML decorativo) não são reproduzidos quando não alteram a leitura analítica.
+Bookmarks e botões são traduzidos em tabs e filtros do dashboard.
+
 ## RLS e filtros
 
 Todos os datasets virtuais publicados expõem `id_customer`. O dashboard usa os
