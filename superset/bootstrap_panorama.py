@@ -1367,11 +1367,10 @@ DETAIL_DIMENSIONS = ("regiao", "rede", "hierarquia_1", "item", "activity_level")
 def detail_semantic_sql(group_column: str) -> str:
     """Power BI-compatible latest snapshot + rolling ROI detail table.
 
-    The visible table is one row per requested business dimension. Native
-    filters are pushed into the raw 12-month history before aggregation, so a
-    network/product/location filter changes every metric exactly in that
-    filtered context. ROI anual is the DAX SUMX of monthly ROI values, not
-    current ROI multiplied by 12.
+    The default/unfiltered path comes from a compact materialized mart created
+    during the serving refresh.  Cross-dimension filters fall back to the
+    detailed history mart so filters are still applied before aggregation.
+    ROI anual remains the DAX SUMX of monthly ROI values, not current ROI * 12.
     """
     if group_column not in DETAIL_DIMENSIONS:
         raise ValueError(f"Unsupported detail dimension: {group_column}")
@@ -1385,50 +1384,82 @@ def detail_semantic_sql(group_column: str) -> str:
         )
         for column in WEEKLY_FILTER_COLUMNS
     )
+    default_projection = ",\n  ".join(
+        (
+            f"d.dimension_value AS {column}"
+            if column == group_column
+            else f"NULL::text AS {column}"
+        )
+        for column in WEEKLY_FILTER_COLUMNS
+    )
+    cross_filter_checks = " or ".join(
+        f"get_filters('{column}')"
+        for column in WEEKLY_FILTER_COLUMNS
+        if column != group_column
+    )
     return f"""
+{{% set has_detail_filter = {cross_filter_checks} %}}
+{{% if not has_detail_filter %}}
+SELECT
+  d.id_customer,
+  {default_projection},
+  d.nm_measure,
+  d.sales_qty_value,
+  d.sellout_value,
+  d.sales_cost_value,
+  d.markup_value,
+  d.price_value,
+  d.stock_cost_value,
+  d.stock_qty_value,
+  d.roi_value,
+  d.roi_annual_value,
+  d.giro_value,
+  d.osa_value,
+  d.rupture_value,
+  d.isv_value,
+  d.osa_loss_value
+FROM gold.nr_panorama_detail_default d
+WHERE d.detail_scope='{group_column}'
+{{% else %}}
 {{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}}
 WITH customer_latest AS (
-  SELECT id_customer, MAX(mes_ano)::date AS latest_data
-  FROM gold.fato_historico
+  SELECT id_customer, MAX(data)::date AS latest_data
+  FROM gold.nr_panorama_comparison_history_detail
   GROUP BY id_customer
 ), raw AS (
   SELECT
-    f.mes_ano::date AS data,
-    f.id_customer,
-    f.id_item::text AS id_item,
-    f.volume_unidades,
-    f.faturamento,
-    f.estoque_unidades,
-    f.qtd_perda_osa,
-    f.rup,
-    f.est_virtual,
-    f.giro,
-    f.qtd_problemas_osa,
-    f.qtd_item_ativo_osa,
-    f.status_item_geral,
-    f.avg_sales_price,
-    f.avg_price_cost,
-    f.estoque_medio,
-    f.tp_activity_level,
-    CASE f.tp_activity_level
+    h.data::date AS data,
+    h.id_customer,
+    h.id_item::text AS id_item,
+    h.volume_unidades,
+    h.faturamento,
+    h.estoque_unidades,
+    h.qtd_perda_osa,
+    h.rup,
+    h.est_virtual,
+    h.giro,
+    h.qtd_problemas_osa,
+    h.qtd_item_ativo_osa,
+    h.status_item_geral,
+    h.avg_sales_price,
+    h.avg_price_cost,
+    h.estoque_medio,
+    h.tp_activity_level,
+    CASE h.tp_activity_level
       WHEN 'F' THEN 'Fast Mover'
       WHEN 'S' THEN 'Slow Mover'
       WHEN 'US' THEN 'Ultra Slow Mover'
       WHEN 'U' THEN 'Ultra Slow Mover'
       WHEN 'N' THEN 'New Mover'
-      ELSE COALESCE(f.tp_activity_level, 'Outros')
+      ELSE COALESCE(h.tp_activity_level, 'Outros')
     END::text AS activity_level,
-    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,
-    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3
-  FROM gold.fato_historico f
+    h.rede,h.bandeira,h.uf,h.cidade,h.tipo_local,h.loja,h.regiao,
+    h.item,h.descricao_marca,h.hierarquia_1,h.hierarquia_2,h.hierarquia_3
+  FROM gold.nr_panorama_comparison_history_detail h
   JOIN customer_latest d
-    ON d.id_customer=f.id_customer
-   AND f.mes_ano::date > d.latest_data - INTERVAL '12 months'
-   AND f.mes_ano::date <= d.latest_data
-  LEFT JOIN gold.dim_local l
-    ON l.id_customer=f.id_customer AND l.id_location=f.id_location
-  LEFT JOIN gold.dim_itens i
-    ON i.id_customer=f.id_customer AND i.id_item=f.id_item
+    ON d.id_customer=h.id_customer
+   AND h.data::date > d.latest_data - INTERVAL '12 months'
+   AND h.data::date <= d.latest_data
 ), history_filtered AS (
   SELECT h.*
   FROM raw h
@@ -1571,6 +1602,7 @@ LEFT JOIN annual a
   ON a.id_customer=c.id_customer
  AND a.{group_column} IS NOT DISTINCT FROM c.{group_column}
  AND a.nm_measure=c.nm_measure
+{{% endif %}}
 """.strip()
 
 
