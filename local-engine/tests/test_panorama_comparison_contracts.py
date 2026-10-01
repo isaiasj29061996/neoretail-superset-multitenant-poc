@@ -132,7 +132,7 @@ def test_detail_analysis_matches_power_bi_dax_contract_and_uses_raw_status_denom
         assert f'"{metric}": {{"d3NumberFormat": ".2%"}}' in bootstrap
 
     # Runtime gate independently queries fato_historico and ChartData.
-    assert "gold.fato_historico" in validator
+    assert "gold.nr_panorama_comparison_history_detail" in validator
     assert "gold.nr_panorama_detail_default" in validator
     assert "ChartDataCommand" in validator
     assert "status_item_geral" in validator
