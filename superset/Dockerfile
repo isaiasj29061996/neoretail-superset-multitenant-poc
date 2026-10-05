@@ -36,5 +36,7 @@ RUN /app/.venv/bin/python -m pip install --no-cache-dir \
       psycopg2-binary redis
 
 COPY superset_config.py neoretail_publication.py smoke_publication.py bootstrap_analytics.py init.sh /app/pythonpath/
+COPY bootstrap_*.py osa_certified_matrices.py /app/pythonpath/
+COPY neoretail_bootstrap/ /app/pythonpath/neoretail_bootstrap/
 COPY --from=neoretail-frontend /src/superset/static/assets /app/superset/static/assets
 USER superset

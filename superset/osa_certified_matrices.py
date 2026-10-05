@@ -1,6 +1,9 @@
 """Period-aware OSA matrix semantics extracted from the Power BI queries."""
-from bootstrap_overview import _jinja_filter_predicates
-from bootstrap_panorama import WEEKLY_FILTER_COLUMNS, formatted_metric
+from bootstrap_panorama import WEEKLY_FILTER_COLUMNS
+
+
+from neoretail_bootstrap.core.filters import _jinja_filter_predicates
+from neoretail_bootstrap.core.metrics import formatted_metric
 
 
 MATRIX_SCOPES = {
