@@ -1,0 +1,3440 @@
+{
+  "base": "71184f2225c41c594fd4bfb2fc4be2ee79a9036b",
+  "symbols": [
+    {
+      "module": "semantics",
+      "name": "HISTORY_SQL",
+      "sha256": "0c92d428ae732664d9352fbadf6c43180b915e944e63035a532283a192a9d8e7"
+    },
+    {
+      "module": "semantics",
+      "name": "M",
+      "sha256": "6970354ca2fef3ca9349a87f051abef5c889d3f341bafea5c7406c8af6912e9c"
+    },
+    {
+      "module": "semantics",
+      "name": "OVERVIEW_M",
+      "sha256": "4e72e68e1ae0ae602065bf2ffedb2b21dd8c94929812b196a095f9719a23aff2"
+    },
+    {
+      "module": "semantics",
+      "name": "ROI_COMPONENTS",
+      "sha256": "7d96bc3898ae58176836d1457ace66ff989fa7fa178af0312c64582c9e6ae8c8"
+    },
+    {
+      "module": "semantics",
+      "name": "MARKUP_COMPONENTS",
+      "sha256": "3b7153a8198f94cbc8768946d6cfa8b8e4bf1e6f8021c70e59aa0863638a451a"
+    },
+    {
+      "module": "semantics",
+      "name": "TVD_DAILY",
+      "sha256": "a3c3cc5ff6734c71934b6a3e1fae0a9d86c840db1d42f9234c1847563652b02e"
+    },
+    {
+      "module": "semantics",
+      "name": "IVD_DAILY",
+      "sha256": "da50101393d52def49d291a7a9cc3d8cd2dd0449c16892fa4cf6dcc10cf401cd"
+    },
+    {
+      "module": "semantics",
+      "name": "headline_semantic_sql",
+      "sha256": "d745065e659cbaff6a5db30f2db5e1fc0006056fb92f95af82510bb39936aec6"
+    },
+    {
+      "module": "semantics",
+      "name": "overview_semantic_sql",
+      "sha256": "1f872932b8f742159418ca1cdf5a62c268b7a92b019b32d280d6ddce12b823da"
+    },
+    {
+      "module": "semantics",
+      "name": "osa_semantic_sql",
+      "sha256": "a778c2ff938434c45b80097fbdf83d60d424fc1d7ddec037c358ff39268dc198"
+    },
+    {
+      "module": "filters",
+      "name": "HEADLINE_FILTER_COLUMNS",
+      "sha256": "1e2b27a89b7102be10e03a16e92bbc743321842f269727447023622e103a22c7"
+    },
+    {
+      "module": "filters",
+      "name": "sql_filter",
+      "sha256": "c879f9c0f04e74d2519ad2fe3fa5e8060d5611f0888db90159e02840c326b6a2"
+    },
+    {
+      "module": "filters",
+      "name": "_filter_definitions",
+      "sha256": "3a41ec8e429fe65bbd62f9d6bb01685d96fe4b51a2dac2efefb051f6ac34e724"
+    },
+    {
+      "module": "filters",
+      "name": "_native_filters_for_targets",
+      "sha256": "a131fef397a0f4e346d678bb53d58fac50972de2f3798e6aa8d63517a5cc24fc"
+    },
+    {
+      "module": "filters",
+      "name": "native_filters",
+      "sha256": "3cc4b083d40f28ad32d72dac2b28884d84459b41a2934c07c94bb21e95f9231a"
+    },
+    {
+      "module": "filters",
+      "name": "overview_native_filters",
+      "sha256": "7753e0552add3bedfd400e2e4ae9001466a85e58b39f41b355fe3649a1db9acd"
+    },
+    {
+      "module": "presentation",
+      "name": "position_json",
+      "sha256": "cd920b9837afbadd128720ea82a6a5009be9bbe8db5f9bf0d9c042f89790a931"
+    }
+  ],
+  "sql": [
+    {
+      "name": "headline_semantic_sql",
+      "args": [
+        "nr_tvd_daily",
+        "nr_tvd_daily_summary"
+      ],
+      "sha256": "50f151a99bc77b8070ff606ae973f7e9e31e6110db3de54306f67d62f706a4cc"
+    },
+    {
+      "name": "headline_semantic_sql",
+      "args": [
+        "nr_ivd_daily",
+        "nr_ivd_daily_summary"
+      ],
+      "sha256": "4a8803d86487e902f80d68cc1c775d1bae1f8ca06067dc809778e8878ffd5480"
+    },
+    {
+      "name": "overview_semantic_sql",
+      "args": [],
+      "sha256": "8592f61135d57cab1ac402c4048171eb95ed2e133829b1a463d671af11e89a80"
+    },
+    {
+      "name": "osa_semantic_sql",
+      "args": [],
+      "sha256": "7764d90e03d8ea621c554bab3c640a1e82fe8afa023d53a8ba754f0ae26190a6"
+    }
+  ],
+  "native_filters": [
+    {
+      "name": "native_filters",
+      "args": [
+        100
+      ],
+      "expected": [
+        {
+          "id": "NATIVE_FILTER-neoretail-nm_measure",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": false,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Medida",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "nm_measure"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {
+              "filters": [
+                {
+                  "col": "nm_measure",
+                  "op": "IN",
+                  "val": [
+                    "unidade"
+                  ]
+                }
+              ]
+            },
+            "filterState": {
+              "label": "unidade",
+              "value": [
+                "unidade"
+              ]
+            },
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-rede",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Rede",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "rede"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-bandeira",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Bandeira",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "bandeira"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-rede"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-uf",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "UF",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "uf"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-cidade",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Cidade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "cidade"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-uf"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tipo_local",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Tipo de local",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "tipo_local"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-loja",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Loja",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "loja"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-tipo_local"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tp_activity_level",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "N\u00edvel de atividade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "tp_activity_level"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-descricao_marca",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Marca",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "descricao_marca"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_1",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 1",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_1"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-descricao_marca"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_2",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 2",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_2"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_1"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_3",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 3",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_3"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_2"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-item",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Item",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "item"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_3"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "name": "native_filters",
+      "args": [
+        100,
+        200
+      ],
+      "expected": [
+        {
+          "id": "NATIVE_FILTER-neoretail-nm_measure",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": false,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Medida",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "nm_measure"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {
+              "filters": [
+                {
+                  "col": "nm_measure",
+                  "op": "IN",
+                  "val": [
+                    "unidade"
+                  ]
+                }
+              ]
+            },
+            "filterState": {
+              "label": "unidade",
+              "value": [
+                "unidade"
+              ]
+            },
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-rede",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Rede",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "rede"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-bandeira",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Bandeira",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "bandeira"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-rede"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-uf",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "UF",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "uf"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-cidade",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Cidade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "cidade"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-uf"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tipo_local",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Tipo de local",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "tipo_local"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-loja",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Loja",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "loja"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-tipo_local"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tp_activity_level",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "N\u00edvel de atividade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "tp_activity_level"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-descricao_marca",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Marca",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "descricao_marca"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_1",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 1",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "hierarquia_1"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-descricao_marca"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_2",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 2",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "hierarquia_2"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_1"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_3",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 3",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "hierarquia_3"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_2"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-item",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Item",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "item"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_3"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "name": "overview_native_filters",
+      "args": [
+        [
+          100,
+          101,
+          100
+        ]
+      ],
+      "expected": [
+        {
+          "id": "NATIVE_FILTER-neoretail-nm_measure",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": false,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Medida",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "nm_measure"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {
+              "filters": [
+                {
+                  "col": "nm_measure",
+                  "op": "IN",
+                  "val": [
+                    "unidade"
+                  ]
+                }
+              ]
+            },
+            "filterState": {
+              "label": "unidade",
+              "value": [
+                "unidade"
+              ]
+            },
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-rede",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Rede",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "rede"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-bandeira",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Bandeira",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "bandeira"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-rede"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-uf",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "UF",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "uf"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-cidade",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Cidade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "cidade"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-uf"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tipo_local",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Tipo de local",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "tipo_local"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-loja",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Loja",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "loja"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-tipo_local"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tp_activity_level",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "N\u00edvel de atividade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "tp_activity_level"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-descricao_marca",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Marca",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "descricao_marca"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_1",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 1",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_1"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-descricao_marca"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_2",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 2",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_2"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_1"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_3",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 3",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_3"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_2"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-item",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Item",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "item"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_3"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "name": "overview_native_filters",
+      "args": [
+        [
+          100,
+          101
+        ],
+        200
+      ],
+      "expected": [
+        {
+          "id": "NATIVE_FILTER-neoretail-nm_measure",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": false,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Medida",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "nm_measure"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {
+              "filters": [
+                {
+                  "col": "nm_measure",
+                  "op": "IN",
+                  "val": [
+                    "unidade"
+                  ]
+                }
+              ]
+            },
+            "filterState": {
+              "label": "unidade",
+              "value": [
+                "unidade"
+              ]
+            },
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-rede",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Rede",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "rede"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-bandeira",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Bandeira",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "bandeira"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-rede"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-uf",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "UF",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "uf"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-cidade",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Cidade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "cidade"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-uf"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tipo_local",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Tipo de local",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "tipo_local"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-loja",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Loja",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "loja"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-tipo_local"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tp_activity_level",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "N\u00edvel de atividade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "tp_activity_level"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-descricao_marca",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Marca",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "descricao_marca"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_1",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 1",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "hierarquia_1"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-descricao_marca"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_2",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 2",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "hierarquia_2"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_1"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_3",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 3",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "hierarquia_3"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_2"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-item",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Item",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 200,
+              "column": {
+                "name": "item"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_3"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "name": "overview_native_filters",
+      "args": [
+        [
+          100,
+          101
+        ],
+        {
+          "nm_measure": 300,
+          "uf": 400
+        }
+      ],
+      "expected": [
+        {
+          "id": "NATIVE_FILTER-neoretail-nm_measure",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": false,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Medida",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 300,
+              "column": {
+                "name": "nm_measure"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {
+              "filters": [
+                {
+                  "col": "nm_measure",
+                  "op": "IN",
+                  "val": [
+                    "unidade"
+                  ]
+                }
+              ]
+            },
+            "filterState": {
+              "label": "unidade",
+              "value": [
+                "unidade"
+              ]
+            },
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-rede",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Rede",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "rede"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-bandeira",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Bandeira",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "bandeira"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-rede"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-uf",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "UF",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 400,
+              "column": {
+                "name": "uf"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-cidade",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Cidade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "cidade"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-uf"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tipo_local",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Tipo de local",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "tipo_local"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-loja",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Loja",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "loja"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-tipo_local"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-tp_activity_level",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "N\u00edvel de atividade",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "tp_activity_level"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-descricao_marca",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Marca",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "descricao_marca"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_1",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 1",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_1"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-descricao_marca"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_2",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 2",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_2"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_1"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-hierarquia_3",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Hierarquia 3",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "hierarquia_3"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_2"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        },
+        {
+          "id": "NATIVE_FILTER-neoretail-item",
+          "controlValues": {
+            "enableEmptyFilter": false,
+            "defaultToFirstItem": false,
+            "creatable": false,
+            "multiSelect": true,
+            "searchAllOptions": true,
+            "inverseSelection": false
+          },
+          "name": "Item",
+          "filterType": "filter_select",
+          "targets": [
+            {
+              "datasetId": 100,
+              "column": {
+                "name": "item"
+              }
+            }
+          ],
+          "defaultDataMask": {
+            "extraFormData": {},
+            "filterState": {},
+            "ownState": {}
+          },
+          "cascadeParentIds": [
+            "NATIVE_FILTER-neoretail-hierarquia_3"
+          ],
+          "scope": {
+            "excluded": [],
+            "rootPath": [
+              "ROOT_ID"
+            ]
+          },
+          "type": "NATIVE_FILTER",
+          "description": ""
+        }
+      ]
+    }
+  ],
+  "chart_specs": [
+    {
+      "dates": [
+        null,
+        null
+      ],
+      "expected": [
+        [
+          1,
+          "TVD - Pr\u00e9-ruptura",
+          {
+            "datasource": "1__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1D",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(tvd)",
+                "label": "TVD",
+                "optionName": "metric_2889c5740811"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "TVD - Pr\u00e9-ruptura",
+            "card_variant": "area",
+            "help_text": "TVD mensal e tarefas na \u00faltima data com dado.",
+            "metric_labels": "TVD",
+            "metric_formats": "currency",
+            "metric_directions": "lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": true,
+            "adhoc_filters": [],
+            "groupby": [],
+            "critical_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_criticos_tvd)",
+              "label": "Itens cr\u00edticos TVD",
+              "optionName": "metric_1128962e7679"
+            },
+            "risk_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_risco_tvd)",
+              "label": "Itens risco TVD",
+              "optionName": "metric_ea1ccf9b4966"
+            },
+            "semantic_period": "month_last_nonblank",
+            "semantic_profile": "direct_average",
+            "task_labels": "itens cr\u00edticos|itens com risco"
+          }
+        ],
+        [
+          2,
+          "IVD - Excesso",
+          {
+            "datasource": "2__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1D",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(ivd)",
+                "label": "IVD",
+                "optionName": "metric_de740533fd3a"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "IVD - Excesso",
+            "card_variant": "area",
+            "help_text": "IVD mensal e tarefas na \u00faltima data com dado.",
+            "metric_labels": "IVD",
+            "metric_formats": "currency",
+            "metric_directions": "lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": true,
+            "adhoc_filters": [],
+            "groupby": [],
+            "critical_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_criticos_ivd)",
+              "label": "Itens cr\u00edticos IVD",
+              "optionName": "metric_c0875fcc2dc9"
+            },
+            "risk_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_risco_ivd)",
+              "label": "Itens risco IVD",
+              "optionName": "metric_23e1563c721c"
+            },
+            "semantic_period": "month_last_nonblank",
+            "semantic_profile": "direct_average",
+            "task_labels": "itens cr\u00edticos|itens com risco"
+          }
+        ],
+        [
+          3,
+          "Giro",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(giro_sum_positive)",
+                "label": "Giro soma positiva",
+                "optionName": "metric_e35d032958a5"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(giro_count_positive)",
+                "label": "Giro contagem positiva",
+                "optionName": "metric_d6aacddb5900"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "Giro",
+            "card_variant": "bars",
+            "help_text": "Giro",
+            "metric_labels": "Giro",
+            "metric_formats": "number",
+            "metric_directions": "lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_activity_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'activity'"
+              }
+            ],
+            "groupby": [
+              "activity_level"
+            ],
+            "semantic_profile": "weighted_average"
+          }
+        ],
+        [
+          4,
+          "OSA",
+          {
+            "datasource": "4__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(osa_problem_sum)",
+                "label": "OSA problemas",
+                "optionName": "metric_68a3e81d52a6"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(osa_active_sum)",
+                "label": "OSA ativos",
+                "optionName": "metric_b4a4b9d7cb31"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(osa_loss_sum)",
+                "label": "Perda OSA",
+                "optionName": "metric_72766ca542f3"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "OSA",
+            "card_variant": "osa",
+            "help_text": "OSA por razao dos totais, perda pela fonte mensal de causas e alertas por contagem de linhas.",
+            "metric_labels": "% Numerico|Perda OSA",
+            "metric_formats": "percent|currency",
+            "metric_directions": "higher|lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": true,
+            "adhoc_filters": [],
+            "groupby": [],
+            "critical_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(osa_critical_count)",
+              "label": "Itens cr\u00edticos OSA",
+              "optionName": "metric_705abe0cd90a"
+            },
+            "risk_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(osa_risk_count)",
+              "label": "Itens risco OSA",
+              "optionName": "metric_ae97721ebdf5"
+            },
+            "semantic_profile": "osa_bundle",
+            "task_labels": "itens criticos|itens com risco"
+          }
+        ],
+        [
+          3,
+          "Vendas",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sellout_sum)",
+                "label": "Venda sell out",
+                "optionName": "metric_5bcb5df6dd48"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_cost_sum)",
+                "label": "Venda custo",
+                "optionName": "metric_0a87c8eb9e67"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_qty_sum)",
+                "label": "Venda qtd",
+                "optionName": "metric_206acbc0f8db"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "Vendas",
+            "card_variant": "multi",
+            "help_text": "Vendas",
+            "metric_labels": "Venda sell out|Venda custo|Venda qtd",
+            "metric_formats": "currency|currency|number",
+            "metric_directions": "higher|lower|higher",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_all_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'all'"
+              }
+            ],
+            "groupby": [],
+            "semantic_profile": "direct_average"
+          }
+        ],
+        [
+          3,
+          "Estoque",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(stock_cost_sum)",
+                "label": "Estoque custo",
+                "optionName": "metric_7345aea37b93"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(stock_qty_sum)",
+                "label": "Estoque qtd",
+                "optionName": "metric_5f2c0ddec5cb"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "Estoque",
+            "card_variant": "multi",
+            "help_text": "Estoque",
+            "metric_labels": "Estoque custo|Estoque qtd",
+            "metric_formats": "currency|number",
+            "metric_directions": "lower|lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_all_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'all'"
+              }
+            ],
+            "groupby": [],
+            "semantic_profile": "stock_bundle"
+          }
+        ],
+        [
+          3,
+          "ROI",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sellout_sum)",
+                "label": "Venda sell out",
+                "optionName": "metric_5bcb5df6dd48"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_cost_sum)",
+                "label": "Venda custo",
+                "optionName": "metric_0a87c8eb9e67"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(stock_cost_sum)",
+                "label": "Estoque custo",
+                "optionName": "metric_7345aea37b93"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "ROI",
+            "card_variant": "bars",
+            "help_text": "ROI",
+            "metric_labels": "ROI",
+            "metric_formats": "percent",
+            "metric_directions": "higher",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_activity_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'activity'"
+              }
+            ],
+            "groupby": [
+              "activity_level"
+            ],
+            "semantic_profile": "roi",
+            "show_annual": true
+          }
+        ],
+        [
+          3,
+          "MARKUP",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sellout_sum)",
+                "label": "Venda sell out",
+                "optionName": "metric_5bcb5df6dd48"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_cost_sum)",
+                "label": "Venda custo",
+                "optionName": "metric_0a87c8eb9e67"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "MARKUP",
+            "card_variant": "bars",
+            "help_text": "MARKUP",
+            "metric_labels": "Markup",
+            "metric_formats": "percent",
+            "metric_directions": "higher",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_activity_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'activity'"
+              }
+            ],
+            "groupby": [
+              "activity_level"
+            ],
+            "semantic_profile": "markup"
+          }
+        ]
+      ]
+    },
+    {
+      "dates": [
+        "2026-09-30",
+        "2026-09-29"
+      ],
+      "expected": [
+        [
+          1,
+          "TVD - Pr\u00e9-ruptura",
+          {
+            "datasource": "1__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1D",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(tvd)",
+                "label": "TVD",
+                "optionName": "metric_2889c5740811"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "TVD - Pr\u00e9-ruptura",
+            "card_variant": "area",
+            "help_text": "TVD mensal e tarefas na \u00faltima data com dado.",
+            "metric_labels": "TVD",
+            "metric_formats": "currency",
+            "metric_directions": "lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": true,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_tvd_recent",
+                "fromFormData": true,
+                "sqlExpression": "data >= DATE '2026-09-30' - INTERVAL '4 months'"
+              }
+            ],
+            "groupby": [],
+            "critical_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_criticos_tvd)",
+              "label": "Itens cr\u00edticos TVD",
+              "optionName": "metric_1128962e7679"
+            },
+            "risk_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_risco_tvd)",
+              "label": "Itens risco TVD",
+              "optionName": "metric_ea1ccf9b4966"
+            },
+            "semantic_period": "month_last_nonblank",
+            "semantic_profile": "direct_average",
+            "task_labels": "itens cr\u00edticos|itens com risco"
+          }
+        ],
+        [
+          2,
+          "IVD - Excesso",
+          {
+            "datasource": "2__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1D",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(ivd)",
+                "label": "IVD",
+                "optionName": "metric_de740533fd3a"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "IVD - Excesso",
+            "card_variant": "area",
+            "help_text": "IVD mensal e tarefas na \u00faltima data com dado.",
+            "metric_labels": "IVD",
+            "metric_formats": "currency",
+            "metric_directions": "lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": true,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_ivd_recent",
+                "fromFormData": true,
+                "sqlExpression": "data >= DATE '2026-09-29' - INTERVAL '4 months'"
+              }
+            ],
+            "groupby": [],
+            "critical_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_criticos_ivd)",
+              "label": "Itens cr\u00edticos IVD",
+              "optionName": "metric_c0875fcc2dc9"
+            },
+            "risk_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(itens_risco_ivd)",
+              "label": "Itens risco IVD",
+              "optionName": "metric_23e1563c721c"
+            },
+            "semantic_period": "month_last_nonblank",
+            "semantic_profile": "direct_average",
+            "task_labels": "itens cr\u00edticos|itens com risco"
+          }
+        ],
+        [
+          3,
+          "Giro",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(giro_sum_positive)",
+                "label": "Giro soma positiva",
+                "optionName": "metric_e35d032958a5"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(giro_count_positive)",
+                "label": "Giro contagem positiva",
+                "optionName": "metric_d6aacddb5900"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "Giro",
+            "card_variant": "bars",
+            "help_text": "Giro",
+            "metric_labels": "Giro",
+            "metric_formats": "number",
+            "metric_directions": "lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_activity_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'activity'"
+              }
+            ],
+            "groupby": [
+              "activity_level"
+            ],
+            "semantic_profile": "weighted_average"
+          }
+        ],
+        [
+          4,
+          "OSA",
+          {
+            "datasource": "4__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(osa_problem_sum)",
+                "label": "OSA problemas",
+                "optionName": "metric_68a3e81d52a6"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(osa_active_sum)",
+                "label": "OSA ativos",
+                "optionName": "metric_b4a4b9d7cb31"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(osa_loss_sum)",
+                "label": "Perda OSA",
+                "optionName": "metric_72766ca542f3"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "OSA",
+            "card_variant": "osa",
+            "help_text": "OSA por razao dos totais, perda pela fonte mensal de causas e alertas por contagem de linhas.",
+            "metric_labels": "% Numerico|Perda OSA",
+            "metric_formats": "percent|currency",
+            "metric_directions": "higher|lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": true,
+            "adhoc_filters": [],
+            "groupby": [],
+            "critical_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(osa_critical_count)",
+              "label": "Itens cr\u00edticos OSA",
+              "optionName": "metric_705abe0cd90a"
+            },
+            "risk_metric": {
+              "expressionType": "SQL",
+              "sqlExpression": "SUM(osa_risk_count)",
+              "label": "Itens risco OSA",
+              "optionName": "metric_ae97721ebdf5"
+            },
+            "semantic_profile": "osa_bundle",
+            "task_labels": "itens criticos|itens com risco"
+          }
+        ],
+        [
+          3,
+          "Vendas",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sellout_sum)",
+                "label": "Venda sell out",
+                "optionName": "metric_5bcb5df6dd48"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_cost_sum)",
+                "label": "Venda custo",
+                "optionName": "metric_0a87c8eb9e67"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_qty_sum)",
+                "label": "Venda qtd",
+                "optionName": "metric_206acbc0f8db"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "Vendas",
+            "card_variant": "multi",
+            "help_text": "Vendas",
+            "metric_labels": "Venda sell out|Venda custo|Venda qtd",
+            "metric_formats": "currency|currency|number",
+            "metric_directions": "higher|lower|higher",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_all_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'all'"
+              }
+            ],
+            "groupby": [],
+            "semantic_profile": "direct_average"
+          }
+        ],
+        [
+          3,
+          "Estoque",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(stock_cost_sum)",
+                "label": "Estoque custo",
+                "optionName": "metric_7345aea37b93"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(stock_qty_sum)",
+                "label": "Estoque qtd",
+                "optionName": "metric_5f2c0ddec5cb"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "Estoque",
+            "card_variant": "multi",
+            "help_text": "Estoque",
+            "metric_labels": "Estoque custo|Estoque qtd",
+            "metric_formats": "currency|number",
+            "metric_directions": "lower|lower",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_all_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'all'"
+              }
+            ],
+            "groupby": [],
+            "semantic_profile": "stock_bundle"
+          }
+        ],
+        [
+          3,
+          "ROI",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sellout_sum)",
+                "label": "Venda sell out",
+                "optionName": "metric_5bcb5df6dd48"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_cost_sum)",
+                "label": "Venda custo",
+                "optionName": "metric_0a87c8eb9e67"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(stock_cost_sum)",
+                "label": "Estoque custo",
+                "optionName": "metric_7345aea37b93"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "ROI",
+            "card_variant": "bars",
+            "help_text": "ROI",
+            "metric_labels": "ROI",
+            "metric_formats": "percent",
+            "metric_directions": "higher",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_activity_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'activity'"
+              }
+            ],
+            "groupby": [
+              "activity_level"
+            ],
+            "semantic_profile": "roi",
+            "show_annual": true
+          }
+        ],
+        [
+          3,
+          "MARKUP",
+          {
+            "datasource": "3__table",
+            "viz_type": "neoretail-kpi-card",
+            "x_axis": "data",
+            "time_grain_sqla": "P1M",
+            "time_range": "No filter",
+            "metrics": [
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sellout_sum)",
+                "label": "Venda sell out",
+                "optionName": "metric_5bcb5df6dd48"
+              },
+              {
+                "expressionType": "SQL",
+                "sqlExpression": "SUM(sales_cost_sum)",
+                "label": "Venda custo",
+                "optionName": "metric_0a87c8eb9e67"
+              }
+            ],
+            "row_limit": 10000,
+            "card_title": "MARKUP",
+            "card_variant": "bars",
+            "help_text": "MARKUP",
+            "metric_labels": "Markup",
+            "metric_formats": "percent",
+            "metric_directions": "higher",
+            "accent_color": "#7C4AD9",
+            "analysis_url": "",
+            "show_tasks": false,
+            "adhoc_filters": [
+              {
+                "clause": "WHERE",
+                "comparator": "",
+                "expressionType": "SQL",
+                "filterOptionName": "filter_activity_scope",
+                "fromFormData": true,
+                "sqlExpression": "semantic_scope = 'activity'"
+              }
+            ],
+            "groupby": [
+              "activity_level"
+            ],
+            "semantic_profile": "markup"
+          }
+        ]
+      ]
+    }
+  ],
+  "position_json": "{\"ROOT_ID\": {\"id\": \"ROOT_ID\", \"type\": \"ROOT\", \"children\": [\"GRID_ID\"]}, \"GRID_ID\": {\"id\": \"GRID_ID\", \"type\": \"GRID\", \"parents\": [\"ROOT_ID\"], \"children\": [\"ROW-1\", \"ROW-2\"]}, \"CHART-10\": {\"id\": \"CHART-10\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-1\"], \"children\": [], \"meta\": {\"chartId\": 10, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 0\", \"uuid\": \"00000000-0000-0000-0000-000000000001\"}}, \"CHART-11\": {\"id\": \"CHART-11\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-1\"], \"children\": [], \"meta\": {\"chartId\": 11, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 1\", \"uuid\": \"00000000-0000-0000-0000-000000000002\"}}, \"CHART-12\": {\"id\": \"CHART-12\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-1\"], \"children\": [], \"meta\": {\"chartId\": 12, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 2\", \"uuid\": \"00000000-0000-0000-0000-000000000003\"}}, \"CHART-13\": {\"id\": \"CHART-13\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-1\"], \"children\": [], \"meta\": {\"chartId\": 13, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 3\", \"uuid\": \"00000000-0000-0000-0000-000000000004\"}}, \"ROW-1\": {\"id\": \"ROW-1\", \"type\": \"ROW\", \"parents\": [\"ROOT_ID\", \"GRID_ID\"], \"children\": [\"CHART-10\", \"CHART-11\", \"CHART-12\", \"CHART-13\"], \"meta\": {\"background\": \"BACKGROUND_TRANSPARENT\"}}, \"CHART-14\": {\"id\": \"CHART-14\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-2\"], \"children\": [], \"meta\": {\"chartId\": 14, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 4\", \"uuid\": \"00000000-0000-0000-0000-000000000005\"}}, \"CHART-15\": {\"id\": \"CHART-15\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-2\"], \"children\": [], \"meta\": {\"chartId\": 15, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 5\", \"uuid\": \"00000000-0000-0000-0000-000000000006\"}}, \"CHART-16\": {\"id\": \"CHART-16\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-2\"], \"children\": [], \"meta\": {\"chartId\": 16, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 6\", \"uuid\": \"00000000-0000-0000-0000-000000000007\"}}, \"CHART-17\": {\"id\": \"CHART-17\", \"type\": \"CHART\", \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-2\"], \"children\": [], \"meta\": {\"chartId\": 17, \"height\": 50, \"width\": 3, \"sliceName\": \"Chart 7\", \"uuid\": \"00000000-0000-0000-0000-000000000008\"}}, \"ROW-2\": {\"id\": \"ROW-2\", \"type\": \"ROW\", \"parents\": [\"ROOT_ID\", \"GRID_ID\"], \"children\": [\"CHART-14\", \"CHART-15\", \"CHART-16\", \"CHART-17\"], \"meta\": {\"background\": \"BACKGROUND_TRANSPARENT\"}}}",
+  "chart_block_ast": "bb94e78893f21d0a1c0b965c5c6bf3076b11f935528042ca1981cedccae0b91d"
+}
