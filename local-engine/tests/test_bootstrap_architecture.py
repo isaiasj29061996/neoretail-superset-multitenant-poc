@@ -24,7 +24,6 @@ DOMAIN_IMPORTS = {
         "native_filters", "overview_native_filters", "position_json",
     },
     "bootstrap_overview_quantity": {"Q", "quantity_semantic_sql"},
-    "bootstrap_panorama": {"WEEKLY_FILTER_COLUMNS"},
 }
 
 

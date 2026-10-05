@@ -1,11 +1,13 @@
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def bootstrap_text():
-    return (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    return read_panorama('inventory', 'osa', 'gaps', 'sales', 'filters', 'layout')
 
 
 def test_stock_monthly_matches_power_bi_dax_components():

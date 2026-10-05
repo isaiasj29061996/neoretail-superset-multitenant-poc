@@ -1,10 +1,14 @@
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def read(path):
+    if path == "superset/bootstrap_panorama.py":
+        return read_panorama('kpis', 'comparisons', 'filters', 'layout')
     return (ROOT / path).read_text(encoding="utf-8")
 
 
@@ -33,7 +37,7 @@ def test_three_hierarchies_and_layout_position_are_preserved():
     assert '"region": ("regiao", "uf", "cidade")' in bootstrap
     assert '"retail": ("rede", "bandeira", "loja")' in bootstrap
     assert '"hierarchy": ("hierarquia_1", "descricao_marca", "item")' in bootstrap
-    layout = bootstrap[bootstrap.index('        layout = Layout()'):]
+    layout = bootstrap[bootstrap.index('    layout = Layout()'):]
     stock = layout.index('"Evolutivo de estoque"')
     kpis = layout.index('"Comparativo de KPIs por dimensão"')
     matrices = layout.index('"Comparativos"', kpis)
