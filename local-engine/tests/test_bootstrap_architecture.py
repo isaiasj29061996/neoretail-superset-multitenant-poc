@@ -19,10 +19,6 @@ from neoretail_bootstrap.core.metrics import formatted_metric, metric
 
 # Phase 1 retains these explicit domain contracts; generic helpers belong in core.
 DOMAIN_IMPORTS = {
-    "bootstrap_overview": {
-        "HISTORY_SQL", "M", "OVERVIEW_M", "headline_semantic_sql",
-        "native_filters", "overview_native_filters", "position_json",
-    },
     "bootstrap_overview_quantity": {"Q", "quantity_semantic_sql"},
 }
 

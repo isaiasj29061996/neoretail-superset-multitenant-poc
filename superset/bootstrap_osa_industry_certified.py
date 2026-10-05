@@ -17,7 +17,7 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import overview_native_filters
+from neoretail_bootstrap.overview.filters import overview_native_filters
 from neoretail_bootstrap.panorama.filters import WEEKLY_FILTER_COLUMNS
 from osa_certified_matrices import (
     MATRIX_SCOPES,

@@ -196,6 +196,9 @@ def main() -> None:
 
     dashboard_bootstraps = [
         ROOT / "superset/bootstrap_overview.py",
+        ROOT / "superset/neoretail_bootstrap/overview/semantics.py",
+        ROOT / "superset/neoretail_bootstrap/overview/filters.py",
+        ROOT / "superset/neoretail_bootstrap/overview/presentation.py",
         ROOT / "superset/bootstrap_overview_quantity.py",
         ROOT / "superset/bootstrap_panorama.py",
         ROOT / "superset/bootstrap_osa_industry.py",

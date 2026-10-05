@@ -11,7 +11,8 @@ import uuid
 from sqlalchemy import text
 from superset.app import create_app
 
-from bootstrap_overview import HISTORY_SQL, M, overview_native_filters
+from neoretail_bootstrap.overview.semantics import HISTORY_SQL, M
+from neoretail_bootstrap.overview.filters import overview_native_filters
 from bootstrap_overview_quantity import Q, quantity_semantic_sql
 
 
