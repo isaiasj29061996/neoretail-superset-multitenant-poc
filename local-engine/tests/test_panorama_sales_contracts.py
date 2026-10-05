@@ -10,7 +10,7 @@ def test_weekly_sales_contract_uses_real_fact_and_top_13_cd_week():
     assert "ORDER BY cd_week DESC" in bootstrap
     assert "week_rank<=13" in bootstrap or "week_rank <= 13" in bootstrap
     assert "get_filters" in bootstrap and "remove_filter=True" in (
-        ROOT / "superset" / "bootstrap_overview.py"
+        ROOT / "superset" / "neoretail_bootstrap" / "core" / "filters.py"
     ).read_text(encoding="utf-8")
 
 

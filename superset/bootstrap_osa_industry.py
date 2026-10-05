@@ -9,8 +9,13 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import HISTORY_SQL, M, OVERVIEW_M, metric, native_filters, upsert_dataset
-from bootstrap_panorama import Layout, custom_params, table_params, upsert_chart
+from bootstrap_overview import HISTORY_SQL, M, OVERVIEW_M, native_filters
+
+
+from neoretail_bootstrap.core.chart_params import custom_params, table_params
+from neoretail_bootstrap.core.layout import Layout
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
+from neoretail_bootstrap.core.metrics import metric
 
 
 DASHBOARD_TITLE = "NeoRetail V9 — OSA Indústria"

@@ -12,6 +12,12 @@ from sqlalchemy import text
 from superset.app import create_app
 
 
+from neoretail_bootstrap.core.chart_params import chart_params
+from neoretail_bootstrap.core.filters import _jinja_filter_predicates
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_overview_chart as upsert_chart
+from neoretail_bootstrap.core.metrics import metric
+
+
 DASHBOARD_TITLE = "NeoRetail V9 — Visão geral da indústria"
 HISTORY_SQL = """
 SELECT
@@ -71,13 +77,6 @@ def sql_filter(expression: str, name: str = "filter_recent_period") -> dict:
     }
 
 
-def metric(label: str, expression: str) -> dict:
-    return {
-        "expressionType": "SQL",
-        "sqlExpression": expression,
-        "label": label,
-        "optionName": f"metric_{uuid.uuid5(uuid.NAMESPACE_DNS, label).hex[:12]}",
-    }
 
 
 # Base semantic metrics retained because Panorama and other bootstraps import M.
@@ -161,36 +160,6 @@ def headline_semantic_sql(detail_table: str, summary_table: str) -> str:
     )
 
 
-def _jinja_filter_predicates(
-    alias: str,
-    activity_expression: str | None = None,
-    overrides: dict[str, str] | None = None,
-) -> str:
-    """Push native IN filters below the business aggregation."""
-    columns = {
-        "rede": "rede", "bandeira": "bandeira", "uf": "uf", "cidade": "cidade",
-        "tipo_local": "tipo_local", "loja": "loja", "regiao": "regiao",
-        "descricao_marca": "descricao_marca", "hierarquia_1": "hierarquia_1",
-        "hierarquia_2": "hierarquia_2", "hierarquia_3": "hierarquia_3", "item": "item",
-        "tp_activity_level": activity_expression or "tp_activity_level",
-    }
-    lines = []
-    overrides = overrides or {}
-    for column, expression in columns.items():
-        qualified = overrides.get(column, expression)
-        qualified = qualified if "." in qualified else f"{alias}.{qualified}"
-        lines.extend((
-            f"{{% for filter in get_filters('{column}', remove_filter=True) %}}",
-            "{% if filter.get('op') == 'IN' %}",
-            f"  AND {qualified} IN {{{{ filter.get('val') | where_in }}}}",
-            "{% elif filter.get('op') == 'NOT IN' %}",
-            f"  AND {qualified} NOT IN {{{{ filter.get('val') | where_in }}}}",
-            "{% endif %}",
-            "{% endfor %}",
-        ))
-    return "\n".join(lines)
-
-
 def overview_semantic_sql() -> str:
     """Certified conversion/SUMX path with a compact unfiltered branch."""
     checks = " or ".join(
@@ -255,69 +224,6 @@ def osa_semantic_sql() -> str:
         "SELECT r.data,r.id_customer,l.nm_measure,r.osa_problem_sum,r.osa_active_sum,l.osa_loss_sum,CASE WHEN r.data=d.data THEN COALESCE(t.osa_critical_count,0) ELSE 0 END osa_critical_count,CASE WHEN r.data=d.data THEN COALESCE(t.osa_risk_count,0) ELSE 0 END osa_risk_count FROM ratio r JOIN loss l USING(data,id_customer) JOIN latest d USING(id_customer) LEFT JOIN tasks t USING(id_customer)\n"
         "{% else %}\nSELECT * FROM gold.nr_osa_semantic_default\n{% endif %}"
     )
-
-
-def upsert_dataset(session, model, database, name, *, table_name=None, sql=None):
-    dataset = session.query(model).filter(model.table_name == name).one_or_none()
-    needs_metadata = dataset is None
-    if dataset is None:
-        dataset = model(table_name=name, schema="gold", database=database)
-        session.add(dataset)
-    else:
-        needs_metadata = (
-            dataset.sql != sql
-            or (table_name is not None and dataset.table_name != table_name)
-            or not dataset.columns
-        )
-    dataset.database = database
-    dataset.schema = "gold"
-    dataset.sql = sql
-    if table_name:
-        dataset.table_name = table_name
-    session.flush()
-    if needs_metadata:
-        dataset.fetch_metadata()
-        session.flush()
-    return dataset
-
-
-def chart_params(dataset, title, variant, metrics, **extra):
-    params = {
-        "datasource": f"{dataset.id}__table",
-        "viz_type": "neoretail-kpi-card",
-        "x_axis": "data",
-        "time_grain_sqla": "P1M",
-        "time_range": extra.pop("time_range", "No filter"),
-        "metrics": metrics,
-        "row_limit": 10000,
-        "card_title": title,
-        "card_variant": variant,
-        "help_text": extra.pop("help_text", title),
-        "metric_labels": extra.pop("metric_labels", "|".join(m["label"] for m in metrics)),
-        "metric_formats": extra.pop("metric_formats", "number"),
-        "metric_directions": extra.pop("metric_directions", "higher"),
-        "accent_color": "#7C4AD9",
-        "analysis_url": "",
-        "show_tasks": extra.pop("show_tasks", False),
-        "adhoc_filters": [],
-        "groupby": extra.pop("groupby", []),
-        **extra,
-    }
-    return params
-
-
-def upsert_chart(session, Slice, dataset, title, params):
-    chart = session.query(Slice).filter(Slice.slice_name == title).one_or_none()
-    if chart is None:
-        chart = Slice(slice_name=title)
-        session.add(chart)
-    chart.datasource_type = "table"
-    chart.datasource_id = dataset.id
-    chart.viz_type = "neoretail-kpi-card"
-    chart.params = json.dumps(params, ensure_ascii=False)
-    chart.description = "Visão geral NeoRetail V9 baseada no PBIX de referência."
-    session.flush()
-    return chart
 
 
 def position_json(charts):

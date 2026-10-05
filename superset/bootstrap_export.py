@@ -6,8 +6,10 @@ import json
 from sqlalchemy import text
 from superset.app import create_app
 
-from bootstrap_overview import metric, upsert_dataset
-from bootstrap_panorama import Layout, upsert_chart
+
+from neoretail_bootstrap.core.layout import Layout
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
+from neoretail_bootstrap.core.metrics import metric
 
 
 DATABASE_NAME = "NeoRetail Gold - PostgreSQL Local"

@@ -17,20 +17,8 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import (
-    _jinja_filter_predicates,
-    metric,
-    overview_native_filters,
-    upsert_dataset,
-)
-from bootstrap_panorama import (
-    Layout,
-    WEEKLY_FILTER_COLUMNS,
-    comparison_pivot_params,
-    custom_params,
-    formatted_metric,
-    upsert_chart,
-)
+from bootstrap_overview import overview_native_filters
+from bootstrap_panorama import WEEKLY_FILTER_COLUMNS
 from osa_certified_matrices import (
     MATRIX_SCOPES,
     TABLE_OSA as MATRIX_OSA,
@@ -39,6 +27,13 @@ from osa_certified_matrices import (
     TABLE_VALUE as MATRIX_VALUE,
     matrix_period_sql,
 )
+
+
+from neoretail_bootstrap.core.chart_params import comparison_pivot_params, custom_params
+from neoretail_bootstrap.core.filters import _jinja_filter_predicates
+from neoretail_bootstrap.core.layout import Layout
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
+from neoretail_bootstrap.core.metrics import metric, formatted_metric
 
 
 DASHBOARD_TITLE = "NeoRetail V9 — OSA Indústria — Certificada"
