@@ -9,7 +9,8 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import HISTORY_SQL, M, OVERVIEW_M, native_filters
+from neoretail_bootstrap.overview.semantics import HISTORY_SQL, M, OVERVIEW_M
+from neoretail_bootstrap.overview.filters import native_filters
 
 
 from neoretail_bootstrap.core.chart_params import custom_params, table_params

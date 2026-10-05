@@ -5,7 +5,8 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import overview_native_filters, position_json
+from neoretail_bootstrap.overview.filters import overview_native_filters
+from neoretail_bootstrap.overview.presentation import position_json
 
 from neoretail_bootstrap.core.chart_params import chart_params
 from neoretail_bootstrap.core.filters import _jinja_filter_predicates
