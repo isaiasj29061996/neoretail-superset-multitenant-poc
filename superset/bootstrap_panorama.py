@@ -1067,13 +1067,9 @@ def weekly_inventory_card_semantic_sql() -> str:
     """TOP-13 weekly inventory timeline plus monthly summary in one dataset."""
     checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
     weekly_predicates = _jinja_filter_predicates("w")
-    monthly_predicates = _jinja_filter_predicates("f", "tp_activity_level", {
-        "rede": "l.rede", "bandeira": "l.bandeira", "uf": "l.uf",
-        "cidade": "l.cidade", "tipo_local": "l.tipo_local",
-        "loja": "l.loja", "regiao": "l.regiao", "item": "i.item",
-        "descricao_marca": "i.descricao_marca", "hierarquia_1": "i.hierarquia_1",
-        "hierarquia_2": "i.hierarquia_2", "hierarquia_3": "i.hierarquia_3",
-    })
+    # This governed detail already includes dimensions and STATUS_ITEM_GERAL.
+    # The overview history omits that certified Ruptura/ISV denominator.
+    monthly_predicates = _jinja_filter_predicates("f")
     detail = f"""
 WITH weekly_filtered AS (
   SELECT w.* FROM gold.nr_panorama_inventory_weekly_detail w WHERE 1=1
@@ -1119,7 +1115,7 @@ WITH weekly_filtered AS (
     ON c.id_customer=s.id_customer AND c.id_item::text=s.id_item::text
   GROUP BY s.data,s.id_customer,c.nm_measure
 ), monthly_filtered AS (
-  SELECT h.* FROM gold.nr_overview_history h WHERE 1=1
+  SELECT f.* FROM gold.nr_panorama_comparison_history_detail f WHERE 1=1
 {monthly_predicates}
 ), monthly AS (
   SELECT

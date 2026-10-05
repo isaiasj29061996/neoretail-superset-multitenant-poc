@@ -1,4 +1,7 @@
+import ast
 from pathlib import Path
+
+from jinja2 import Environment
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,3 +125,34 @@ def test_monthly_osa_status_denominator_comes_from_fato_historico():
     assert "f.status_item_geral," in bootstrap
     assert "FROM gold.fato_historico f" in bootstrap
     assert "SUM(COALESCE(status_item_geral,0))::float8 AS status_sum" in bootstrap
+
+
+def test_filtered_weekly_inventory_summary_uses_governed_detail_and_valid_aliases():
+    # Execute the SQL generator without importing the Superset application.
+    namespace = {}
+    for path, names in (
+        ("superset/bootstrap_overview.py", {"_jinja_filter_predicates"}),
+        ("superset/bootstrap_panorama.py", {"weekly_inventory_card_semantic_sql"}),
+    ):
+        tree = ast.parse(read(path))
+        nodes = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), path, "exec"), namespace)
+    columns = ("rede", "bandeira", "uf", "cidade", "tipo_local", "loja", "regiao",
+               "item", "descricao_marca", "hierarquia_1", "hierarquia_2", "hierarquia_3",
+               "tp_activity_level")
+    namespace["WEEKLY_FILTER_COLUMNS"] = columns
+    sql = namespace["weekly_inventory_card_semantic_sql"]()
+    environment = Environment()
+    environment.filters["where_in"] = lambda values: "('selected')"
+    for column in columns:
+        for operator in ("IN", "NOT IN"):
+            rendered = environment.from_string(sql).render(
+                get_filters=lambda name, **kwargs: (
+                    [{"op": operator, "val": ["selected"]}] if name == column else []
+                ),
+            )
+            monthly = rendered.split("monthly_filtered AS (", 1)[1].split("), monthly AS (", 1)[0]
+            assert "FROM gold.nr_panorama_comparison_history_detail f" in monthly
+            assert f"AND f.{column} {operator} ('selected')" in monthly
+            assert "l." not in monthly and "i." not in monthly and "h." not in monthly
+            assert "nr_overview_history" not in monthly

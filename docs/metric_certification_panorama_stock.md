@@ -108,7 +108,9 @@ para manter o isolamento por tenant.
 
 ## Arquitetura de serving
 
-A implementação final usa marts físicos dedicados para o bloco de inventário. O caminho sem filtros é `gold.nr_panorama_inventory_monthly_default` / `gold.nr_panorama_inventory_weekly_card_default`; quando filtros dimensionais são aplicados, o dataset virtual empurra os filtros para `gold.nr_overview_history` ou `gold.nr_panorama_inventory_weekly_detail` antes de recompor as mesmas fórmulas. Assim a regra não fica escondida somente em SQL virtual do Superset.
+A implementação final usa marts físicos dedicados para o bloco de inventário. O caminho sem filtros é `gold.nr_panorama_inventory_monthly_default` / `gold.nr_panorama_inventory_weekly_card_default`. Com filtros dimensionais, o mensal usa `gold.fato_historico` com suas dimensões; o card semanal usa `gold.nr_panorama_inventory_weekly_detail` para a timeline e `gold.nr_panorama_comparison_history_detail` para o resumo mensal. Esta última fonte já contém as dimensões e `status_item_geral`, denominador certificado de Ruptura/ISV. Os filtros são aplicados antes das agregações, preservando as mesmas fórmulas e `id_customer`.
+
+O gate `superset/validate_panorama_inventory_filters.py` reconcilia Estoque, Giro x ROI e OSA com as fatos de origem, incluindo resumos mensais dos cards semanais, filtros de UF/item (IN e NOT IN) e conversão em unidade e uma medida alternativa. Também verifica RLS guest nos oito charts de estoque com uma regra de tenant conflitante e confirma sua presença no SQL executado. O BLANK de Giro na última semana é normalizado de NaN para nulo somente no validador.
 
 ## Status
 
@@ -118,4 +120,5 @@ A implementação final usa marts físicos dedicados para o bloco de inventário
 - Conversão de Estoque Quantidade semanal: **CERTIFICADA NO CÓDIGO**
 - MTD/U3M: **CERTIFICADO NO CONTRATO DO PLUGIN**, incluindo a assimetria literal de `Estoque qtd`
 - Card único mensal/semanal: **IMPLEMENTADO**
-- Reconciliação com o PostgreSQL/Superset local: **PENDENTE DE EXECUÇÃO NO AMBIENTE DOCKER**
+- Reconciliação com o PostgreSQL/Superset local: **VALIDADA EM TRANSAÇÃO DE TESTE** em 05/10/2026 para o tenant 142, unidade e hectolitro; 36 cenários com filtros de UF/item e oito checks de RLS guest aprovados.
+- Aplicação persistente e inspeção visual: **PENDENTES**. O ambiente Docker encontrado aponta para outra worktree; os arquivos atuais foram copiados para diretórios temporários e o bootstrap incremental de estoque foi validado com rollback, reutilizando os metadados dos demais datasets. Nenhum rebuild integral foi certificado nesta auditoria.

@@ -33,9 +33,10 @@ def test_three_hierarchies_and_layout_position_are_preserved():
     assert '"region": ("regiao", "uf", "cidade")' in bootstrap
     assert '"retail": ("rede", "bandeira", "loja")' in bootstrap
     assert '"hierarchy": ("hierarquia_1", "descricao_marca", "item")' in bootstrap
-    stock = bootstrap.index('"Evolutivo de estoque"')
-    kpis = bootstrap.index('"Comparativo de KPIs por dimensão"')
-    matrices = bootstrap.index('"Comparativos"', kpis)
+    layout = bootstrap[bootstrap.index('        layout = Layout()'):]
+    stock = layout.index('"Evolutivo de estoque"')
+    kpis = layout.index('"Comparativo de KPIs por dimensão"')
+    matrices = layout.index('"Comparativos"', kpis)
     assert stock < kpis < matrices
     assert 'variant="hierarchyrank"' in bootstrap
 
