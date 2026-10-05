@@ -1,6 +1,8 @@
 import ast
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
 import pytest
 from jinja2 import Environment
 
@@ -9,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def read(path):
+    if path == "superset/bootstrap_panorama.py":
+        return read_panorama('inventory', 'osa', 'gaps', 'filters', 'layout')
     return (ROOT / path).read_text(encoding="utf-8")
 
 
@@ -133,7 +137,7 @@ def weekly_inventory_template():
     namespace = {}
     for path, names in (
         ("superset/neoretail_bootstrap/core/filters.py", {"_jinja_filter_predicates"}),
-        ("superset/bootstrap_panorama.py", {"weekly_inventory_card_semantic_sql"}),
+        ("superset/neoretail_bootstrap/panorama/inventory.py", {"weekly_inventory_card_semantic_sql"}),
     ):
         tree = ast.parse(read(path))
         nodes = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]

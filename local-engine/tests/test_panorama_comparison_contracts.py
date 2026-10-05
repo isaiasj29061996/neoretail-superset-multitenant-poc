@@ -1,10 +1,14 @@
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def read(path):
+    if path == "superset/bootstrap_panorama.py":
+        return read_panorama('comparisons', 'details', 'filters', 'layout')
     return (ROOT / path).read_text(encoding="utf-8")
 
 

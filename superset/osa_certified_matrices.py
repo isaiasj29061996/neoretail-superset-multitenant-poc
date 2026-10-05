@@ -1,5 +1,5 @@
 """Period-aware OSA matrix semantics extracted from the Power BI queries."""
-from bootstrap_panorama import WEEKLY_FILTER_COLUMNS
+from neoretail_bootstrap.panorama.filters import WEEKLY_FILTER_COLUMNS
 
 
 from neoretail_bootstrap.core.filters import _jinja_filter_predicates
