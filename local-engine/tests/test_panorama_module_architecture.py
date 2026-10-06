@@ -85,7 +85,7 @@ def test_generated_sql_is_byte_identical_to_certified_baseline(case):
     assert hashlib.sha256(sql.encode()).hexdigest() == case['sha256']
 
 
-@pytest.mark.parametrize('name', ['bootstrap_osa_industry_certified.py', 'osa_certified_matrices.py'])
+@pytest.mark.parametrize('name', ['bootstrap_osa_industry_certified.py', 'osa_certified_matrices.py', 'neoretail_bootstrap/osa_certified/filters.py', 'neoretail_bootstrap/osa_certified/matrices.py'])
 def test_osa_consumers_import_weekly_contract_from_canonical_package(name):
     imports = [node for node in ast.parse((ROOT / 'superset' / name).read_text(encoding='utf-8')).body if isinstance(node, ast.ImportFrom)]
     assert any(node.module == 'neoretail_bootstrap.panorama.filters' and any(alias.name == 'WEEKLY_FILTER_COLUMNS' for alias in node.names) for node in imports)
