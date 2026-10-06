@@ -5,6 +5,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def read(path: str) -> str:
+    if path == "superset/bootstrap_osa_industry_certified.py":
+        paths = [path, *["superset/neoretail_bootstrap/osa_certified/" + name + ".py" for name in ("semantics", "filters", "presentation")]]
+        return "\n".join((ROOT / item).read_text(encoding="utf-8") for item in paths)
+    if path == "superset/osa_certified_matrices.py":
+        path = "superset/neoretail_bootstrap/osa_certified/matrices.py"
     return (ROOT / path).read_text(encoding="utf-8")
 
 

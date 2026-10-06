@@ -121,7 +121,7 @@ def test_chart_specs_preserve_metrics_profiles_and_filters(case):
 
 
 @pytest.mark.parametrize('name', ['bootstrap_overview_quantity.py', 'bootstrap_panorama.py', 'bootstrap_osa_industry.py',
-                                  'bootstrap_osa_industry_certified.py', 'bootstrap_stock_optimization.py'])
+                                  'bootstrap_osa_industry_certified.py', 'bootstrap_stock_optimization.py', 'neoretail_bootstrap/osa_certified/filters.py'])
 def test_consumers_use_canonical_overview_contracts(name):
     nodes = ast.walk(ast.parse((ROOT / 'superset' / name).read_text(encoding='utf-8')))
     imports = [node.module for node in nodes if isinstance(node, ast.ImportFrom)]
