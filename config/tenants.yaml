@@ -1,5 +1,5 @@
 version: "9.0"
-default_customer_id: 142
+default_customer_id: 290
 default_dashboard: overview
 
 # Catálogo único consumido pelo portal e pelo bootstrap embedded do Superset.
@@ -82,12 +82,12 @@ navigation:
 
 # POC local. Em produção, usuários e permissões virão do backend NeoRetail.
 customers:
-  "142":
-    name: AMBEV
+  "290":
+    name: LACTALIS
     modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
 
 users:
   - username: demo.multitenant
     password_env: DEMO_USER_PASSWORD
     display_name: Analista POC
-    allowed_customer_ids: [142]
+    allowed_customer_ids: [290]

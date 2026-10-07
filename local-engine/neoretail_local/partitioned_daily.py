@@ -45,7 +45,8 @@ def _base(frame: DataFrame, id_customer: int) -> DataFrame:
     missing = sorted(REQUIRED - set(source.columns))
     if missing:
         raise RuntimeError(f"customer_daily: colunas obrigatorias ausentes: {missing}")
-    invalid = source.filter(F.col("id_customer").cast("long") != F.lit(id_customer)).limit(1).count()
+    identity = F.col("id_customer").cast("long")
+    invalid = source.filter(identity.isNull() | (identity != F.lit(id_customer))).limit(1).count()
     if invalid:
         raise RuntimeError("customer_daily: linha fora do tenant selecionado")
     return source.withColumn("id_customer", F.col("id_customer").cast("long")).withColumn(
@@ -105,7 +106,7 @@ def _periodic(base: DataFrame, period: str) -> DataFrame:
     return grouped
 
 
-def build_partitioned_daily_facts(frame: DataFrame, id_customer: int) -> dict[str, DataFrame]:
+def build_partitioned_daily_facts(frame: DataFrame, id_customer: int, customer_name: str = "AMBEV") -> dict[str, DataFrame]:
     base = _base(frame, id_customer)
     weekly = _periodic(base, "week").select(
         F.col("period").alias("id_time"),
@@ -192,7 +193,7 @@ def build_partitioned_daily_facts(frame: DataFrame, id_customer: int) -> dict[st
     price = base.groupBy(
         "id_customer", F.month("data").alias("mes"), F.year("data").alias("ano"),
         F.col("id_item").cast("long").alias("id_item"), F.col("id_location").cast("long").alias("id_location"),
-    ).agg(F.avg(_double("vl_sales_price")).alias("media_preco_venda"), F.avg(_double("vl_price_cost")).alias("media_preco_custo")).withColumn("customer", F.lit("AMBEV"))
+    ).agg(F.avg(_double("vl_sales_price")).alias("media_preco_venda"), F.avg(_double("vl_price_cost")).alias("media_preco_custo")).withColumn("customer", F.lit(customer_name))
     latest = base.withColumn("_rn", F.row_number().over(Window.partitionBy("id_customer", "id_location", "id_item").orderBy(F.col("data").desc()))).filter(F.col("_rn") == 1)
     opportunities = latest.select(
         F.col("id_location").cast("string"), F.col("id_item").cast("string"),

@@ -17,12 +17,16 @@ param(
     [double]$SampleFraction = 1.0,
     [switch]$PruneRawCache,
     [switch]$InventoryOnly,
+    [switch]$CustomerOnlyDimensions,
     [Parameter(Mandatory = $false)]
     [string]$Customer = "142"
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+if ($CustomerOnlyDimensions -and $Step -notin @("02", "02A")) {
+    throw "-CustomerOnlyDimensions exige -Step 02 ou 02A; nenhuma etapa foi iniciada."
+}
 
 if (-not (Test-Path ".env")) { throw ".env ausente. Execute .\start.ps1 primeiro." }
 $envText = Get-Content ".env" -Raw
@@ -50,9 +54,11 @@ if ($Step -eq "02B") {
     if ($PruneRawCache) { $arguments += "--prune-raw-cache" }
     if ($InventoryOnly) { $arguments += "--inventory-only" }
     & docker @arguments
-} elseif ($Step -eq "03D" -and $Customer -in @("142", "AMBEV")) {
+} elseif ($Step -in @("02", "02A") -and $CustomerOnlyDimensions) {
+    docker compose exec -T -e NEORETAIL_DIMENSIONS_CUSTOMER_ONLY=true local-engine python -m neoretail_local.pipeline --step 02 --customer $Customer
+} elseif ($Step -eq "03D" -and $Customer -in @("142", "AMBEV", "290", "LACTALIS")) {
     docker compose exec -T local-engine python -m neoretail_local.partitioned_validation --customer $Customer
-} elseif ($Step -eq "06" -and $Customer -in @("142", "AMBEV")) {
+} elseif ($Step -eq "06" -and $Customer -in @("142", "AMBEV", "290", "LACTALIS")) {
     docker compose exec -T local-engine python -m neoretail_local.gold_serving --customer $Customer
 } else {
     $pipelineStep = if ($Step -eq "02A") { "02" } else { $Step }

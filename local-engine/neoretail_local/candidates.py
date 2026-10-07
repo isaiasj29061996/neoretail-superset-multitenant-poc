@@ -280,7 +280,8 @@ def run(
                     )
             frame = spark.read.parquet(*local_files)
             source_customer = "ID_CUSTOMER" if "ID_CUSTOMER" in frame.columns else "id_customer"
-            invalid = frame.filter(F.col(source_customer).cast("long") != F.lit(settings.id_customer)).limit(1).count()
+            identity = F.col(source_customer).cast("long")
+            invalid = frame.filter(identity.isNull() | (identity != F.lit(settings.id_customer))).limit(1).count()
             if invalid:
                 raise RuntimeError("Fonte diaria particionada contem ID_CUSTOMER fora do tenant selecionado")
             enriched = (

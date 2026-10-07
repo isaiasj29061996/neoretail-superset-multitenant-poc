@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -275,13 +276,17 @@ def download_approved_source(settings: Settings, relative_path: str) -> Path:
 
 def step_02_bronze(settings: Settings, spark) -> dict[str, Any]:
     catalog = load_yaml(settings.source_catalog_path)
+    scoped_files = None
+    if os.getenv("NEORETAIL_DIMENSIONS_CUSTOMER_ONLY") == "true":
+        from .scoped_dimensions import materialize_dimensions
+        scoped_files = materialize_dimensions(settings, catalog, blob_service(settings))
     approved = catalog.get("sources", {})
     loaded: list[str] = []
     for logical_name, source in approved.items():
         if source.get("status") != "approved_path":
             continue
         table = validate_identifier(source["bronze_table"])
-        local_file = download_approved_source(settings, source["path"])
+        local_file = scoped_files[table] if scoped_files is not None else download_approved_source(settings, source["path"])
         frame = spark.read.parquet(str(local_file))
         if not frame.take(1):
             raise RuntimeError(f"{logical_name}: fonte aprovada nao retornou linhas")
@@ -348,7 +353,7 @@ def step_03b_silver_facts(settings: Settings, spark) -> dict[str, Any]:
         source = read_lake(
             spark, settings, "bronze", "candidate_customer_daily", customer_scoped=True
         )
-        transformed = build_partitioned_daily_facts(source, settings.id_customer)
+        transformed = build_partitioned_daily_facts(source, settings.id_customer, customer_name=settings.nm_customer)
         written: list[str] = []
         for target, frame in transformed.items():
             write_lake(frame, settings, "silver", target, customer_scoped=True)
