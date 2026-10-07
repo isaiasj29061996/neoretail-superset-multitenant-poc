@@ -1,6 +1,8 @@
 """Reconcile Quantity Overview source, marts, Superset and displayed periods."""
 from __future__ import annotations
 
+import os
+
 import json
 import math
 from datetime import date, datetime
@@ -12,7 +14,7 @@ from superset.app import create_app
 
 from profile_dashboard_performance import build_queries
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 MEASURE = "unidade"
 DASHBOARD = "neoretail-v9-visao-geral-quantidade"
 
@@ -450,7 +452,7 @@ def main():
             print(json.dumps({"measure_results": option_results}, ensure_ascii=False))
 
             filtered = execute(factory, ChartDataCommand, charts["[Visão quantidade] Vendas"], [
-                *filters, {"col": "rede", "op": "IN", "val": ["AKKIATACADO"]},
+                *filters, {"col": "rede", "op": "IN", "val": [os.getenv("NEORETAIL_VALIDATION_REDE", "AKKIATACADO")]},
             ])
             filtered_sql = filtered.get("query") or filtered.get("sql") or ""
             if "nr_overview_quantity_detail" not in filtered_sql or "nr_overview_quantity_default" in filtered_sql:
@@ -460,6 +462,7 @@ def main():
             print(json.dumps({
                 "filtered_chart": "Vendas", "rows": len(filtered["data"]),
                 "source": "nr_overview_quantity_detail",
+                "rede": os.getenv("NEORETAIL_VALIDATION_REDE", "AKKIATACADO"),
             }, ensure_ascii=False))
 
 

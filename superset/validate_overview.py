@@ -8,7 +8,7 @@ from flask_login import login_user
 from superset.app import create_app
 
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 FILTER_COLUMN = os.getenv('OVERVIEW_FILTER_COLUMN', '').strip()
 FILTER_VALUE = os.getenv('OVERVIEW_FILTER_VALUE', '').strip()
 CONVERSION_MEASURE = os.getenv('OVERVIEW_CONVERSION_MEASURE', 'unidade').strip()

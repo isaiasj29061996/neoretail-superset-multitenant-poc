@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from flask import g
 from flask_login import login_user
@@ -80,7 +81,15 @@ def main():
         factory = QueryContextFactory()
         report = []
         with database.get_sqla_engine() as engine, engine.connect() as connection:
-            measure = connection.execute(NON_UNIT_MEASURE, {"customer": CUSTOMER_ID}).scalar()
+            configured_measure = os.getenv("NEORETAIL_VALIDATION_FILTER_MEASURE")
+            if configured_measure:
+                measure = connection.execute(text("""
+                    SELECT nm_measure FROM gold.dim_conversao
+                    WHERE id_customer=:customer AND nm_measure=:measure
+                    GROUP BY nm_measure HAVING MAX(conversion_rate) <> 1
+                """), {"customer": CUSTOMER_ID, "measure": configured_measure}).scalar_one()
+            else:
+                measure = connection.execute(NON_UNIT_MEASURE, {"customer": CUSTOMER_ID}).scalar()
             measures = list(dict.fromkeys(["unidade", measure])) if measure else ["unidade"]
             for column, operator in (("uf", "IN"), ("item", "IN"), ("uf", "NOT IN")):
                 table = "dim_local" if column == "uf" else "dim_itens"
@@ -112,6 +121,7 @@ def main():
                             if period == "semanal":
                                 compare_components(sources[f"{source_key}mensal"], responses[1].get("data") or [], components, context + "/summary")
                             report.append({"context": context, "rows": len(responses[0]["data"])})
+                            print(json.dumps(report[-1], ensure_ascii=False), flush=True)
         # An embedded guest from a different tenant must see no rows even
         # when a chart request explicitly asks for the known positive tenant.
         guest = security_manager.get_guest_user_from_token({
