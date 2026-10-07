@@ -2,7 +2,8 @@
 from __future__ import annotations
 from neoretail_bootstrap.core.filters import _jinja_filter_predicates
 from neoretail_bootstrap.core.metrics import metric
-from .filters import DIMENSION_OVERRIDES, _dimension_nulls, _measure_filter
+from .filters import DIMENSION_OVERRIDES, _dimension_nulls, _measure_filter, _dimension_filter_checks
+from neoretail_bootstrap.panorama.filters import WEEKLY_FILTER_COLUMNS
 
 PERIODS = (
     ("MTD", 1),
@@ -26,7 +27,7 @@ def monthly_overview_sql() -> str:
     )
     dims = _dimension_nulls()
     measure_filter = _measure_filter("m")
-    return f"""
+    detail = f"""
 WITH history_filtered AS (
   SELECT
     h.mes_ano::date AS data,h.id_customer,h.id_item,h.id_location,
@@ -142,6 +143,37 @@ LEFT JOIN cause_factor cf
   ON cf.data=h.data AND cf.id_customer=h.id_customer
  AND cf.nm_measure=hf.nm_measure
 """.strip()
+    default = f"""
+SELECT *
+FROM gold.nr_osa_monthly_default m
+WHERE 1=1
+{measure_filter}
+""".strip()
+    other_dimensions = " or ".join(
+        f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS if column != "rede"
+    )
+    retail = f"""
+SELECT *
+FROM gold.nr_osa_monthly_retail m
+WHERE 1=1
+{{% for filter in get_filters('rede', remove_filter=True) %}}
+  AND m.rede IN {{{{ filter.get('val') | where_in }}}}
+{{% endfor %}}
+{measure_filter}
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {_dimension_filter_checks()} %}}\n"
+        "{% set retail_filters = get_filters('rede') %}\n"
+        f"{{% set has_other_dimension_filter = {other_dimensions} %}}\n"
+        "{% if retail_filters|length == 1 and retail_filters[0].get('op') == 'IN' "
+        "and retail_filters[0].get('val')|length == 1 and not has_other_dimension_filter %}\n"
+        f"{retail}\n"
+        "{% elif has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        f"{default}\n"
+        "{% endif %}"
+    )
 
 
 def weekly_overview_sql() -> str:
@@ -162,7 +194,7 @@ def weekly_overview_sql() -> str:
     )
     dims = _dimension_nulls()
     measure_filter = _measure_filter("m")
-    return f"""
+    detail = f"""
 WITH weekly_filtered AS (
   SELECT
     w.id_time::date AS data,w.cd_week,w.id_customer,w.id_item,w.id_location,
@@ -269,6 +301,21 @@ JOIN factor f USING(data,id_customer)
 LEFT JOIN demand d USING(data,id_customer)
 ORDER BY w.data
 """.strip()
+    default = f"""
+SELECT *
+FROM gold.nr_osa_weekly_default m
+WHERE 1=1
+{measure_filter}
+ORDER BY m.data
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {_dimension_filter_checks()} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        f"{default}\n"
+        "{% endif %}"
+    )
 
 
 def cause_period_sql() -> str:
@@ -281,7 +328,7 @@ def cause_period_sql() -> str:
         "c", "o.max_tp_activity_level", overrides,
     )
     measure_filter = _measure_filter("m")
-    return f"""
+    detail = f"""
 WITH latest AS (
   SELECT id_customer,MAX(data)::date AS latest_data
   FROM gold.fato_mensal_causa_osa
@@ -343,6 +390,46 @@ WITH latest AS (
 )
 SELECT * FROM converted
 """.strip()
+    periods = """
+    SELECT 'MTD'::text AS osa_period,1::int AS osa_period_order
+      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)
+    UNION ALL
+    SELECT 'Mês Anterior',2
+      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')
+    UNION ALL
+    SELECT 'U3M',3
+      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'
+        AND b.data<=x.latest_data
+    UNION ALL
+    SELECT 'YTD',5
+      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)
+""".strip()
+    default = f"""
+WITH latest AS (
+  SELECT id_customer,MAX(data)::date AS latest_data
+  FROM gold.nr_osa_causes_default
+  GROUP BY id_customer
+), base AS (
+  SELECT m.*
+  FROM gold.nr_osa_causes_default m
+  WHERE 1=1
+{measure_filter}
+)
+SELECT b.*,p.osa_period,p.osa_period_order
+FROM base b
+JOIN latest x USING(id_customer)
+CROSS JOIN LATERAL (
+{periods}
+) p(osa_period,osa_period_order)
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {_dimension_filter_checks()} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        f"{default}\n"
+        "{% endif %}"
+    )
 
 
 def period_options_sql() -> str:

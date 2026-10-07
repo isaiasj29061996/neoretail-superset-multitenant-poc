@@ -86,8 +86,16 @@ def test_value_and_quantity_dashboard_isolated_from_legacy_page():
     tenants = read("config/tenants.yaml")
     assert 'DASHBOARD_SLUG = "neoretail-v9-osa-industria-certified"' in bootstrap
     assert 'PREFIX = "[OSA Certificada]"' in bootstrap
-    assert '("Valor",[' in bootstrap
-    assert '("Quantidade",[' in bootstrap
+    assert "mode_specs = (" in bootstrap
+    assert '"Valor",' in bootstrap
+    assert '"Quantidade",' in bootstrap
+    for chart_key in (
+        "value_month", "value_week", "value_motive", "value_cause",
+        "value_matrix_region", "value_matrix_retail", "value_matrix_item",
+        "qty_month", "qty_week", "qty_motive", "qty_cause",
+        "qty_matrix_region", "qty_matrix_retail", "qty_matrix_item",
+    ):
+        assert f'charts["{chart_key}"]' in bootstrap
     assert "comparison_pivot_params" in bootstrap
     assert '"region": ("Região", "regiao")' in matrices
     assert '"retail": ("Varejo", "rede")' in matrices
@@ -98,6 +106,8 @@ def test_value_and_quantity_dashboard_isolated_from_legacy_page():
     assert "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)" in matrices
     assert "osa_certified:" in tenants
     assert "neoretail-v9-osa-industria-certified" in tenants
+    assert '"nr_conversion_options"' in bootstrap
+    assert '"nm_measure": (conversion_options.id' in bootstrap
     # Legacy key remains available for side-by-side homologation.
     assert "slug: neoretail-v9-osa-industria\n" in tenants
 
@@ -124,6 +134,38 @@ def test_runtime_gate_checks_every_chart_and_raw_sources():
     assert "MOTIVE_QTY_EXPECTED" in validator
     assert "source=ChartData" in validator
     assert "ChartDataCommand" in validator
+
+
+def test_default_osa_paths_use_compact_marts_with_detailed_filter_fallbacks():
+    mart = read("analytics-db/marts/45_osa_certified_semantic.sql")
+    bootstrap = read("superset/bootstrap_osa_industry_certified.py")
+    matrices = read("superset/osa_certified_matrices.py")
+    runner = read("run-osa-certified.ps1")
+
+    for name in (
+        "nr_osa_monthly_default",
+        "nr_osa_weekly_default",
+        "nr_osa_causes_default",
+        "nr_osa_matrix_default",
+    ):
+        assert f"CREATE MATERIALIZED VIEW gold.{name}" in mart
+        assert f"gold.{name}" in bootstrap + matrices
+
+    assert bootstrap.count("has_dimension_filter") >= 6
+    assert "FROM gold.fato_historico h" in bootstrap
+    assert "FROM gold.fato_semanal w" in bootstrap
+    assert "FROM gold.fato_mensal_causa_osa c" in bootstrap
+    assert "FROM gold.fato_historico h" in matrices
+    assert '45_osa_certified_semantic.sql' in runner
+
+
+def test_certified_pivots_publish_semantic_dataset_formats_and_all_causes():
+    bootstrap = read("superset/bootstrap_osa_industry_certified.py")
+
+    assert "SqlaTable, SqlMetric" in bootstrap
+    assert 'saved_metric.d3format = metric_def["d3Format"]' in bootstrap
+    assert "MATRIX_VALUE, MATRIX_QTY, MATRIX_PROBLEMS, MATRIX_OSA" in bootstrap
+    assert "row_limit=100," in bootstrap
 
 
 def test_full_ambev_runner_bootstraps_certified_dashboard_before_embedding():

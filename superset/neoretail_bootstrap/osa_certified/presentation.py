@@ -39,7 +39,9 @@ def _cause_params(dataset, title: str, metric_def: dict, groupby: str, fmt: str)
         groupby=[groupby],
         variant="verticalbars",
         formats=fmt,
-        row_limit=20,
+        # The PBIP does not apply a Top N rule to cause/motive. Keep the
+        # complete governed domain and avoid Superset's row-limit warning.
+        row_limit=100,
     )
 
 

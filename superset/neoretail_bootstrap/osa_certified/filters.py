@@ -23,6 +23,12 @@ def _dimension_nulls() -> str:
     return ",".join(f"NULL::text AS {column}" for column in WEEKLY_FILTER_COLUMNS)
 
 
+def _dimension_filter_checks() -> str:
+    return " or ".join(
+        f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS
+    )
+
+
 def _measure_filter(alias: str = "o") -> str:
     return f"""
 {{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}}
@@ -72,12 +78,15 @@ def _period_filter(period_dataset_id: int, excluded: list[int]) -> dict:
     }
 
 
-def native_filters(monthly, weekly, causes, matrix_datasets, filter_options, period_options, charts):
+def native_filters(monthly, weekly, causes, matrix_datasets, filter_options, period_options, charts, conversion_options=None):
     dataset_ids = [
         monthly.id,weekly.id,causes.id,
         *[dataset.id for dataset in matrix_datasets.values()],
     ]
-    native = overview_native_filters(dataset_ids,filter_options.id)
+    native = overview_native_filters(dataset_ids, filter_options.id if conversion_options is None else {
+        "nm_measure": (conversion_options.id),
+        **{column: filter_options.id for column in WEEKLY_FILTER_COLUMNS},
+    })
     top_ids = {
         charts["value_month"].id,charts["value_week"].id,
         charts["qty_month"].id,charts["qty_week"].id,

@@ -49,6 +49,19 @@ if (-not $SkipSilver) {
 
 Run-Step "06"
 
+Write-Host ""
+Write-Host "=== Serving OSA certificado ===" -ForegroundColor Cyan
+& (Join-Path $PSScriptRoot "create-superset-kpi-views.ps1") `
+    -Only "45_osa_certified_semantic.sql"
+if ($LASTEXITCODE -ne 0) {
+    throw "Serving OSA certificado falhou com exit code $LASTEXITCODE"
+}
+& (Join-Path $PSScriptRoot "create-superset-kpi-views.ps1") `
+    -Only "46_osa_monthly_retail.sql"
+if ($LASTEXITCODE -ne 0) {
+    throw "Serving OSA mensal por rede falhou com exit code $LASTEXITCODE"
+}
+
 Run-Superset "bootstrap_osa_industry_certified.py"
 Run-Superset "bootstrap_embedded.py"
 

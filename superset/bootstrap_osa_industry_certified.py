@@ -54,7 +54,7 @@ def main():
     app = create_app()
     with app.app_context():
         from superset import db
-        from superset.connectors.sqla.models import SqlaTable
+        from superset.connectors.sqla.models import SqlaTable, SqlMetric
         from superset.models.core import Database
         from superset.models.dashboard import Dashboard
         from superset.models.slice import Slice
@@ -82,6 +82,27 @@ def main():
             )
             for key,(_,group_column) in MATRIX_SCOPES.items()
         }
+        # Pivot Table v2 reads per-metric formats from datasource metadata,
+        # which Superset derives from saved SqlMetric rows. The chart still
+        # executes the governed adhoc expressions below; these saved metrics
+        # publish only the matching labels/formats consumed by the renderer.
+        for dataset in matrix_datasets.values():
+            for metric_def in (
+                MATRIX_VALUE, MATRIX_QTY, MATRIX_PROBLEMS, MATRIX_OSA,
+            ):
+                saved_metric = db.session.query(SqlMetric).filter(
+                    SqlMetric.table_id == dataset.id,
+                    SqlMetric.metric_name == metric_def["label"],
+                ).one_or_none()
+                if saved_metric is None:
+                    saved_metric = SqlMetric(
+                        table_id=dataset.id,
+                        metric_name=metric_def["label"],
+                    )
+                    db.session.add(saved_metric)
+                saved_metric.expression = metric_def["sqlExpression"]
+                saved_metric.metric_type = "sql"
+                saved_metric.d3format = metric_def["d3Format"]
         period_options = upsert_dataset(
             db.session,SqlaTable,database,"nr_osa_period_options",
             sql=period_options_sql(),
@@ -89,6 +110,10 @@ def main():
         filter_options = upsert_dataset(
             db.session,SqlaTable,database,"nr_filter_options",
             table_name="nr_filter_options",
+        )
+        conversion_options = upsert_dataset(
+            db.session,SqlaTable,database,"nr_conversion_options",
+            table_name="nr_conversion_options",
         )
 
         charts = {}
@@ -113,7 +138,7 @@ def main():
         # Common slicers mirror the PBI location/activity/brand/category/item/
         # measure selectors. The period control applies only to cause/matrix
         # charts because the top timeline needs its full temporal window.
-        native = native_filters(monthly, weekly, causes, matrix_datasets, filter_options, period_options, charts)
+        native = native_filters(monthly, weekly, causes, matrix_datasets, filter_options, period_options, charts, conversion_options)
 
         dashboard.json_metadata = json.dumps({
             "timed_refresh_immune_slices": [],

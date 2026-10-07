@@ -82,8 +82,11 @@ def matrix_period_sql(group_column: str) -> str:
     measure_filter = _measure_filter()
     history_periods = _period_rows("b", "x")
     cause_periods = _period_rows("b", "x")
+    filter_checks = " or ".join(
+        f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS
+    )
 
-    return f"""
+    detail = f"""
 WITH latest AS (
   SELECT id_customer,MAX(mes_ano)::date AS latest_data
   FROM gold.fato_historico
@@ -170,6 +173,25 @@ LEFT JOIN cause_agg c
  AND c.osa_period=h.osa_period
  AND c.{group_column} IS NOT DISTINCT FROM h.{group_column}
 """.strip()
+    default = f"""
+SELECT
+  m.id_customer,m.nm_measure,m.osa_period,m.osa_period_order,
+  m.rede,m.bandeira,m.uf,m.cidade,m.tipo_local,m.loja,m.regiao,
+  m.tp_activity_level,m.activity_level,m.item,m.descricao_marca,
+  m.hierarquia_1,m.hierarquia_2,m.hierarquia_3,
+  m.loss_value,m.loss_qty,m.problem_qty,m.problem_base,m.active_base
+FROM gold.nr_osa_matrix_default m
+WHERE m.scope='{next(key for key, value in MATRIX_SCOPES.items() if value[1] == group_column)}'
+{measure_filter}
+""".strip()
+    return (
+        f"{{% set has_dimension_filter = {filter_checks} %}}\n"
+        "{% if has_dimension_filter %}\n"
+        f"{detail}\n"
+        "{% else %}\n"
+        f"{default}\n"
+        "{% endif %}"
+    )
 
 
 TABLE_VALUE = formatted_metric("Perda R$ OSA", "SUM(loss_value)", "$,.2f")
