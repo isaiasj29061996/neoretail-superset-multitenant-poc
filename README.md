@@ -708,3 +708,8 @@ Ela tenta provar que:
 A etapa de backend/query com até **10 usuários simultâneos** foi concluída. A
 próxima evidência é o benchmark **E2E/HTTP** e, depois, a validação sobre o
 **DW real**.
+# Assistente local opcional
+
+Veja [inicialização com mock/Ollama, autorização de download e testes](docs/assistant_local_startup.md).
+O fluxo normal continua sendo `.\start.ps1`; use `-Assistant` para habilitar a
+camada opcional e `-PullModel` para autorizar download de modelo ausente.
