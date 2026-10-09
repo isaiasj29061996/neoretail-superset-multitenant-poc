@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import uuid
+import json
 
 import psycopg2
 from psycopg2 import sql
@@ -20,6 +21,18 @@ from pyspark.sql import functions as F
 
 from .pipeline import validate_identifier
 from .settings import Settings
+from .customers import resolve_tenant
+
+
+def publication_schema(settings: Settings, requested: str) -> str:
+    context = resolve_tenant(settings.customers_config_path, settings.id_customer, require_source=True)
+    if context != settings.tenant_context:
+        raise RuntimeError("Publication context differs from canonical registry")
+    if requested == "audit":
+        return requested
+    if requested not in ("gold", context.gold_schema):
+        raise RuntimeError("Publication schema must come from canonical TenantContext")
+    return context.gold_schema
 
 
 _NUMERIC_TYPES = {
@@ -98,14 +111,15 @@ def write_postgres_customer_named(
 ) -> None:
     """Substitui um tenant alinhando staging e destino por nome de coluna."""
 
-    schema = validate_identifier(schema)
+    schema = validate_identifier(publication_schema(settings, schema))
     table = validate_identifier(table)
     if "id_customer" not in frame.columns:
         raise RuntimeError(f"{schema}.{table}: id_customer ausente")
 
     invalid = (
         frame.filter(
-            F.col("id_customer").cast("long") != F.lit(settings.id_customer)
+            F.col("id_customer").cast("long").isNull()
+            | (F.col("id_customer") != F.lit(settings.id_customer))
         )
         .limit(1)
         .count()
@@ -117,19 +131,18 @@ def write_postgres_customer_named(
 
     suffix = uuid.uuid4().hex[:8]
     stage = validate_identifier(f"_stage_{table[:40]}_{suffix}")
-    (
-        frame.write.format("jdbc")
-        .option("url", settings.jdbc_url)
-        .option("dbtable", f"{schema}.{stage}")
-        .option("user", settings.analytics_user)
-        .option("password", settings.analytics_password)
-        .option("driver", "org.postgresql.Driver")
-        .option("batchsize", "5000")
-        .mode("overwrite")
-        .save()
-    )
-
     try:
+        (
+            frame.write.format("jdbc")
+            .option("url", settings.jdbc_url)
+            .option("dbtable", f"{schema}.{stage}")
+            .option("user", settings.analytics_user)
+            .option("password", settings.analytics_password)
+            .option("driver", "org.postgresql.Driver")
+            .option("batchsize", "5000")
+            .mode("overwrite")
+            .save()
+        )
         with psycopg2.connect(settings.psycopg_dsn) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -174,6 +187,25 @@ def write_postgres_customer_named(
                         f"{schema}.{table}: tipos incompativeis entre Gold e staging: "
                         + "; ".join(incompatible)
                     )
+
+                if schema != "audit":
+                    cursor.execute(
+                        sql.SQL("ALTER TABLE {}.{} ALTER COLUMN id_customer SET NOT NULL").format(
+                            sql.Identifier(schema), sql.Identifier(table)
+                        )
+                    )
+                    constraint = validate_identifier(f"ck_{table[:40]}_tenant")
+                    cursor.execute(
+                        "SELECT 1 FROM pg_constraint WHERE conrelid = %s::regclass AND conname = %s",
+                        (f'"{schema}"."{table}"', constraint),
+                    )
+                    if not cursor.fetchone():
+                        cursor.execute(
+                            sql.SQL("ALTER TABLE {}.{} ADD CONSTRAINT {} CHECK (id_customer = %s)").format(
+                                sql.Identifier(schema), sql.Identifier(table), sql.Identifier(constraint)
+                            ),
+                            (settings.id_customer,),
+                        )
 
                 ordered_names = [name for name, _ in stage_columns]
                 columns_sql = sql.SQL(", ").join(
@@ -223,3 +255,5 @@ def write_postgres_customer_named(
                     )
                 )
         raise
+    print(json.dumps({"publication": "committed", "tenant_key": settings.tenant_context.tenant_key,
+                      "id_customer": settings.id_customer, "schema": schema, "table": table}))

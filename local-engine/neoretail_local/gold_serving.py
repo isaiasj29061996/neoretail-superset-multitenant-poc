@@ -112,14 +112,15 @@ def purge_postgres_customer(settings: Settings, table: str) -> None:
     """Remove eventual carga antiga da AMBEV de uma tabela lake-only."""
 
     table = validate_identifier(table)
-    qualified = f"gold.{table}"
+    schema = settings.gold_schema
+    qualified = f"{schema}.{table}"
     with psycopg2.connect(settings.psycopg_dsn) as connection:
         with connection.cursor() as cursor:
             cursor.execute("SELECT to_regclass(%s)", (qualified,))
             exists = cursor.fetchone()[0]
             if exists:
                 cursor.execute(
-                    f'DELETE FROM "gold"."{table}" WHERE id_customer = %s',
+                    f'DELETE FROM "{schema}"."{table}" WHERE id_customer = %s',
                     (settings.id_customer,),
                 )
 
@@ -176,7 +177,8 @@ def publish_daily_export_only(settings: Settings, spark) -> dict[str, object]:
     if "id_customer" not in frame.columns:
         raise RuntimeError("fato_diaria Gold: id_customer ausente")
     invalid = frame.filter(
-        F.col("id_customer").cast("long") != F.lit(settings.id_customer)
+        F.col("id_customer").cast("long").isNull()
+        | (F.col("id_customer") != F.lit(settings.id_customer))
     ).limit(1).count()
     if invalid:
         raise RuntimeError("fato_diaria Gold contem linhas de outro tenant")
@@ -226,7 +228,8 @@ def publish(settings: Settings, spark) -> dict[str, object]:
         if "id_customer" not in frame.columns:
             raise RuntimeError(f"{logical}: id_customer ausente")
         invalid = frame.filter(
-            F.col("id_customer").cast("long") != F.lit(settings.id_customer)
+            F.col("id_customer").cast("long").isNull()
+            | (F.col("id_customer") != F.lit(settings.id_customer))
         ).limit(1).count()
         if invalid:
             raise RuntimeError(f"{logical}: linhas fora do tenant selecionado")
@@ -300,7 +303,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Publica Gold e serving PostgreSQL do NeoRetail"
     )
-    parser.add_argument("--customer", default="142")
+    parser.add_argument("--customer", "--tenant")
     parser.add_argument(
         "--export-daily-only",
         action="store_true",

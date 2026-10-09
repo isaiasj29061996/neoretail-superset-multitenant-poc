@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 
 from sqlalchemy import text
+from neoretail_bootstrap.core.sql_sources import consumption_sql
 from superset.app import create_app
 
 from neoretail_bootstrap.overview.semantics import headline_semantic_sql
@@ -166,9 +167,9 @@ def main():
         ).one()
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
-                last_date = connection.execute(text(
+                last_date = connection.execute(text(consumption_sql(
                     "SELECT MAX(id_time)::date FROM gold.fato_ivd_tvd"
-                )).scalar_one()
+                ))).scalar_one()
 
         tvd_daily = upsert_dataset(
             db.session, SqlaTable, database, "nr_tvd_daily_interactive",

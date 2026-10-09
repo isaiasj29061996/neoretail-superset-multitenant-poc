@@ -134,6 +134,22 @@ def test_dataset_second_run_preserves_id_and_skips_unchanged_metadata(session):
     assert second.metadata_fetches == 2
 
 
+def test_source_only_serving_migration_preserves_columns_and_id(session,monkeypatch):
+    monkeypatch.setenv('NEORETAIL_CONSUMPTION_SCHEMA','gold')
+    database=object()
+    original='SELECT id_customer, SUM(tvd) FROM gold.nr_tvd_daily GROUP BY id_customer'
+    dataset=upsert_dataset(session,Dataset,database,'nr_tvd',sql=original)
+    identity,columns=dataset.id,dataset.columns
+    monkeypatch.setenv('NEORETAIL_CONSUMPTION_SCHEMA','serving')
+    migrated=upsert_dataset(session,Dataset,database,'nr_tvd',sql=original)
+    assert migrated.id == identity and migrated.columns == columns
+    assert migrated.schema == 'serving'
+    assert migrated.sql == original.replace('gold.nr_tvd_daily','serving.nr_tvd_daily')
+    assert migrated.metadata_fetches == 1
+    upsert_dataset(session,Dataset,database,'nr_tvd',sql=original.replace('SUM(tvd)','AVG(tvd)'))
+    assert migrated.metadata_fetches == 2, 'a formula change must never qualify as source-only'
+
+
 @pytest.mark.parametrize('upsert', [upsert_chart, upsert_overview_chart])
 def test_chart_second_run_preserves_id_and_serialized_params(session, upsert):
     dataset = type('Dataset', (), {'id': 42})()

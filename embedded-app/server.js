@@ -3,13 +3,16 @@ import session from "express-session";
 import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
+import { loadTenantRegistry, buildAuthorizedCustomers } from "./tenant-registry.js";
 import { createAssistantService, registerAssistantRoutes } from "./assistant/index.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const configPath = process.env.TENANTS_CONFIG || "/app/config/tenants.yaml";
 const tenantConfig = YAML.parse(fs.readFileSync(configPath, "utf8"));
-const customers = tenantConfig.customers || {};
+const customersConfigPath = process.env.CUSTOMERS_CONFIG_PATH || path.join(path.dirname(configPath), "customers.yaml");
+const registry = loadTenantRegistry(customersConfigPath);
+const customers = buildAuthorizedCustomers(registry, tenantConfig);
 const users = tenantConfig.users || [];
 const dashboards = tenantConfig.dashboards || {};
 const navigation = tenantConfig.navigation || [];

@@ -18,7 +18,8 @@ param(
     [switch]$PruneRawCache,
     [switch]$InventoryOnly,
     [Parameter(Mandatory = $false)]
-    [string]$Customer = "142"
+    [Alias("Tenant")]
+    [string]$Customer = "pandurata"
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +38,11 @@ if ($MaxFiles -gt 0 -and $SampleFraction -lt 1.0) {
 docker compose up -d local-engine analytics-db
 if ($LASTEXITCODE -ne 0) { throw "Nao foi possivel preparar o engine local." }
 
+$contextJson = docker compose exec -T local-engine python -m neoretail_local.customers --tenant $Customer --require-source
+if ($LASTEXITCODE -ne 0) { throw "Tenant/source resolution failed; pipeline not started." }
+$tenantContext = $contextJson | ConvertFrom-Json
+$Customer = [string]$tenantContext.id_customer
+
 if ($Step -eq "02B") {
     $sampleText = $SampleFraction.ToString([System.Globalization.CultureInfo]::InvariantCulture)
     $arguments = @(
@@ -50,9 +56,9 @@ if ($Step -eq "02B") {
     if ($PruneRawCache) { $arguments += "--prune-raw-cache" }
     if ($InventoryOnly) { $arguments += "--inventory-only" }
     & docker @arguments
-} elseif ($Step -eq "03D" -and $Customer -in @("142", "AMBEV")) {
+} elseif ($Step -eq "03D" -and $tenantContext.source_layout -eq "partitioned_customer_daily_v1") {
     docker compose exec -T local-engine python -m neoretail_local.partitioned_validation --customer $Customer
-} elseif ($Step -eq "06" -and $Customer -in @("142", "AMBEV")) {
+} elseif ($Step -eq "06" -and $tenantContext.source_layout -eq "partitioned_customer_daily_v1") {
     docker compose exec -T local-engine python -m neoretail_local.gold_serving --customer $Customer
 } else {
     $pipelineStep = if ($Step -eq "02A") { "02" } else { $Step }

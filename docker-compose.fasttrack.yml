@@ -1,0 +1,24 @@
+# Run with --project-directory and -f paths from this worktree.
+# Retains the existing named volumes; does not run initialization or remove AMBEV.
+services:
+  superset-init:
+    environment:
+      NEORETAIL_CONSUMPTION_SCHEMA: serving
+  superset:
+    environment:
+      NEORETAIL_CONSUMPTION_SCHEMA: serving
+    labels:
+      neoretail.runtime: multitenant-fasttrack
+  local-engine:
+    environment:
+      NEORETAIL_CUSTOMER: pandurata
+      SPARK_MASTER: local[2]
+      SPARK_DRIVER_MEMORY: 1g
+      SPARK_LOCAL_IP: 127.0.0.1
+    labels:
+      neoretail.runtime: multitenant-fasttrack
+  embedded-app:
+    environment:
+      ASSISTANT_ENABLED: "false"
+    labels:
+      neoretail.runtime: multitenant-fasttrack

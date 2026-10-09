@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import YAML from "yaml";
+import path from "node:path";
+import { loadTenantRegistry, buildAuthorizedCustomers } from "./tenant-registry.js";
 
 const base = process.env.SMOKE_BASE_URL || "http://localhost:3000";
 const password = process.env.DEMO_USER_PASSWORD;
@@ -7,9 +9,13 @@ if (!password) throw new Error("DEMO_USER_PASSWORD não configurada");
 
 const tenantConfigPath = process.env.TENANTS_CONFIG || "/app/config/tenants.yaml";
 const tenantConfig = YAML.parse(fs.readFileSync(tenantConfigPath, "utf8"));
+const customers = buildAuthorizedCustomers(
+  loadTenantRegistry(process.env.CUSTOMERS_CONFIG_PATH || path.join(path.dirname(tenantConfigPath), "customers.yaml")),
+  tenantConfig,
+);
 
 function expectedDashboardIds(idCustomer) {
-  const modules = new Set(tenantConfig.customers?.[String(idCustomer)]?.modules || []);
+  const modules = new Set(customers[String(idCustomer)]?.modules || []);
   return Object.entries(tenantConfig.dashboards || {})
     .filter(([, dashboard]) => !dashboard.required_module || modules.has(dashboard.required_module))
     .map(([dashboardId]) => dashboardId);

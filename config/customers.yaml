@@ -9,20 +9,50 @@ identity:
   name_column: nm_customer
   rls_column: id_customer
 
-# Escopo ativo da POC: somente AMBEV.
+# Canonical identity. Authorization lives in tenants.yaml.
+# The manual default preserves baseline compatibility; automatic selection uses execution_active.
 # Horarios permanecem desabilitados ate confirmacao do refresh da nova fonte.
 customers:
-  - id_customer: 142
+  - tenant_key: ambev
+    id_customer: 142
     nm_customer: AMBEV
     display_name: AMBEV
     source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV
     source_layout: partitioned_customer_daily_v1
     enabled: true
-    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
+    gold_schema: gold_ambev
+    execution_active: false
     schedule:
       enabled: false
       timezone: America/Sao_Paulo
       cron: null
+
+  - tenant_key: pandurata
+    id_customer: 17066
+    nm_customer: PANDURATA
+    gold_schema: gold_pandurata
+    source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=PANDURATA
+    source_layout: partitioned_customer_daily_v1
+    execution_active: true
+    enabled: true
+
+  - tenant_key: lactalis
+    id_customer: 290
+    nm_customer: LACTALIS
+    gold_schema: gold_lactalis
+    source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=LACTALIS
+    source_layout: partitioned_customer_daily_v1
+    execution_active: true
+    enabled: true
+
+  - tenant_key: safira
+    id_customer: 16868
+    nm_customer: SAFIRA
+    gold_schema: gold_safira
+    source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=SAFIRA
+    source_layout: partitioned_customer_daily_v1
+    execution_active: true
+    enabled: true
 
 validation:
   require_unique_id_customer: true

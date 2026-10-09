@@ -4,26 +4,17 @@ from __future__ import annotations
 import json
 
 from sqlalchemy import text
+from neoretail_bootstrap.core.sql_sources import consumption_sql
 from superset.app import create_app
 
 
 from neoretail_bootstrap.core.layout import Layout
 from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
 from neoretail_bootstrap.core.metrics import metric
+from neoretail_bootstrap.export.options import INDICATORS, indicator_sql
 
 
 DATABASE_NAME = "NeoRetail Gold - PostgreSQL Local"
-INDICATORS = (
-    "Venda",
-    "Cobertura estoque",
-    "Estoque",
-    "Estoque em Trânsito",
-    "ISV (%)",
-    "OSA (%)",
-    "Perda OSA vol.",
-    "Perda OSA R$",
-    "Preço médio (R$)",
-)
 
 # O seletor de indicador segue as fórmulas já usadas nos dashboards NeoRetail
 # (Panorama/Visão geral), evitando criar uma nova definição de negócio só para
@@ -132,9 +123,6 @@ FROM gold.{summary_table} source
 """.strip()
 
 
-def indicator_sql() -> str:
-    values = ",\n    ".join(f"('{value}')" for value in INDICATORS)
-    return f"SELECT indicador FROM (VALUES\n    {values}\n) AS options(indicador)"
 
 
 def pivot_params(dataset, rows, *, daily: bool, value_metric=EXPORT_VALUE):
@@ -429,10 +417,10 @@ def main():
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
                 daily_max_date = connection.execute(
-                    text("SELECT MAX(data) FROM gold.nr_export_daily")
+                    text(consumption_sql("SELECT MAX(data) FROM gold.nr_export_daily"))
                 ).scalar_one()
                 monthly_max_date = connection.execute(
-                    text("SELECT MAX(data) FROM gold.nr_export_monthly")
+                    text(consumption_sql("SELECT MAX(data) FROM gold.nr_export_monthly"))
                 ).scalar_one()
 
         daily_dashboard, daily_charts = build_export_dashboard(

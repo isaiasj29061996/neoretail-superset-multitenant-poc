@@ -16,6 +16,9 @@ def run_tests(directory: Path) -> None:
         if path.name == "test_power_query_runtime.py":
             # Executado dentro do local-engine, onde PySpark/Java estao instalados.
             continue
+        if path.name in ("test_tenant_publisher_integration.py", "test_tenant_marts_integration.py"):
+            # Opt-in integration requires its disposable PostgreSQL, never analytics.
+            continue
         spec = importlib.util.spec_from_file_location(path.stem, path)
         module = importlib.util.module_from_spec(spec)
         assert spec.loader is not None
@@ -223,9 +226,15 @@ def main() -> None:
     customers = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
     )["customers"]
-    assert [row["id_customer"] for row in customers] == [142]
+    assert [row["id_customer"] for row in customers] == [142, 17066, 290, 16868]
     assert customers[0]["nm_customer"] == "AMBEV"
-    assert len({row["source_prefix"] for row in customers}) == 1
+    assert customers[0]["source_prefix"] == "FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV"
+    assert customers[0]["execution_active"] is False
+    configured_prefixes = [row["source_prefix"] for row in customers if row["source_prefix"]]
+    assert len(set(configured_prefixes)) == len(configured_prefixes)
+    for row in customers:
+        if row["execution_active"]:
+            assert row["source_prefix"] and row["source_layout"]
 
     embedded = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in embedded

@@ -2,20 +2,31 @@
 from __future__ import annotations
 
 import json
+import os
+from .sql_sources import rewrite_gold_sources
 def upsert_dataset(session, model, database, name, *, table_name=None, sql=None):
+    schema = os.getenv("NEORETAIL_CONSUMPTION_SCHEMA", "gold")
+    if schema not in ("gold", "serving"):
+        raise ValueError("Unsupported consumption schema")
+    if sql is not None:
+        sql = rewrite_gold_sources(sql, schema)
     dataset = session.query(model).filter(model.table_name == name).one_or_none()
     needs_metadata = dataset is None
     if dataset is None:
-        dataset = model(table_name=name, schema="gold", database=database)
+        dataset = model(table_name=name, schema=schema, database=database)
         session.add(dataset)
     else:
+        source_only = (
+            dataset.schema == "gold" and schema == "serving"
+            and sql == (rewrite_gold_sources(dataset.sql, schema) if dataset.sql is not None else None)
+        )
         needs_metadata = (
-            dataset.sql != sql
+            ((dataset.sql != sql or dataset.schema != schema) and not source_only)
             or (table_name is not None and dataset.table_name != table_name)
             or not dataset.columns
         )
     dataset.database = database
-    dataset.schema = "gold"
+    dataset.schema = schema
     dataset.sql = sql
     if table_name:
         dataset.table_name = table_name

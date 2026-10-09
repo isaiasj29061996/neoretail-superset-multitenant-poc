@@ -1,0 +1,61 @@
+version: "9.0"
+default_customer: 142
+
+# Identidade corporativa oficial. O id_customer vem de
+# DIMENSAO/DIMENSAO_CUSTOMER.snappy.parquet e sera a chave do RLS.
+identity:
+  source_table: dim_customer_raw
+  id_column: id_customer
+  name_column: nm_customer
+  rls_column: id_customer
+
+# Canonical identity. Authorization lives in tenants.yaml.
+# The manual default preserves baseline compatibility; automatic selection uses execution_active.
+# Horarios permanecem desabilitados ate confirmacao do refresh da nova fonte.
+customers:
+  - tenant_key: ambev
+    id_customer: 142
+    nm_customer: AMBEV
+    display_name: AMBEV
+    source_prefix: FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV
+    source_layout: partitioned_customer_daily_v1
+    enabled: true
+    gold_schema: gold_ambev
+    execution_active: false
+    schedule:
+      enabled: false
+      timezone: America/Sao_Paulo
+      cron: null
+
+  - tenant_key: pandurata
+    id_customer: 17066
+    nm_customer: PANDURATA
+    gold_schema: gold_pandurata
+    source_prefix: null # Pending source evidence; execution must fail closed.
+    source_layout: null
+    execution_active: true
+    enabled: true
+
+  - tenant_key: lactalis
+    id_customer: 290
+    nm_customer: LACTALIS
+    gold_schema: gold_lactalis
+    source_prefix: null
+    source_layout: null
+    execution_active: false
+    enabled: true
+
+  - tenant_key: safira
+    id_customer: 16868
+    nm_customer: SAFIRA
+    gold_schema: gold_safira
+    source_prefix: null
+    source_layout: null
+    execution_active: false
+    enabled: true
+
+validation:
+  require_unique_id_customer: true
+  require_unique_nm_customer: true
+  verify_against_dim_customer: true
+  reject_unknown_customer: true

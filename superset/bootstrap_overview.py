@@ -10,6 +10,7 @@ import json
 import uuid
 
 from sqlalchemy import text
+from neoretail_bootstrap.core.sql_sources import consumption_sql
 from superset.app import create_app
 
 from neoretail_bootstrap.core.chart_params import chart_params
@@ -86,10 +87,10 @@ def main():
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
                 tvd_max_date = connection.execute(
-                    text("SELECT MAX(data) FROM gold.nr_tvd_daily")
+                    text(consumption_sql("SELECT MAX(data) FROM gold.nr_tvd_daily"))
                 ).scalar_one()
                 ivd_max_date = connection.execute(
-                    text("SELECT MAX(data) FROM gold.nr_ivd_daily")
+                    text(consumption_sql("SELECT MAX(data) FROM gold.nr_ivd_daily"))
                 ).scalar_one()
 
         specs = chart_specs(tvd_daily, ivd_daily, summary, osa_summary, tvd_max_date, ivd_max_date)

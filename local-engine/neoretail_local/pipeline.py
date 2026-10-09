@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -62,6 +61,19 @@ def write_lake(
     *,
     customer_scoped: bool = False,
 ) -> None:
+    if layer == 'gold':
+        if not customer_scoped:
+            raise RuntimeError('Gold lake publication must be tenant-scoped')
+        from .customers import resolve_tenant
+        context = resolve_tenant(settings.customers_config_path,settings.id_customer,require_source=True)
+        if context != settings.tenant_context:
+            raise RuntimeError('Gold lake context differs from canonical registry')
+        if 'id_customer' not in frame.columns:
+            raise RuntimeError('Gold lake publication requires id_customer')
+        invalid = frame.filter(F.col('id_customer').cast('long').isNull()
+                               | (F.col('id_customer') != F.lit(context.id_customer))).limit(1).count()
+        if invalid:
+            raise RuntimeError('Gold lake publication contains null/foreign tenant')
     path = (
         customer_layer_path(settings, layer, table)
         if customer_scoped
@@ -109,59 +121,9 @@ def write_postgres_customer(
     schema: str,
     table: str,
 ) -> None:
-    """Substitui atomicamente somente o ID_CUSTOMER processado."""
-
-    validate_identifier(schema)
-    validate_identifier(table)
-    if "id_customer" not in frame.columns:
-        raise RuntimeError(f"{schema}.{table}: id_customer ausente")
-    invalid = frame.filter(F.col("id_customer") != F.lit(settings.id_customer)).limit(1).count()
-    if invalid:
-        raise RuntimeError(
-            f"{schema}.{table}: linhas fora do cliente {settings.id_customer}"
-        )
-    suffix = uuid.uuid4().hex[:8]
-    stage = validate_identifier(f"_stage_{table[:40]}_{suffix}")
-    (
-        frame.write.format("jdbc")
-        .option("url", settings.jdbc_url)
-        .option("dbtable", f"{schema}.{stage}")
-        .option("user", settings.analytics_user)
-        .option("password", settings.analytics_password)
-        .option("driver", "org.postgresql.Driver")
-        .option("batchsize", "5000")
-        .mode("overwrite")
-        .save()
-    )
-    quoted_schema = f'"{schema}"'
-    quoted_table = f'"{table}"'
-    quoted_stage = f'"{stage}"'
-    index_name = validate_identifier(f"ix_{table[:45]}_id_customer")
-    try:
-        with psycopg2.connect(settings.psycopg_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f"CREATE TABLE IF NOT EXISTS {quoted_schema}.{quoted_table} "
-                    f"(LIKE {quoted_schema}.{quoted_stage} INCLUDING ALL)"
-                )
-                cursor.execute(
-                    f"DELETE FROM {quoted_schema}.{quoted_table} WHERE id_customer = %s",
-                    (settings.id_customer,),
-                )
-                cursor.execute(
-                    f"INSERT INTO {quoted_schema}.{quoted_table} "
-                    f"SELECT * FROM {quoted_schema}.{quoted_stage}"
-                )
-                cursor.execute(
-                    f"CREATE INDEX IF NOT EXISTS \"{index_name}\" "
-                    f"ON {quoted_schema}.{quoted_table} (id_customer)"
-                )
-                cursor.execute(f"DROP TABLE {quoted_schema}.{quoted_stage}")
-    except Exception:
-        with psycopg2.connect(settings.psycopg_dsn) as cleanup:
-            with cleanup.cursor() as cursor:
-                cursor.execute(f"DROP TABLE IF EXISTS {quoted_schema}.{quoted_stage}")
-        raise
+    """Delegate all tenant writes to the named, validated publisher."""
+    from .postgres_serving import write_postgres_customer_named
+    write_postgres_customer_named(frame, settings, schema, table)
 
 
 def ensure_schemas(settings: Settings) -> None:
@@ -171,7 +133,7 @@ def ensure_schemas(settings: Settings) -> None:
         (settings.data_root / layer).mkdir(parents=True, exist_ok=True)
     with psycopg2.connect(settings.psycopg_dsn) as connection:
         with connection.cursor() as cursor:
-            for schema in ("audit", "bronze", "silver", "gold"):
+            for schema in ("audit", "bronze", "silver", settings.gold_schema):
                 cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
 
 
@@ -348,7 +310,7 @@ def step_03b_silver_facts(settings: Settings, spark) -> dict[str, Any]:
         source = read_lake(
             spark, settings, "bronze", "candidate_customer_daily", customer_scoped=True
         )
-        transformed = build_partitioned_daily_facts(source, settings.id_customer)
+        transformed = build_partitioned_daily_facts(source, settings.id_customer, customer_name=settings.nm_customer)
         written: list[str] = []
         for target, frame in transformed.items():
             write_lake(frame, settings, "silver", target, customer_scoped=True)
@@ -719,7 +681,7 @@ def step_08_quality_gate(settings: Settings, spark) -> dict[str, Any]:
         tenant_ready = "id_customer" in frame.columns
         allow_empty = (
             table == "dim_catalogo_produtos"
-            and "mercado" not in settings.customer.modules
+            and "mercado" not in settings.customer_modules
         )
         checks.append(
             Row(
@@ -818,8 +780,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Pipeline NeoRetail V9 multitenant")
     parser.add_argument("--step", choices=["all", *STEPS], default="all")
     parser.add_argument(
-        "--customer",
-        help="ID_CUSTOMER ou NM_CUSTOMER registrado em config/customers.yaml",
+        "--customer", "--tenant",
+        help="Tenant key, ID_CUSTOMER ou NM_CUSTOMER registrado em config/customers.yaml",
     )
     args = parser.parse_args()
     if args.step == "all":

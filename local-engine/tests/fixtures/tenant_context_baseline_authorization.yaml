@@ -1,0 +1,92 @@
+version: "9.0"
+default_customer_id: 142
+default_dashboard: overview
+
+# Catálogo único consumido pelo portal e pelo bootstrap embedded do Superset.
+# O UUID é estável para que a POC possa ser recriada sem editar o .env.
+dashboards:
+  overview:
+    title: Visão geral — Indústria
+    menu_label: Indústria
+    section: overview
+    slug: neoretail-v9-visao-geral-industria
+    embedded_id: 80291d5e-f3aa-5392-854e-d44c22ae3e0b
+    required_module: visao_industria
+    embedded_height: 980
+  overview_quantity:
+    title: Visão geral — Quantidade
+    menu_label: Visão quantidade
+    section: overview
+    slug: neoretail-v9-visao-geral-quantidade
+    embedded_id: 1bd370c3-bcf1-5f91-a1f0-5800973a805d
+    required_module: visao_industria
+    embedded_height: 1100
+  panorama:
+    title: Panorama — Indústria
+    menu_label: Geral
+    section: panorama
+    slug: neoretail-v9-panorama-industria
+    embedded_id: 3da04b29-3519-5d04-a813-bcffbb1062e8
+    required_module: visao_industria
+    embedded_height: 2700
+  osa:
+    title: Panorama — OSA
+    menu_label: OSA
+    section: panorama
+    slug: neoretail-v9-osa-industria
+    embedded_id: 4d51036e-bb25-56b9-925d-96b367e521bb
+    required_module: visao_industria
+    embedded_height: 2050
+  osa_certified:
+    title: Panorama — OSA — Certificada
+    menu_label: OSA (nova)
+    section: panorama
+    slug: neoretail-v9-osa-industria-certified
+    embedded_id: f4517451-297b-4f6f-bd03-5bd818b057cd
+    required_module: visao_industria
+    embedded_height: 2600
+  tasks:
+    title: Tarefas do dia — Pré-ruptura / Excesso
+    menu_label: Pré-ruptura / Excesso
+    section: tasks
+    slug: neoretail-v9-tarefas-otimizacao-estoque
+    embedded_id: 41b8a47c-9e46-5f87-be63-4efd6757c0bd
+    required_module: tarefas
+    embedded_height: 1500
+  export_daily:
+    title: Exportação — Histórico dia
+    menu_label: Histórico dia
+    section: export
+    slug: neoretail-v9-exportacao-historico-dia
+    embedded_id: a20f5684-8182-5815-95c7-8cf1353bdbcd
+    required_module: exportacao_diaria
+    embedded_height: 1500
+  export_monthly:
+    title: Exportação — Histórico mês
+    menu_label: Histórico mês
+    section: export
+    slug: neoretail-v9-exportacao-historico-mes
+    embedded_id: 535fd5b3-ea7b-56b3-8cf2-94cd8962f88a
+    required_module: exportacao_mensal
+    embedded_height: 1500
+
+navigation:
+  - key: overview
+    label: Visão geral
+  - key: panorama
+    label: Panorama
+  - key: tasks
+    label: Tarefas do dia
+  - key: export
+    label: Exportação
+
+# POC local. Em produção, usuários e permissões virão do backend NeoRetail.
+customer_access:
+  ambev:
+    modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
+
+users:
+  - username: demo.multitenant
+    password_env: DEMO_USER_PASSWORD
+    display_name: Analista POC
+    allowed_customer_ids: [142]

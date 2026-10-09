@@ -9,6 +9,7 @@ import json
 import uuid
 
 from sqlalchemy import text
+from neoretail_bootstrap.core.sql_sources import consumption_sql
 from superset.app import create_app
 
 from neoretail_bootstrap.overview.semantics import HISTORY_SQL, M
@@ -231,7 +232,7 @@ def main():
         with database.get_sqla_engine() as engine:
             with engine.connect() as connection:
                 weekly_max_date = connection.execute(
-                    text("SELECT MAX(data) FROM gold.nr_panorama_weekly")
+                    text(consumption_sql("SELECT MAX(data) FROM gold.nr_panorama_weekly"))
                 ).scalar_one()
         weekly_recent = [sql_filter(
             f"data >= DATE '{weekly_max_date.isoformat()}' - INTERVAL '12 weeks'"

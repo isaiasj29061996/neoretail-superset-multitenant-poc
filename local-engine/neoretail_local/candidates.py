@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
+from azure.core import MatchConditions
 
 from pyspark.sql import Row
 from pyspark.sql import functions as F
@@ -174,9 +175,14 @@ def download_candidate(settings: Settings, candidate: Candidate) -> Path:
         if etag_path.read_text(encoding="utf-8") == etag:
             return target
     temporary = target.with_suffix(target.suffix + f".{uuid.uuid4().hex}.part")
-    with temporary.open("wb") as handle:
-        blob.download_blob(max_concurrency=4).readinto(handle)
-    temporary.replace(target)
+    try:
+        with temporary.open("wb") as handle:
+            blob.download_blob(max_concurrency=4,etag=etag,
+                match_condition=MatchConditions.IfNotModified).readinto(handle)
+        temporary.replace(target)
+    finally:
+        if temporary.is_file():
+            temporary.unlink()
     etag_path.write_text(etag, encoding="utf-8")
     return target
 
@@ -280,7 +286,8 @@ def run(
                     )
             frame = spark.read.parquet(*local_files)
             source_customer = "ID_CUSTOMER" if "ID_CUSTOMER" in frame.columns else "id_customer"
-            invalid = frame.filter(F.col(source_customer).cast("long") != F.lit(settings.id_customer)).limit(1).count()
+            invalid = frame.filter(F.col(source_customer).cast("long").isNull() |
+                                   (F.col(source_customer) != F.lit(settings.id_customer))).limit(1).count()
             if invalid:
                 raise RuntimeError("Fonte diaria particionada contem ID_CUSTOMER fora do tenant selecionado")
             enriched = (

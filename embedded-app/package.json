@@ -9,6 +9,7 @@
     "check": "node --check server.js && node --check src/app.js && node --check smoke.mjs",
     "smoke": "node smoke.mjs",
     "test:assistant": "node --test assistant/tests/*.test.js",
+    "test:tenants": "node --test tests/tenant-registry.test.js",
     "test:assistant:regression": "node assistant/demo-regression.mjs",
     "smoke:assistant": "node assistant/api-smoke.mjs"
   },

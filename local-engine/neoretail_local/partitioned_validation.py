@@ -283,7 +283,7 @@ def validate(settings: Settings, spark) -> dict[str, object]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Gate Silver da origem particionada NeoRetail")
-    parser.add_argument("--customer", default="142")
+    parser.add_argument("--customer", "--tenant")
     args = parser.parse_args()
 
     settings = Settings.from_env(require_blob=False, customer_selector=args.customer)

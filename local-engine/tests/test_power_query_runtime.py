@@ -142,7 +142,7 @@ def test_partitioned_customer_daily_builds_dashboard_contracts(spark):
         "TP_OSA_ROOT_CAUSE": "RUPTURA", "VL_TVD": 5.0, "VL_IVD": 0.0,
         "VL_DAYS_WITH_NO_SALE": 1, "QUANTITY_VALID_ITEM": 1, "BL_RCA_VALID": 1,
     }
-    result = build_partitioned_daily_facts(spark.createDataFrame([row]), 142)
+    result = build_partitioned_daily_facts(spark.createDataFrame([row]), 142, customer_name="AMBEV")
     assert set(result) == {
         "fato_diaria", "fato_semanal", "fato_historico", "fato_ivd_tvd",
         "fato_nivel_atividade", "fato_mensal_causa_osa", "fato_preco",
