@@ -132,7 +132,7 @@ def weekly_inventory_template():
     # Execute the SQL generator without importing the Superset application.
     namespace = {}
     for path, names in (
-        ("superset/bootstrap_overview.py", {"_jinja_filter_predicates"}),
+        ("superset/neoretail_bootstrap/core/filters.py", {"_jinja_filter_predicates"}),
         ("superset/bootstrap_panorama.py", {"weekly_inventory_card_semantic_sql"}),
     ):
         tree = ast.parse(read(path))

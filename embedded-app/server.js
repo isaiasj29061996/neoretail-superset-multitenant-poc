@@ -161,7 +161,7 @@ app.get("/api/catalog", (req, res) => {
     navigation: navigationFor(req.session.identity),
   });
 });
-
+ 
 app.post("/api/context", (req, res) => {
   const identity = req.session.identity;
   if (!identity) return res.status(401).json({ error: "Sessão NeoRetail ausente." });

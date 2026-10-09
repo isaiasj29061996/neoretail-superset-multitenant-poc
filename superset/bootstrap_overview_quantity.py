@@ -5,15 +5,13 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import (
-    _jinja_filter_predicates,
-    chart_params,
-    metric,
-    overview_native_filters,
-    position_json,
-    upsert_chart,
-    upsert_dataset,
-)
+from bootstrap_overview import overview_native_filters, position_json
+
+from neoretail_bootstrap.core.chart_params import chart_params
+from neoretail_bootstrap.core.filters import _jinja_filter_predicates
+from neoretail_bootstrap.core.metadata import upsert_overview_chart as upsert_chart, upsert_dataset
+from neoretail_bootstrap.core.metrics import metric
+
 
 DASHBOARD_TITLE = "NeoRetail V9 — Visão geral quantidade"
 DASHBOARD_SLUG = "neoretail-v9-visao-geral-quantidade"

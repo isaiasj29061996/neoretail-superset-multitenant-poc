@@ -11,11 +11,15 @@ import uuid
 from sqlalchemy import text
 from superset.app import create_app
 
-from bootstrap_overview import (
-    HISTORY_SQL, M, _jinja_filter_predicates, metric, overview_native_filters,
-    upsert_dataset,
-)
+from bootstrap_overview import HISTORY_SQL, M, overview_native_filters
 from bootstrap_overview_quantity import Q, quantity_semantic_sql
+
+
+from neoretail_bootstrap.core.chart_params import custom_params, table_params, comparison_pivot_params
+from neoretail_bootstrap.core.filters import _jinja_filter_predicates
+from neoretail_bootstrap.core.layout import Layout
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
+from neoretail_bootstrap.core.metrics import metric, formatted_metric
 
 
 DASHBOARD_TITLE = "NeoRetail V9 — Panorama Indústria"
@@ -112,11 +116,6 @@ KPI_INDUSTRY_OPTIONS = (
     ("TVD - Pré-Ruptura", "currency"),
     ("IVD - Excesso de estoque", "currency"),
 )
-
-def formatted_metric(label: str, expression: str, d3_format: str) -> dict:
-    result = metric(label, expression)
-    result["d3Format"] = d3_format
-    return result
 
 
 KPI_DIMENSION_VALUE = formatted_metric("KPI valor", "MAX(kpi_value)", ",.2f")
@@ -964,7 +963,6 @@ FROM monthly m JOIN monthly_factors f USING(data,id_customer)
     )
 
 
-
 def monthly_inventory_semantic_sql() -> str:
     """Certified monthly Stock/Giro/ROI/OSA components over the serving mart."""
     checks = " or ".join(f"get_filters('{column}')" for column in WEEKLY_FILTER_COLUMNS)
@@ -1324,41 +1322,8 @@ def sql_filter(expression):
     }
 
 
-def upsert_chart(
-    session, Slice, dataset, title, params, viz_type="neoretail-kpi-card",
-    legacy_titles=(),
-):
-    chart = session.query(Slice).filter(Slice.slice_name == title).one_or_none()
-    if chart is None and legacy_titles:
-        chart = session.query(Slice).filter(Slice.slice_name.in_(legacy_titles)).one_or_none()
-    if chart is None:
-        chart = Slice(slice_name=title)
-        session.add(chart)
-    chart.slice_name = title
-    chart.datasource_type = "table"
-    chart.datasource_id = dataset.id
-    chart.viz_type = viz_type
-    chart.params = json.dumps(params, ensure_ascii=False)
-    chart.description = "Panorama da indústria NeoRetail V9 baseado no PBIX de referência."
-    session.flush()
-    return chart
-
-
-def custom_params(dataset, title, metrics, *, grain="P1M", styles="bar|bar|line", formats="number", groupby=None, variant="panorama", row_limit=10000, labels=None, **extra):
-    params = {
-        "datasource": f"{dataset.id}__table", "viz_type": "neoretail-kpi-card",
-        "x_axis": "data", "time_grain_sqla": grain, "time_range": "No filter",
-        "metrics": metrics, "row_limit": row_limit, "card_title": title,
-        "card_variant": variant, "help_text": title, "metric_labels": labels or "|".join(m["label"] for m in metrics),
-        "metric_formats": formats, "metric_directions": "higher", "chart_styles": styles,
-        "accent_color": "#7C4AD9", "show_tasks": False, "adhoc_filters": [], "groupby": groupby or [],
-    }
-    params.update(extra)
-    return params
-
-
-
 DETAIL_DIMENSIONS = ("regiao", "rede", "hierarquia_1", "item", "activity_level")
+
 
 def detail_semantic_sql(group_column: str) -> str:
     """Power BI-compatible latest snapshot + rolling ROI detail table.
@@ -1635,110 +1600,6 @@ def detail_table_params(dataset, groupby, page_length=20):
         "Estoque custo": {"d3NumberFormat": "$,.2f"},
     }
     return params
-
-
-def table_params(dataset, groupby, metrics, page_length=12):
-    return {
-        "datasource": f"{dataset.id}__table", "viz_type": "table", "query_mode": "aggregate",
-        "groupby": [groupby], "metrics": metrics, "adhoc_filters": [], "time_range": "No filter",
-        "row_limit": 1000, "page_length": page_length, "include_search": True,
-        "server_pagination": False, "order_desc": True, "table_timestamp_format": "%d/%m/%Y",
-        "percent_metrics": [], "align_pn": False, "color_pn": False, "show_cell_bars": False,
-    }
-
-
-def comparison_pivot_params(dataset, rows, metrics):
-    """Power BI matrix equivalent: hierarchy rows and mixed semantic metrics."""
-    return {
-        "datasource": f"{dataset.id}__table",
-        "viz_type": "pivot_table_v2",
-        "groupbyRows": list(rows),
-        "groupbyColumns": [],
-        "metrics": metrics,
-        "adhoc_filters": [],
-        "time_range": "Current year",
-        # The AMBEV retail hierarchy has more than 2,000 leaf rows.  The PBIP
-        # matrix has no Top N filter, so the Superset contract must not silently
-        # truncate it at the former 1,000-row default.
-        "row_limit": 10000,
-        "order_desc": True,
-        "aggregateFunction": "Sum",
-        "rowOrder": "value_z_to_a",
-        "colOrder": "key_a_to_z",
-        "transposePivot": False,
-        "combineMetric": False,
-        "showRowTotals": True,
-        "showColTotals": False,
-        "expandRows": False,
-        # Pivot v2 accepts per-metric columnFormats. Keep SMART_NUMBER as
-        # fallback, but preserve the Power BI percentage/currency formats for
-        # mixed matrices such as Sell out + Markup and Estoque + ROI.
-        "columnFormats": {
-            item["label"]: item.get("d3Format")
-            for item in metrics
-            if isinstance(item, dict) and item.get("label") and item.get("d3Format")
-        },
-        "valueFormat": "SMART_NUMBER",
-        "date_format": "%m/%Y",
-    }
-
-
-class Layout:
-    def __init__(self):
-        self.nodes = {
-            "ROOT_ID": {"id": "ROOT_ID", "type": "ROOT", "children": ["GRID_ID"]},
-            "GRID_ID": {"id": "GRID_ID", "type": "GRID", "parents": ["ROOT_ID"], "children": []},
-        }
-        self.counter = 0
-
-    def _id(self, prefix):
-        self.counter += 1
-        return f"{prefix}-{self.counter}"
-
-    def tabs(self, parent, parents, title, entries, height=52):
-        tabs_id = self._id("TABS")
-        tab_ids = []
-        self.nodes[tabs_id] = {"id": tabs_id, "type": "TABS", "parents": parents, "children": tab_ids, "meta": {"defaultText": title}}
-        self.nodes[parent]["children"].append(tabs_id)
-        for label, chart_rows in entries:
-            tab_id = self._id("TAB")
-            tab_ids.append(tab_id)
-            self.nodes[tab_id] = {"id": tab_id, "type": "TAB", "parents": [*parents, tabs_id], "children": [], "meta": {"text": label}}
-            for row_charts in chart_rows:
-                # A compact, full-width control bar precedes the tall KPI
-                # hierarchy charts. All other layouts retain their heights.
-                row_height = row_charts.get("height", height) if isinstance(row_charts, dict) else height
-                content = row_charts["charts"] if isinstance(row_charts, dict) else row_charts
-                self.row(tab_id, [*parents, tabs_id, tab_id], content, row_height)
-        return tabs_id
-
-    def period_tabs(self, parent, parents, title, entries, height=52):
-        """Render business views with an inner Mensal/Semanal selector."""
-        outer_id = self._id("TABS")
-        outer_tabs = []
-        self.nodes[outer_id] = {"id": outer_id, "type": "TABS", "parents": parents, "children": outer_tabs, "meta": {"defaultText": title}}
-        self.nodes[parent]["children"].append(outer_id)
-        for label, periods in entries:
-            tab_id = self._id("TAB")
-            outer_tabs.append(tab_id)
-            tab_parents = [*parents, outer_id]
-            self.nodes[tab_id] = {"id": tab_id, "type": "TAB", "parents": tab_parents, "children": [], "meta": {"text": label}}
-            self.tabs(tab_id, [*tab_parents, tab_id], f"Período de {label}", [
-                (period.title(), [[*chart] if isinstance(chart, (list, tuple)) else [chart]])
-                for period, chart in periods
-            ], height)
-        return outer_id
-
-    def row(self, parent, parents, charts, height):
-        row_id = self._id("ROW")
-        children = []
-        self.nodes[row_id] = {"id": row_id, "type": "ROW", "parents": parents, "children": children, "meta": {"background": "BACKGROUND_TRANSPARENT"}}
-        self.nodes[parent]["children"].append(row_id)
-        widths = [3, 9] if len(charts) == 2 and "Resumo" in charts[0].slice_name else [max(1, 12 // len(charts))] * len(charts)
-        for chart, width in zip(charts, widths):
-            chart_id = f"CHART-{chart.id}"
-            children.append(chart_id)
-            self.nodes[chart_id] = {"id": chart_id, "type": "CHART", "parents": [*parents, row_id], "children": [], "meta": {"chartId": chart.id, "height": height, "width": width, "sliceName": chart.slice_name, "uuid": str(chart.uuid)}}
 
 
 def main():
