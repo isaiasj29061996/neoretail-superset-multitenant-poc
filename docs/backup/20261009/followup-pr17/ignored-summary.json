@@ -1,0 +1,201 @@
+{
+  "ignored_files_inventoried": 2718,
+  "original_reports": {
+    "count": 20,
+    "sha256_unchanged": true,
+    "github_copies": "../reports/ (sanitized)",
+    "originals_external_required": true
+  },
+  "worktrees": [
+    {
+      "name": "NeoRetail_V8_1_LOCAL_POSTGRES",
+      "categories": {
+        "PRIVATE_CONFIGURATION_EXTERNAL": 1,
+        "LOCAL_ARTIFACT_REVIEW_EXTERNAL": 1,
+        "ORIGINAL_EVIDENCE_OR_TOOLING_EXTERNAL": 370,
+        "PRIVATE_DATA_OR_SOURCE_EXTERNAL": 6
+      },
+      "excluded_from_walk": [
+        ".git",
+        ".pytest_cache",
+        ".worktrees",
+        "blob-profiler/__pycache__",
+        "generated/preformat_backup_20261009_093737",
+        "generated/preformat_followup_20261009_095930",
+        "local-engine/.pytest_cache",
+        "local-engine/neoretail_local/__pycache__",
+        "local-engine/notebooks/__pycache__",
+        "local-engine/tests/__pycache__",
+        "scripts/__pycache__",
+        "superset/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "governed-assistant",
+      "categories": {
+        "PRIVATE_CONFIGURATION_EXTERNAL": 1
+      },
+      "excluded_from_walk": [
+        ".pytest_cache",
+        "blob-profiler/__pycache__",
+        "local-engine/neoretail_local/__pycache__",
+        "local-engine/notebooks/__pycache__",
+        "local-engine/tests/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "governed-assistant-ambev",
+      "categories": {
+        "PRIVATE_CONFIGURATION_EXTERNAL": 1,
+        "LOCAL_ARTIFACT_REVIEW_EXTERNAL": 1
+      },
+      "excluded_from_walk": [
+        "embedded-app/node_modules",
+        "local-engine/.pytest_cache"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "integration-pr3",
+      "categories": {
+        "LOCAL_ARTIFACT_REVIEW_EXTERNAL": 1
+      },
+      "excluded_from_walk": [
+        "embedded-app/node_modules"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "multitenant-fasttrack",
+      "categories": {
+        "ORIGINAL_EVIDENCE_OR_TOOLING_EXTERNAL": 106
+      },
+      "excluded_from_walk": [
+        "local-engine/neoretail_local/__pycache__",
+        "local-engine/tests/__pycache__",
+        "scripts/__pycache__",
+        "superset/__pycache__",
+        "superset/neoretail_bootstrap/__pycache__",
+        "superset/neoretail_bootstrap/core/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "multitenant-tenant-context",
+      "categories": {},
+      "excluded_from_walk": [],
+      "read_error_count": 0
+    },
+    {
+      "name": "osa-industry",
+      "categories": {
+        "PRIVATE_CONFIGURATION_EXTERNAL": 1,
+        "LOCAL_ARTIFACT_REVIEW_EXTERNAL": 7,
+        "ORIGINAL_EVIDENCE_OR_TOOLING_EXTERNAL": 2182,
+        "PRIVATE_DATA_OR_SOURCE_EXTERNAL": 35
+      },
+      "excluded_from_walk": [
+        ".chrome-headless",
+        ".chrome-selenium",
+        ".pytest_cache",
+        "embedded-app/node_modules",
+        "generated/f13_test_dependencies",
+        "generated/neoretail-start-1f2qu0l0",
+        "generated/neoretail-start-1j8qapua",
+        "generated/neoretail-start-1x7w4wv2",
+        "generated/neoretail-start-5s1k31dk",
+        "generated/neoretail-start-67hexfk0",
+        "generated/neoretail-start-a534ef1v",
+        "generated/neoretail-start-elnnfzs2",
+        "generated/neoretail-start-j0et6143",
+        "generated/neoretail-start-m5yhdx01",
+        "generated/neoretail-start-s_foovc0",
+        "generated/neoretail-start-toh24w8q",
+        "generated/neoretail-start-x6r_w2g0",
+        "generated/neoretail-start-yea9y6w2",
+        "generated/neoretail-start-zhtweann",
+        "generated/__pycache__",
+        "local-engine/neoretail_local/__pycache__",
+        "local-engine/tests/__pycache__",
+        "scripts/__pycache__",
+        "superset/__pycache__",
+        "superset/neoretail_bootstrap/__pycache__",
+        "superset/neoretail_bootstrap/core/__pycache__",
+        "superset/neoretail_bootstrap/overview/__pycache__",
+        "superset/neoretail_bootstrap/pbip_overview/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "overview-quantity",
+      "categories": {},
+      "excluded_from_walk": [
+        ".pytest_cache",
+        "blob-profiler/__pycache__",
+        "local-engine/neoretail_local/__pycache__",
+        "local-engine/notebooks/__pycache__",
+        "local-engine/tests/__pycache__",
+        "superset/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "panorama-sales-evolution",
+      "categories": {
+        "ORIGINAL_EVIDENCE_OR_TOOLING_EXTERNAL": 1
+      },
+      "excluded_from_walk": [
+        ".worktrees",
+        "superset/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "panorama-stock",
+      "categories": {
+        "ORIGINAL_EVIDENCE_OR_TOOLING_EXTERNAL": 4
+      },
+      "excluded_from_walk": [
+        ".pytest_cache",
+        "superset/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "superset-bootstrap-core",
+      "categories": {},
+      "excluded_from_walk": [],
+      "read_error_count": 0
+    },
+    {
+      "name": "superset-osa-certified-modules",
+      "categories": {},
+      "excluded_from_walk": [],
+      "read_error_count": 0
+    },
+    {
+      "name": "superset-overview-modules",
+      "categories": {},
+      "excluded_from_walk": [
+        "superset/neoretail_bootstrap/__pycache__",
+        "superset/neoretail_bootstrap/core/__pycache__"
+      ],
+      "read_error_count": 0
+    },
+    {
+      "name": "superset-panorama-modules",
+      "categories": {},
+      "excluded_from_walk": [
+        "superset/neoretail_bootstrap/__pycache__",
+        "superset/neoretail_bootstrap/core/__pycache__"
+      ],
+      "read_error_count": 0
+    }
+  ],
+  "details": "Full private local inventory is generated/preformat_followup_20261009_095930/ignored_inventory.json; copy generated directories externally. Runtime output/configuration may contain private data.",
+  "external_destination": "Not yet provided or verified; only C: available",
+  "docker_engine": "Unavailable; no dump or restore performed",
+  "safe_to_format": false
+}
