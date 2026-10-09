@@ -189,7 +189,7 @@ def main():
                 semantic, "Distribuição e sortimento",
                 [Q["stores"], Q["items"], Q["stores_u3m"], Q["items_u3m"]],
                 profile="distribution_bundle", labels="Quantidade de lojas|Quantidade de itens",
-                help_text="PENDENTE_DADOS: positivacao está ausente no snapshot AMBEV; regra DAX preservada sem substituição por IDs.",
+                help_text="PENDENTE_DADOS: positivacao está ausente no snapshot publicado; regra DAX preservada sem substituição por IDs.",
             )),
             ("% OSA", comparison_params(semantic, "% OSA", [Q["osa_problem"], Q["osa_active"]], profile="one_minus_ratio", fmt="percent", show_tasks=True, critical_metric=Q["osa_critical"], risk_metric=Q["osa_risk"])),
             ("Ruptura", comparison_params(semantic, "Ruptura", [Q["rupture_num"], Q["status_den"]], profile="ratio_percent", fmt="percent", direction="lower", show_tasks=True, critical_metric=Q["rup_critical"], risk_metric=Q["rup_risk"])),

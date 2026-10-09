@@ -187,6 +187,10 @@ def main() -> None:
         "38_export_retail_summary.sql": [
             "nr_export_daily_retail_summary", "nr_export_monthly_retail_summary",
         ],
+        "45_osa_certified_semantic.sql": [
+            "nr_osa_monthly_default", "nr_osa_weekly_default",
+            "nr_osa_causes_default", "nr_osa_matrix_default",
+        ],
     }
     for filename, mart_names in performance_marts.items():
         sql = (ROOT / "analytics-db/marts" / filename).read_text(encoding="utf-8")
@@ -199,6 +203,7 @@ def main() -> None:
         ROOT / "superset/bootstrap_overview_quantity.py",
         ROOT / "superset/bootstrap_panorama.py",
         ROOT / "superset/bootstrap_osa_industry.py",
+        ROOT / "superset/bootstrap_osa_industry_certified.py",
         ROOT / "superset/bootstrap_stock_optimization.py",
         ROOT / "superset/bootstrap_export.py",
         ROOT / "superset/bootstrap_embedded.py",
@@ -232,10 +237,10 @@ def main() -> None:
     )
     assert tenants["default_dashboard"] == "overview"
     assert set(tenants["dashboards"]) == {
-        "overview", "overview_quantity", "panorama", "osa", "tasks",
-        "export_daily", "export_monthly",
+        "overview", "overview_quantity", "panorama", "osa", "osa_certified",
+        "tasks", "export_daily", "export_monthly",
     }
-    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 7
+    assert len({item["embedded_id"] for item in tenants["dashboards"].values()}) == 8
     assert [item["key"] for item in tenants["navigation"]] == [
         "overview", "panorama", "tasks", "export"
     ]

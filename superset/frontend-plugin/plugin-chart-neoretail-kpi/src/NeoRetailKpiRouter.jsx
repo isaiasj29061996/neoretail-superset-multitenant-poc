@@ -1,6 +1,7 @@
 import React from 'react';
 
 import NeoRetailKpi from './NeoRetailKpi';
+import KpiFilterBar from './KpiFilterBar';
 import formatValue from './formatValue';
 
 const trend = (value, reference, lowerIsBetter) => {
@@ -117,6 +118,7 @@ function QuantityComparison(props) {
 }
 
 export default function NeoRetailKpiRouter(props) {
+  if (props.variant === 'kpifilters') return <KpiFilterBar {...props} />;
   if (props.variant === 'quantitycompare' || props.variant === 'quantitycompareplain') {
     return <QuantityComparison {...props} />;
   }

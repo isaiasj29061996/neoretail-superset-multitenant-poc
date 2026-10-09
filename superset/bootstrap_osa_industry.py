@@ -46,6 +46,9 @@ JOIN (
 ) d ON d.id_customer = h.id_customer AND d.max_data = h.data
 """.strip()
 
+LEGACY_SELLOUT = metric("Venda sell out", "CASE WHEN SUM(faturamento_sum) > 0 THEN SUM(faturamento_sum) ELSE SUM(fallback_sellout_sum) END")
+LEGACY_OSA_LOSS = metric("Perda OSA", "SUM(osa_loss_qty_sum) * (SUM(avg_sales_price_sum) / NULLIF(SUM(avg_sales_price_count), 0))")
+
 LOSS_VALUE = metric("Perda R$ OSA", "SUM(loss_value_sum)")
 LOSS_PERCENT = metric("% Perda", "100.0 * SUM(qtd_perda_osa) * AVG(avg_sales_price) / NULLIF(CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END, 0)")
 LOSS_PERCENT_SUMMARY = metric(
@@ -138,8 +141,8 @@ def main():
 
         top_metrics = [
             OVERVIEW_M["osa"],
-            OVERVIEW_M["sellout"],
-            OVERVIEW_M["osa_loss"],
+            LEGACY_SELLOUT,
+            LEGACY_OSA_LOSS,
             LOSS_PERCENT_SUMMARY,
         ]
         top = custom_params(

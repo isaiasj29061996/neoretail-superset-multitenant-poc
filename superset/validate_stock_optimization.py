@@ -1,3 +1,4 @@
+import os
 """Execute every stock-optimization dashboard query through Superset."""
 import json
 
@@ -26,7 +27,7 @@ with app.test_request_context('/'):
     for chart in sorted(dashboard.slices, key=lambda item: item.id):
         form = json.loads(chart.params)
         metrics = form.get('metrics', [])
-        filters = [{'col': 'id_customer', 'op': 'IN', 'val': [142]}]
+        filters = [{'col': 'id_customer', 'op': 'IN', 'val': [int(os.getenv('NEORETAIL_VALIDATION_CUSTOMER', '142'))]}]
         sql_filters = [
             item.get('sqlExpression') for item in form.get('adhoc_filters', [])
             if item.get('expressionType') == 'SQL' and item.get('sqlExpression')
