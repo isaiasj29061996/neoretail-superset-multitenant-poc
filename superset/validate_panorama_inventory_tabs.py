@@ -13,7 +13,7 @@ from superset.app import create_app
 
 from profile_dashboard_performance import build_queries
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 DASHBOARD = "neoretail-v9-panorama-industria"
 
 

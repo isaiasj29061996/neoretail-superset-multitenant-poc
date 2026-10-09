@@ -1,0 +1,133 @@
+{
+  "timestamp": "2026-10-09T09:50:15.927934-03:00",
+  "url": "https://github.com/isaiasj29061996/neoretail-superset-multitenant-poc",
+  "fresh_network_clone": true,
+  "no_shared_objects": true,
+  "git_fsck_full_strict": true,
+  "osa_checkout_clean": true,
+  "redacted_reports_present": 20,
+  "windows_long_paths_required_at_deep_clone_location": true,
+  "branches": [
+    {
+      "branch": "backup/root-pre-format-20261009",
+      "commit": "ef6b3a50bede92d1c6b9ebe645fa2ed5f1b909ca",
+      "tree": "ae0a072247ca70247b30ad99ef0e20805a2f0e4d",
+      "files_verified": 215,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/governed-assistant-pre-format-20261009",
+      "commit": "f7bc712cf8e95f109f1179e8ae41e4884c55f70b",
+      "tree": "7eb5823e09d653fac91518e15dd23d0931a4a1c1",
+      "files_verified": 134,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/governed-assistant-ambev-pre-format-20261009",
+      "commit": "c0d469c9501f37c18c50b6ba6018157e93958f2f",
+      "tree": "42050b63da2552942ab68fc6e6ba22bdf8cfa668",
+      "files_verified": 177,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/integration-pr3-pre-format-20261009",
+      "commit": "e56ea05e51c63a99e37c75fe68764e2d1b76f16e",
+      "tree": "963e040423c0297c90cec542e50eb93ff3cafe27",
+      "files_verified": 150,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/multitenant-fasttrack-pre-format-20261009",
+      "commit": "688723e9c8f227d91d6df0e19d1b08bc11acfd58",
+      "tree": "cbf664e19d82fd13f45c19709dc8936f503436a6",
+      "files_verified": 278,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/multitenant-tenant-context-pre-format-20261009",
+      "commit": "83a0c6bc5e90c3f082e839a079ce3e82af34c9d8",
+      "tree": "e1558df6bd4f448a3fafc6bea10eb02079229d20",
+      "files_verified": 253,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/osa-industry-pre-format-20261009",
+      "commit": "0c870a53d5740243a3cbcdd49584fa6e505e4db8",
+      "tree": "bb560a5c68d24d5bc53844f53d60f9d6728129a1",
+      "files_verified": 343,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/overview-quantity-pre-format-20261009",
+      "commit": "8dac7fcfbdb7677a71a8c504bbf7b91bbb03b3c3",
+      "tree": "644129e94daca2502a77f9843a773feae260fa87",
+      "files_verified": 156,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/panorama-sales-evolution-pre-format-20261009",
+      "commit": "1a47a8ebd5bbe44e71be3ff84ae49f362f384376",
+      "tree": "e0c660157efa9e1fa7cbd09109fb3ca880bf7888",
+      "files_verified": 182,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/panorama-stock-pre-format-20261009",
+      "commit": "4bec5ff7e320d8ef1753cfd2d46be53d9dda8053",
+      "tree": "da6d339dfed2727ea0ae231a73c1cb0db7602132",
+      "files_verified": 200,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/superset-bootstrap-core-pre-format-20261009",
+      "commit": "a5f2a558b88366b58277d282888291a16129e2c0",
+      "tree": "a653d904ba2ae2d4f1acc8d11d723967c7292a0e",
+      "files_verified": 215,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/superset-osa-certified-modules-pre-format-20261009",
+      "commit": "d30af427b9b367b05383138ddc3605e893b3ac2f",
+      "tree": "9531ab47e669651ca25b503f8e04837b10b9d687",
+      "files_verified": 247,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/superset-overview-modules-pre-format-20261009",
+      "commit": "a1337e98f4415ad8b4d04bd2135a8fb47bb677b8",
+      "tree": "770714cd57db6265df3e90545600be57301552dc",
+      "files_verified": 238,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/superset-panorama-modules-pre-format-20261009",
+      "commit": "8080801ab0570f9e2b4edf4c638714cf7b449ee5",
+      "tree": "eaf3fc1f32c891862d2d97cf069d0d17be8521a2",
+      "files_verified": 230,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/test-overview-quantity-stacked-pre-format-20261009",
+      "commit": "faad0dda40673b3f318baa9bae30acef9842bff6",
+      "tree": "a0ab2dbc64bc298e56c8debf29aeae32f0a6d273",
+      "files_verified": 155,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/test-remove-overview-quantity-pre-format-20261009",
+      "commit": "1b415ecbcd3c6b8ffa45aa5b58afb459a5fbcda2",
+      "tree": "3ed6b8a99ba3b793ddac85d775c02c2c3cea01b2",
+      "files_verified": 149,
+      "exact_tree_match": true
+    },
+    {
+      "branch": "backup/wip-lactalis-rebuild-safe-20261007-pre-format-20261009",
+      "commit": "d8e03e61d0257addbe131a4f4c66678c78b2d697",
+      "tree": "af8c9ce7ea6a79042d28a370a4bee3d72ea7758f",
+      "files_verified": 232,
+      "exact_tree_match": true
+    }
+  ],
+  "external_backup_completed": false,
+  "safe_to_format": false
+}

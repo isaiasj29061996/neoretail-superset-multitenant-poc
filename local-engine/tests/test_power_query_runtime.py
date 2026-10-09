@@ -36,7 +36,7 @@ def contract():
 def test_monthly_fact_recreates_power_query_date_and_types(spark):
     source = spark.createDataFrame([{
         "vl_month": "9", "vl_year": "2026", "id_item": 10,
-        "ID_LOCATION": 20, "QTD_PERDA_OSA": "1.5", "QTD_PROBLEMAS_OSA": "2",
+        "ID_LOCATION": 20, "QTD_PERDA_OSA": "1.5", "VL_PERDA_OSA": "9.75", "QTD_PROBLEMAS_OSA": "2",
         "QTD_ITENS_ATIVOS": "3", "VOLUME_UNIDADES": "4.5", "FATURAMENTO": "5.5",
         "PRECO_MEDIO": "6.5", "CAUSA_OSA": "causa", "MOTIVO_OSA": "motivo",
     }])
@@ -47,6 +47,7 @@ def test_monthly_fact_recreates_power_query_date_and_types(spark):
     assert str(row.data) == "2026-09-01"
     assert row.id_item == "10"
     assert row.qtd_problemas_osa == 2
+    assert row.vl_perda_osa == 9.75
     assert "vl_month" not in result.columns
 
 
@@ -125,10 +126,11 @@ def test_dimensions_apply_customer_and_retailer_contracts(spark):
     assert result["dim_catalogo_local"].count() == 1
 
 
-def test_partitioned_customer_daily_builds_dashboard_contracts(spark):
+@pytest.mark.parametrize('customer_id,customer_name', [(142, 'AMBEV'), (290, 'LACTALIS')])
+def test_partitioned_customer_daily_builds_dashboard_contracts(spark, customer_id, customer_name):
     row = {
         "id_time": "2026-09-09", "id_location": 20, "id_item": 10,
-        "ID_CUSTOMER": 142, "VL_QUANTITY_SOLD": 2.0,
+        "ID_CUSTOMER": customer_id, "VL_QUANTITY_SOLD": 2.0,
         "VL_SALES_TOTAL_VALUE": 20.0, "VL_QUANTITY_IN_STOCK": 8.0,
         "VL_STOCK_IN_WAREHOUSE": 3.0, "VL_SECURITY_STOCK": 2.0,
         "VL_MAX_STOCK": 12.0, "VL_SALES_PRICE": 10.0, "VL_PRICE_COST": 7.0,
@@ -141,14 +143,30 @@ def test_partitioned_customer_daily_builds_dashboard_contracts(spark):
         "TP_OSA_ROOT_CAUSE": "RUPTURA", "VL_TVD": 5.0, "VL_IVD": 0.0,
         "VL_DAYS_WITH_NO_SALE": 1, "QUANTITY_VALID_ITEM": 1, "BL_RCA_VALID": 1,
     }
-    result = build_partitioned_daily_facts(spark.createDataFrame([row]), 142)
+    result = build_partitioned_daily_facts(spark.createDataFrame([row]), customer_id, customer_name=customer_name)
     assert set(result) == {
         "fato_diaria", "fato_semanal", "fato_historico", "fato_ivd_tvd",
         "fato_nivel_atividade", "fato_mensal_causa_osa", "fato_preco",
         "etl_calc_v2", "calculo_oportunidades",
     }
-    assert result["fato_diaria"].first().id_customer == 142
+    assert result["fato_diaria"].first().id_customer == customer_id
+    assert result["fato_preco"].first().customer == customer_name
     assert result["fato_semanal"].first().cd_week == "2026-37"
     opportunity = result["calculo_oportunidades"].first()
     assert str(opportunity.tvd) == "5.0000"
     assert opportunity.regra_critico == "F"
+    osa = result["fato_mensal_causa_osa"].first()
+    assert osa.vl_perda_osa == 10.0
+    assert osa.qtd_perda_osa == 1.0
+    assert osa.motivo_osa == "Ruptura na loja"
+
+
+def test_partitioned_source_rejects_null_or_foreign_identity(spark):
+    from neoretail_local.partitioned_daily import REQUIRED, _base
+    columns = sorted(REQUIRED)
+    for invalid in (None, '142', '17066'):
+        row = {column: '0' for column in columns}
+        row['id_customer'] = invalid
+        frame = spark.createDataFrame([tuple(row[c] for c in columns)], ', '.join(c + ' string' for c in columns))
+        with pytest.raises(RuntimeError, match='tenant'):
+            _base(frame, 290)

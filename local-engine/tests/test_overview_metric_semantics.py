@@ -1,11 +1,15 @@
 from pathlib import Path
 
+from overview_contract_sources import read_overview
+
 
 HOST_ROOT = Path(__file__).resolve().parents[2]
 ROOT = Path("/repo") if Path("/repo/.git").exists() else HOST_ROOT
 
 
 def _read(relative_path: str) -> str:
+    if relative_path == "superset/bootstrap_overview.py":
+        return read_overview(ROOT)
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 

@@ -10,8 +10,13 @@ import json
 from sqlalchemy import text
 from superset.app import create_app
 
-from bootstrap_overview import headline_semantic_sql, metric, upsert_dataset
-from bootstrap_panorama import Layout, custom_params, upsert_chart
+from neoretail_bootstrap.overview.semantics import headline_semantic_sql
+
+
+from neoretail_bootstrap.core.chart_params import custom_params
+from neoretail_bootstrap.core.layout import Layout
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
+from neoretail_bootstrap.core.metrics import metric
 
 
 DASHBOARD_TITLE = "NeoRetail V9 — Tarefas de Otimização — Estoque"

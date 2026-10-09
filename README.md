@@ -328,6 +328,7 @@ docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_overview_quantity.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_panorama.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry.py
+docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_osa_industry_certified.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_stock_optimization.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_export.py
 docker compose exec -T superset /app/.venv/bin/python /app/pythonpath/bootstrap_embedded.py
@@ -347,6 +348,11 @@ reconciliação fonte → mart → ChartData e medições antes/depois, está em
 O contrato do seletor `AP_KPI_INDUSTRIA`, os três gráficos horizontais com
 drill, a reconciliação das dez opções e a otimização do caminho padrão estão em
 [docs/metric_certification_panorama_kpi_dimensions.md](docs/metric_certification_panorama_kpi_dimensions.md).
+
+A reconstrução isolada do Panorama OSA, incluindo Valor/Quantidade,
+Mensal/Semanal, `VL_PERDA_OSA`, períodos, motivos/causas, matrizes e o gate
+fonte → ChartData está em
+[docs/metric_certification_osa_industry.md](docs/metric_certification_osa_industry.md).
 
 ---
 
@@ -702,3 +708,8 @@ Ela tenta provar que:
 A etapa de backend/query com até **10 usuários simultâneos** foi concluída. A
 próxima evidência é o benchmark **E2E/HTTP** e, depois, a validação sobre o
 **DW real**.
+# Assistente local opcional
+
+Veja [inicialização com mock/Ollama, autorização de download e testes](docs/assistant_local_startup.md).
+O fluxo normal continua sendo `.\start.ps1`; use `-Assistant` para habilitar a
+camada opcional e `-PullModel` para autorizar download de modelo ausente.

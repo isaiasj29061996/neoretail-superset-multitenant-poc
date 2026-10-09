@@ -1,0 +1,1898 @@
+{
+  "sql": {
+    "monthly_overview_sql": "WITH history_filtered AS (\n  SELECT\n    h.mes_ano::date AS data,h.id_customer,h.id_item,h.id_location,\n    h.volume_unidades,h.faturamento,h.qtd_perda_osa,\n    h.qtd_problemas_osa,h.qtd_item_ativo_osa,h.avg_sales_price,\n    h.tp_activity_level\n  FROM gold.fato_historico h\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=h.id_customer AND l.id_location=h.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=h.id_customer AND i.id_item=h.id_item\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND h.tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND h.tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), cause_filtered AS (\n  SELECT\n    c.data,c.id_customer,c.id_item,c.id_location,\n    c.qtd_perda_osa,c.vl_perda_osa,c.qtd_problemas_osa,\n    c.qtd_itens_ativos,c.volume_unidades,c.faturamento,c.preco_medio\n  FROM gold.fato_mensal_causa_osa c\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=c.id_customer AND l.id_location=c.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=c.id_customer AND i.id_item=c.id_item\n  LEFT JOIN gold.calculo_oportunidades o\n    ON o.id_customer=c.id_customer\n   AND o.id_location::text=c.id_location::text\n   AND o.id_item::text=c.id_item::text\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), measures AS (\n  SELECT DISTINCT id_customer,nm_measure\n  FROM gold.nr_conversion_options m\n  WHERE 1=1\n{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}\n{% if measure_filters|length == 0 %}\n  AND m.nm_measure='unidade'\n{% else %}\n  {% for filter in measure_filters %}\n    {% if filter.get('op') == 'IN' %}\n      AND m.nm_measure IN {{ filter.get('val') | where_in }}\n    {% elif filter.get('op') == 'NOT IN' %}\n      AND m.nm_measure NOT IN {{ filter.get('val') | where_in }}\n    {% endif %}\n  {% endfor %}\n{% endif %}\n), hist_month AS (\n  SELECT\n    h.data,h.id_customer,\n    SUM(COALESCE(h.faturamento,0))::float8 AS faturamento_sum,\n    SUM(COALESCE(h.volume_unidades,0))::float8 AS volume_sum,\n    SUM(COALESCE(h.qtd_perda_osa,0))::float8 AS loss_qty_sum,\n    SUM(COALESCE(h.qtd_problemas_osa,0))::float8 AS problem_sum,\n    SUM(COALESCE(h.qtd_item_ativo_osa,0))::float8 AS active_sum,\n    SUM(h.avg_sales_price)::float8 AS sales_price_sum,\n    COUNT(h.avg_sales_price)::bigint AS sales_price_count\n  FROM history_filtered h\n  GROUP BY h.data,h.id_customer\n), cause_month AS (\n  SELECT\n    c.data,c.id_customer,\n    SUM(COALESCE(c.qtd_perda_osa,0))::float8 AS loss_qty_sum,\n    SUM(COALESCE(c.vl_perda_osa,0))::float8 AS loss_value_sum,\n    SUM(COALESCE(c.qtd_problemas_osa,0))::float8 AS problem_sum,\n    SUM(COALESCE(c.qtd_itens_ativos,0))::float8 AS active_sum,\n    SUM(COALESCE(c.volume_unidades,0))::float8 AS volume_sum,\n    SUM(COALESCE(c.faturamento,0))::float8 AS faturamento_sum,\n    SUM(COALESCE(c.preco_medio,0))::float8 AS price_sum\n  FROM cause_filtered c\n  GROUP BY c.data,c.id_customer\n), hist_factor AS (\n  SELECT\n    h.data,h.id_customer,m.nm_measure,\n    COALESCE(MAX(cv.conversion_rate),\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_factor\n  FROM (SELECT DISTINCT data,id_customer,id_item FROM history_filtered) h\n  JOIN measures m ON m.id_customer=h.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=h.id_customer\n   AND cv.id_item::text=h.id_item::text\n   AND cv.nm_measure=m.nm_measure\n  GROUP BY h.data,h.id_customer,m.nm_measure\n), cause_factor AS (\n  SELECT\n    c.data,c.id_customer,m.nm_measure,\n    COALESCE(MAX(cv.conversion_rate),\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_factor\n  FROM (SELECT DISTINCT data,id_customer,id_item FROM cause_filtered) c\n  JOIN measures m ON m.id_customer=c.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=c.id_customer\n   AND cv.id_item::text=c.id_item::text\n   AND cv.nm_measure=m.nm_measure\n  GROUP BY c.data,c.id_customer,m.nm_measure\n)\nSELECT\n  h.data,h.id_customer,hf.nm_measure,\n  CASE\n    WHEN h.faturamento_sum>0 THEN h.faturamento_sum\n    WHEN hf.conversion_factor IS NOT NULL AND h.sales_price_count>0\n      THEN (h.volume_sum*hf.conversion_factor)\n         *((h.sales_price_sum/h.sales_price_count)*hf.conversion_factor)\n    ELSE NULL\n  END::float8 AS sellout_value,\n  c.loss_value_sum::float8 AS loss_value,\n  CASE\n    WHEN c.faturamento_sum>0\n      THEN 100.0*c.loss_value_sum/NULLIF(c.faturamento_sum,0)\n    ELSE 100.0*c.loss_value_sum\n      / NULLIF(c.volume_sum*c.price_sum,0)\n  END::float8 AS loss_value_percent,\n  (100.0*(1-h.problem_sum/NULLIF(h.active_sum,0)))::float8 AS osa_percent,\n  (c.volume_sum*cf.conversion_factor)::float8 AS sales_qty,\n  (c.loss_qty_sum*cf.conversion_factor)::float8 AS loss_qty,\n  CASE\n    WHEN hf.conversion_factor IS NULL THEN NULL\n    ELSE 100.0*(h.loss_qty_sum*hf.conversion_factor)\n      / NULLIF(h.volume_sum*hf.conversion_factor,0)\n  END::float8 AS loss_qty_percent,\n  NULL::text AS rede,NULL::text AS bandeira,NULL::text AS uf,NULL::text AS cidade,NULL::text AS tipo_local,NULL::text AS loja,NULL::text AS regiao,NULL::text AS tp_activity_level,NULL::text AS activity_level,NULL::text AS item,NULL::text AS descricao_marca,NULL::text AS hierarquia_1,NULL::text AS hierarquia_2,NULL::text AS hierarquia_3\nFROM hist_month h\nJOIN hist_factor hf USING(data,id_customer)\nLEFT JOIN cause_month c USING(data,id_customer)\nLEFT JOIN cause_factor cf\n  ON cf.data=h.data AND cf.id_customer=h.id_customer\n AND cf.nm_measure=hf.nm_measure",
+    "weekly_overview_sql": "WITH weekly_filtered AS (\n  SELECT\n    w.id_time::date AS data,w.cd_week,w.id_customer,w.id_item,w.id_location,\n    w.volume_unidade,w.faturamento,w.qtd_perda_osa,w.qtd_problemas_osa,\n    w.qtd_item_ativo_osa,w.avg_sales_price,w.avg_price_cost\n  FROM gold.fato_semanal w\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=w.id_customer AND l.id_location=w.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=w.id_customer AND i.id_item=w.id_item\n  LEFT JOIN gold.calculo_oportunidades o\n    ON o.id_customer=w.id_customer\n   AND o.id_location::text=w.id_location::text\n   AND o.id_item::text=w.id_item::text\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), ranked_weeks AS (\n  SELECT id_customer,cd_week,MAX(data) AS data,\n    DENSE_RANK() OVER (\n      PARTITION BY id_customer ORDER BY cd_week DESC\n    ) AS week_rank\n  FROM weekly_filtered\n  GROUP BY id_customer,cd_week\n), scoped AS (\n  SELECT w.*\n  FROM weekly_filtered w\n  JOIN ranked_weeks r USING(id_customer,cd_week)\n  WHERE r.week_rank<=13\n), opportunities_filtered AS (\n  SELECT o.id_customer,o.id_item,o.id_location,o.demanda_media\n  FROM gold.calculo_oportunidades o\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=o.id_customer AND l.id_location=o.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=o.id_customer AND i.id_item=o.id_item\n  WHERE COALESCE(o.qtd_item_ativo_osa_m0,0)>0\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), measures AS (\n  SELECT DISTINCT id_customer,nm_measure\n  FROM gold.nr_conversion_options m\n  WHERE 1=1\n{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}\n{% if measure_filters|length == 0 %}\n  AND m.nm_measure='unidade'\n{% else %}\n  {% for filter in measure_filters %}\n    {% if filter.get('op') == 'IN' %}\n      AND m.nm_measure IN {{ filter.get('val') | where_in }}\n    {% elif filter.get('op') == 'NOT IN' %}\n      AND m.nm_measure NOT IN {{ filter.get('val') | where_in }}\n    {% endif %}\n  {% endfor %}\n{% endif %}\n), weekly AS (\n  SELECT\n    s.data,s.cd_week,s.id_customer,\n    SUM(COALESCE(s.faturamento,0))::float8 AS faturamento_sum,\n    SUM(COALESCE(s.volume_unidade,0))::float8 AS volume_sum,\n    SUM(COALESCE(s.qtd_perda_osa,0))::float8 AS loss_qty_sum,\n    SUM(COALESCE(s.qtd_problemas_osa,0))::float8 AS problem_sum,\n    SUM(COALESCE(s.qtd_item_ativo_osa,0))::float8 AS active_sum,\n    AVG(s.avg_sales_price)::float8 AS avg_sales_price,\n    AVG(s.avg_price_cost)::float8 AS avg_price_cost\n  FROM scoped s\n  GROUP BY s.data,s.cd_week,s.id_customer\n), factor AS (\n  SELECT\n    s.data,s.id_customer,m.nm_measure,\n    COALESCE(MAX(cv.conversion_rate),\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_factor\n  FROM (SELECT DISTINCT data,id_customer,id_item FROM scoped) s\n  JOIN measures m ON m.id_customer=s.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=s.id_customer\n   AND cv.id_item::text=s.id_item::text\n   AND cv.nm_measure=m.nm_measure\n  GROUP BY s.data,s.id_customer,m.nm_measure\n), week_locations AS (\n  SELECT DISTINCT data,id_customer,id_location\n  FROM scoped\n), demand AS (\n  SELECT\n    wl.data,wl.id_customer,\n    SUM(COALESCE(o.demanda_media,0))::float8 AS demand_sum\n  FROM week_locations wl\n  JOIN opportunities_filtered o\n    ON o.id_customer=wl.id_customer\n   AND o.id_location::text=wl.id_location::text\n  GROUP BY wl.data,wl.id_customer\n)\nSELECT\n  w.data,w.cd_week,w.id_customer,f.nm_measure,\n  CASE\n    WHEN w.faturamento_sum>0 THEN w.faturamento_sum\n    WHEN f.conversion_factor IS NOT NULL AND w.avg_sales_price IS NOT NULL\n      THEN (w.volume_sum*f.conversion_factor)\n         *(w.avg_sales_price*f.conversion_factor)\n    ELSE NULL\n  END::float8 AS sellout_value,\n  (w.loss_qty_sum*w.avg_price_cost)::float8 AS loss_value,\n  CASE\n    WHEN w.faturamento_sum>0\n      THEN 100.0*(w.loss_qty_sum*w.avg_price_cost)\n        / NULLIF(w.faturamento_sum,0)\n    ELSE 100.0*(w.loss_qty_sum*w.avg_price_cost)\n      / NULLIF(w.volume_sum*w.avg_price_cost,0)\n  END::float8 AS loss_value_percent,\n  (100.0*(1-w.problem_sum/NULLIF(w.active_sum,0)))::float8 AS osa_percent,\n  (w.volume_sum*f.conversion_factor)::float8 AS sales_qty,\n  (w.loss_qty_sum*f.conversion_factor)::float8 AS loss_qty,\n  (100.0*w.loss_qty_sum/NULLIF(d.demand_sum*30.0,0))::float8 AS loss_qty_percent,\n  NULL::text AS rede,NULL::text AS bandeira,NULL::text AS uf,NULL::text AS cidade,NULL::text AS tipo_local,NULL::text AS loja,NULL::text AS regiao,NULL::text AS tp_activity_level,NULL::text AS activity_level,NULL::text AS item,NULL::text AS descricao_marca,NULL::text AS hierarquia_1,NULL::text AS hierarquia_2,NULL::text AS hierarquia_3\nFROM weekly w\nJOIN factor f USING(data,id_customer)\nLEFT JOIN demand d USING(data,id_customer)\nORDER BY w.data",
+    "cause_period_sql": "WITH latest AS (\n  SELECT id_customer,MAX(data)::date AS latest_data\n  FROM gold.fato_mensal_causa_osa\n  GROUP BY id_customer\n), measures AS (\n  SELECT DISTINCT id_customer,nm_measure\n  FROM gold.nr_conversion_options m\n  WHERE 1=1\n{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}\n{% if measure_filters|length == 0 %}\n  AND m.nm_measure='unidade'\n{% else %}\n  {% for filter in measure_filters %}\n    {% if filter.get('op') == 'IN' %}\n      AND m.nm_measure IN {{ filter.get('val') | where_in }}\n    {% elif filter.get('op') == 'NOT IN' %}\n      AND m.nm_measure NOT IN {{ filter.get('val') | where_in }}\n    {% endif %}\n  {% endfor %}\n{% endif %}\n), base AS (\n  SELECT\n    c.data,c.id_customer,c.id_item,c.id_location,\n    c.motivo_osa,c.causa_osa,c.qtd_perda_osa,c.vl_perda_osa,\n    c.qtd_problemas_osa,c.qtd_itens_ativos,c.volume_unidades,\n    c.faturamento,c.preco_medio,\n    l.rede,l.bandeira,l.uf,l.cidade,l.tipo_local,l.loja,l.regiao,\n    i.item,i.descricao_marca,i.hierarquia_1,i.hierarquia_2,i.hierarquia_3,\n    o.max_tp_activity_level::text AS tp_activity_level\n  FROM gold.fato_mensal_causa_osa c\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=c.id_customer AND l.id_location=c.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=c.id_customer AND i.id_item=c.id_item\n  LEFT JOIN gold.calculo_oportunidades o\n    ON o.id_customer=c.id_customer\n   AND o.id_location::text=c.id_location::text\n   AND o.id_item::text=c.id_item::text\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), expanded AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\n    SELECT 'MTD'::text AS osa_period,1::int AS osa_period_order\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) p\n), converted AS (\n  SELECT\n    e.*,m.nm_measure,\n    COALESCE(cv.conversion_rate,\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_rate\n  FROM expanded e\n  JOIN measures m ON m.id_customer=e.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=e.id_customer\n   AND cv.id_item::text=e.id_item::text\n   AND cv.nm_measure=m.nm_measure\n)\nSELECT * FROM converted",
+    "period_options_sql": "SELECT c.id_customer,p.osa_period,p.osa_period_order\nFROM (\n  SELECT DISTINCT id_customer FROM gold.nr_filter_options\n) c\nCROSS JOIN (VALUES ('MTD',1),('Mês Anterior',2),('U3M',3),('YTD',5)) AS p(osa_period,osa_period_order)"
+  },
+  "matrix_sql": {
+    "regiao": "WITH latest AS (\n  SELECT id_customer,MAX(mes_ano)::date AS latest_data\n  FROM gold.fato_historico\n  GROUP BY id_customer\n), measures AS (\n  SELECT DISTINCT id_customer,nm_measure\n  FROM gold.nr_conversion_options m\n  WHERE 1=1\n{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}\n{% if measure_filters|length == 0 %}\n  AND m.nm_measure='unidade'\n{% else %}\n  {% for filter in measure_filters %}\n    {% if filter.get('op') == 'IN' %}\n      AND m.nm_measure IN {{ filter.get('val') | where_in }}\n    {% elif filter.get('op') == 'NOT IN' %}\n      AND m.nm_measure NOT IN {{ filter.get('val') | where_in }}\n    {% endif %}\n  {% endfor %}\n{% endif %}\n), history_base AS (\n  SELECT\n    h.mes_ano::date AS data,h.id_customer,h.id_item,\n    l.regiao::text AS regiao,\n    h.qtd_perda_osa,h.qtd_problemas_osa,h.qtd_item_ativo_osa\n  FROM gold.fato_historico h\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=h.id_customer AND l.id_location=h.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=h.id_customer AND i.id_item=h.id_item\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND h.tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND h.tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), history_period AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM history_base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\nSELECT 'MTD'::text,1::int\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) AS p(osa_period,osa_period_order)\n), history_agg AS (\n  SELECT\n    p.id_customer,p.osa_period,p.osa_period_order,p.regiao,\n    m.nm_measure,\n    SUM(COALESCE(p.qtd_perda_osa,0))::float8 AS loss_base,\n    SUM(COALESCE(p.qtd_problemas_osa,0))::float8 AS problem_base,\n    SUM(COALESCE(p.qtd_item_ativo_osa,0))::float8 AS active_base,\n    COALESCE(MAX(cv.conversion_rate),\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_factor\n  FROM history_period p\n  JOIN measures m ON m.id_customer=p.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=p.id_customer\n   AND cv.id_item::text=p.id_item::text\n   AND cv.nm_measure=m.nm_measure\n  GROUP BY p.id_customer,p.osa_period,p.osa_period_order,p.regiao,m.nm_measure\n), cause_base AS (\n  SELECT\n    c.data,c.id_customer,c.id_item,\n    l.regiao::text AS regiao,\n    c.vl_perda_osa\n  FROM gold.fato_mensal_causa_osa c\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=c.id_customer AND l.id_location=c.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=c.id_customer AND i.id_item=c.id_item\n  LEFT JOIN gold.calculo_oportunidades o\n    ON o.id_customer=c.id_customer\n   AND o.id_location::text=c.id_location::text\n   AND o.id_item::text=c.id_item::text\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), cause_period AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM cause_base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\nSELECT 'MTD'::text,1::int\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) AS p(osa_period,osa_period_order)\n), cause_agg AS (\n  SELECT id_customer,osa_period,osa_period_order,regiao,\n         SUM(COALESCE(vl_perda_osa,0))::float8 AS loss_value\n  FROM cause_period\n  GROUP BY id_customer,osa_period,osa_period_order,regiao\n)\nSELECT\n  h.id_customer,h.nm_measure,h.osa_period,h.osa_period_order,\n  NULL::text AS rede,NULL::text AS bandeira,NULL::text AS uf,NULL::text AS cidade,NULL::text AS tipo_local,NULL::text AS loja,h.regiao,NULL::text AS tp_activity_level,NULL::text AS activity_level,NULL::text AS item,NULL::text AS descricao_marca,NULL::text AS hierarquia_1,NULL::text AS hierarquia_2,NULL::text AS hierarquia_3,\n  c.loss_value,\n  (h.loss_base*h.conversion_factor)::float8 AS loss_qty,\n  (h.problem_base*h.conversion_factor)::float8 AS problem_qty,\n  h.problem_base,h.active_base\nFROM history_agg h\nLEFT JOIN cause_agg c\n  ON c.id_customer=h.id_customer\n AND c.osa_period=h.osa_period\n AND c.regiao IS NOT DISTINCT FROM h.regiao",
+    "rede": "WITH latest AS (\n  SELECT id_customer,MAX(mes_ano)::date AS latest_data\n  FROM gold.fato_historico\n  GROUP BY id_customer\n), measures AS (\n  SELECT DISTINCT id_customer,nm_measure\n  FROM gold.nr_conversion_options m\n  WHERE 1=1\n{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}\n{% if measure_filters|length == 0 %}\n  AND m.nm_measure='unidade'\n{% else %}\n  {% for filter in measure_filters %}\n    {% if filter.get('op') == 'IN' %}\n      AND m.nm_measure IN {{ filter.get('val') | where_in }}\n    {% elif filter.get('op') == 'NOT IN' %}\n      AND m.nm_measure NOT IN {{ filter.get('val') | where_in }}\n    {% endif %}\n  {% endfor %}\n{% endif %}\n), history_base AS (\n  SELECT\n    h.mes_ano::date AS data,h.id_customer,h.id_item,\n    l.rede::text AS rede,\n    h.qtd_perda_osa,h.qtd_problemas_osa,h.qtd_item_ativo_osa\n  FROM gold.fato_historico h\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=h.id_customer AND l.id_location=h.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=h.id_customer AND i.id_item=h.id_item\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND h.tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND h.tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), history_period AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM history_base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\nSELECT 'MTD'::text,1::int\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) AS p(osa_period,osa_period_order)\n), history_agg AS (\n  SELECT\n    p.id_customer,p.osa_period,p.osa_period_order,p.rede,\n    m.nm_measure,\n    SUM(COALESCE(p.qtd_perda_osa,0))::float8 AS loss_base,\n    SUM(COALESCE(p.qtd_problemas_osa,0))::float8 AS problem_base,\n    SUM(COALESCE(p.qtd_item_ativo_osa,0))::float8 AS active_base,\n    COALESCE(MAX(cv.conversion_rate),\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_factor\n  FROM history_period p\n  JOIN measures m ON m.id_customer=p.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=p.id_customer\n   AND cv.id_item::text=p.id_item::text\n   AND cv.nm_measure=m.nm_measure\n  GROUP BY p.id_customer,p.osa_period,p.osa_period_order,p.rede,m.nm_measure\n), cause_base AS (\n  SELECT\n    c.data,c.id_customer,c.id_item,\n    l.rede::text AS rede,\n    c.vl_perda_osa\n  FROM gold.fato_mensal_causa_osa c\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=c.id_customer AND l.id_location=c.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=c.id_customer AND i.id_item=c.id_item\n  LEFT JOIN gold.calculo_oportunidades o\n    ON o.id_customer=c.id_customer\n   AND o.id_location::text=c.id_location::text\n   AND o.id_item::text=c.id_item::text\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), cause_period AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM cause_base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\nSELECT 'MTD'::text,1::int\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) AS p(osa_period,osa_period_order)\n), cause_agg AS (\n  SELECT id_customer,osa_period,osa_period_order,rede,\n         SUM(COALESCE(vl_perda_osa,0))::float8 AS loss_value\n  FROM cause_period\n  GROUP BY id_customer,osa_period,osa_period_order,rede\n)\nSELECT\n  h.id_customer,h.nm_measure,h.osa_period,h.osa_period_order,\n  h.rede,NULL::text AS bandeira,NULL::text AS uf,NULL::text AS cidade,NULL::text AS tipo_local,NULL::text AS loja,NULL::text AS regiao,NULL::text AS tp_activity_level,NULL::text AS activity_level,NULL::text AS item,NULL::text AS descricao_marca,NULL::text AS hierarquia_1,NULL::text AS hierarquia_2,NULL::text AS hierarquia_3,\n  c.loss_value,\n  (h.loss_base*h.conversion_factor)::float8 AS loss_qty,\n  (h.problem_base*h.conversion_factor)::float8 AS problem_qty,\n  h.problem_base,h.active_base\nFROM history_agg h\nLEFT JOIN cause_agg c\n  ON c.id_customer=h.id_customer\n AND c.osa_period=h.osa_period\n AND c.rede IS NOT DISTINCT FROM h.rede",
+    "hierarquia_1": "WITH latest AS (\n  SELECT id_customer,MAX(mes_ano)::date AS latest_data\n  FROM gold.fato_historico\n  GROUP BY id_customer\n), measures AS (\n  SELECT DISTINCT id_customer,nm_measure\n  FROM gold.nr_conversion_options m\n  WHERE 1=1\n{% set measure_filters = get_filters('nm_measure', remove_filter=True) %}\n{% if measure_filters|length == 0 %}\n  AND m.nm_measure='unidade'\n{% else %}\n  {% for filter in measure_filters %}\n    {% if filter.get('op') == 'IN' %}\n      AND m.nm_measure IN {{ filter.get('val') | where_in }}\n    {% elif filter.get('op') == 'NOT IN' %}\n      AND m.nm_measure NOT IN {{ filter.get('val') | where_in }}\n    {% endif %}\n  {% endfor %}\n{% endif %}\n), history_base AS (\n  SELECT\n    h.mes_ano::date AS data,h.id_customer,h.id_item,\n    i.hierarquia_1::text AS hierarquia_1,\n    h.qtd_perda_osa,h.qtd_problemas_osa,h.qtd_item_ativo_osa\n  FROM gold.fato_historico h\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=h.id_customer AND l.id_location=h.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=h.id_customer AND i.id_item=h.id_item\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND h.tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND h.tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), history_period AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM history_base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\nSELECT 'MTD'::text,1::int\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) AS p(osa_period,osa_period_order)\n), history_agg AS (\n  SELECT\n    p.id_customer,p.osa_period,p.osa_period_order,p.hierarquia_1,\n    m.nm_measure,\n    SUM(COALESCE(p.qtd_perda_osa,0))::float8 AS loss_base,\n    SUM(COALESCE(p.qtd_problemas_osa,0))::float8 AS problem_base,\n    SUM(COALESCE(p.qtd_item_ativo_osa,0))::float8 AS active_base,\n    COALESCE(MAX(cv.conversion_rate),\n      CASE WHEN m.nm_measure='valor' THEN 1.0 END)::float8 AS conversion_factor\n  FROM history_period p\n  JOIN measures m ON m.id_customer=p.id_customer\n  LEFT JOIN gold.dim_conversao cv\n    ON cv.id_customer=p.id_customer\n   AND cv.id_item::text=p.id_item::text\n   AND cv.nm_measure=m.nm_measure\n  GROUP BY p.id_customer,p.osa_period,p.osa_period_order,p.hierarquia_1,m.nm_measure\n), cause_base AS (\n  SELECT\n    c.data,c.id_customer,c.id_item,\n    i.hierarquia_1::text AS hierarquia_1,\n    c.vl_perda_osa\n  FROM gold.fato_mensal_causa_osa c\n  LEFT JOIN gold.dim_local l\n    ON l.id_customer=c.id_customer AND l.id_location=c.id_location\n  LEFT JOIN gold.dim_itens i\n    ON i.id_customer=c.id_customer AND i.id_item=c.id_item\n  LEFT JOIN gold.calculo_oportunidades o\n    ON o.id_customer=c.id_customer\n   AND o.id_location::text=c.id_location::text\n   AND o.id_item::text=c.id_item::text\n  WHERE 1=1\n{% for filter in get_filters('rede', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.rede IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.rede NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('bandeira', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.bandeira IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.bandeira NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('uf', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.uf IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.uf NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('cidade', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.cidade IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.cidade NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tipo_local', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.tipo_local IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.tipo_local NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('loja', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.loja IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.loja NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('regiao', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND l.regiao IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND l.regiao NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('descricao_marca', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.descricao_marca IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.descricao_marca NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_1', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_1 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_1 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_2', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_2 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_2 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('hierarquia_3', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.hierarquia_3 IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.hierarquia_3 NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('item', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND i.item IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND i.item NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n{% for filter in get_filters('tp_activity_level', remove_filter=True) %}\n{% if filter.get('op') == 'IN' %}\n  AND o.max_tp_activity_level IN {{ filter.get('val') | where_in }}\n{% elif filter.get('op') == 'NOT IN' %}\n  AND o.max_tp_activity_level NOT IN {{ filter.get('val') | where_in }}\n{% endif %}\n{% endfor %}\n), cause_period AS (\n  SELECT b.*,p.osa_period,p.osa_period_order\n  FROM cause_base b\n  JOIN latest x USING(id_customer)\n  CROSS JOIN LATERAL (\nSELECT 'MTD'::text,1::int\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data)\n    UNION ALL\n    SELECT 'Mês Anterior',2\n      WHERE DATE_TRUNC('month',b.data)=DATE_TRUNC('month',x.latest_data-INTERVAL '1 month')\n    UNION ALL\n    SELECT 'U3M',3\n      WHERE b.data>=DATE_TRUNC('month',x.latest_data)-INTERVAL '2 months'\n        AND b.data<=x.latest_data\n    UNION ALL\n    SELECT 'YTD',5\n      WHERE EXTRACT(YEAR FROM b.data)=EXTRACT(YEAR FROM x.latest_data)\n  ) AS p(osa_period,osa_period_order)\n), cause_agg AS (\n  SELECT id_customer,osa_period,osa_period_order,hierarquia_1,\n         SUM(COALESCE(vl_perda_osa,0))::float8 AS loss_value\n  FROM cause_period\n  GROUP BY id_customer,osa_period,osa_period_order,hierarquia_1\n)\nSELECT\n  h.id_customer,h.nm_measure,h.osa_period,h.osa_period_order,\n  NULL::text AS rede,NULL::text AS bandeira,NULL::text AS uf,NULL::text AS cidade,NULL::text AS tipo_local,NULL::text AS loja,NULL::text AS regiao,NULL::text AS tp_activity_level,NULL::text AS activity_level,NULL::text AS item,NULL::text AS descricao_marca,h.hierarquia_1,NULL::text AS hierarquia_2,NULL::text AS hierarquia_3,\n  c.loss_value,\n  (h.loss_base*h.conversion_factor)::float8 AS loss_qty,\n  (h.problem_base*h.conversion_factor)::float8 AS problem_qty,\n  h.problem_base,h.active_base\nFROM history_agg h\nLEFT JOIN cause_agg c\n  ON c.id_customer=h.id_customer\n AND c.osa_period=h.osa_period\n AND c.hierarquia_1 IS NOT DISTINCT FROM h.hierarquia_1"
+  },
+  "symbols": {
+    "bootstrap.DASHBOARD_TITLE": "4e3bfa43972dd61f4be8e1b8e66dd03d67731d167554e033271a7e32e3ac284a",
+    "bootstrap.DASHBOARD_SLUG": "3a041fc4ee2744e57733bbf5f8b82023e5c57d9422592289c5323bdd32b888d0",
+    "bootstrap.PREFIX": "cf6ea746c1f630fd77031c79429d7e40104ef4158b38d6cf2db879f767ea66b5",
+    "bootstrap.PERIODS": "4bdc7ad42281fb47c8ec67a54c01dc0fc2bf23a4284d8ac2b7aaf1377f335ead",
+    "bootstrap.DIMENSION_OVERRIDES": "f6793c4a3b7fea14ffb966419ccba80a6804a2b23e0fdfdb9fdf754e9881edcc",
+    "bootstrap._dimension_nulls": "9aa0af34335b93d5cc5b86645c86ef3db81623f68744bd23388c67d5e75eab60",
+    "bootstrap._measure_filter": "19ce0655e9d3e932b473c064354099cd5dea2dfdb5dbd26f3ef30cf6d8fd5595",
+    "bootstrap.monthly_overview_sql": "179e07b676d0d72561d9fb8ac84d4f7aa9cb2694bfdd5cbc262f05b56a6f908b",
+    "bootstrap.weekly_overview_sql": "ed947ec50e14f94f3c06079d7b50f7b8133ddc73d453f05f551158aa6dec2683",
+    "bootstrap.cause_period_sql": "49a6a513b5a95184af32fe1aa6769bbb220964383c798a20a84e1e652ab16240",
+    "bootstrap.period_options_sql": "4ab786ab81cf71327a11d4a3823c57703fc61bc3e289ceb516251b25dbb53a97",
+    "bootstrap._period_filter": "26a1170d0bccb536b240d557aee048efeba1d7d8f894184567eed717aff176cf",
+    "bootstrap.TOP_VALUE_METRICS": "13c922f1a59f3e934d16b4d557b82f97544a6caa1039ae0f7c66a98865d4f813",
+    "bootstrap.TOP_QTY_METRICS": "61da481221aa464ae424bed9f6e4c34e7196f8872c8b756c71b79254741b4ba6",
+    "bootstrap.CAUSE_VALUE": "d6cf1ca912983e3df6a291e85b10193cfe199eace31bf0ee368f48bb315ef28b",
+    "bootstrap.CAUSE_QTY": "513e609ed8d2f47fc994c7fe370969f19112bf77425a469d7505defcf2ea8602",
+    "bootstrap._top_params": "5d62df361c7bdf28d4e3830e7157f31f357faf4d578875a60a75eb702864d6ef",
+    "bootstrap._cause_params": "a0991d65087ce76437a833e21d148a101782dce08123759355db335c15bc11b0",
+    "bootstrap._matrix_params": "060d276e33cf5a6569659aadcfa43363557a257f19e0538b4c6942e436190825",
+    "matrices.MATRIX_SCOPES": "e98775772dd686d261ff91f3b2fc45bf56bf12e210095e84cf35bb5fb5e93a25",
+    "matrices.DIMENSION_OVERRIDES": "f6793c4a3b7fea14ffb966419ccba80a6804a2b23e0fdfdb9fdf754e9881edcc",
+    "matrices._measure_filter": "1a1d3a590f196025205920e475726fdcbeb65fa34b0a22b45ebbe75cb073ad4f",
+    "matrices._period_rows": "c72b31a79aebbe2d9a4f434060a65b3a42064045c7a7ebc8bfa19bcdc4eae674",
+    "matrices.matrix_period_sql": "98a7a0bbddca256eedffec94119f0d7e7993871158af640f4a39277de503836d",
+    "matrices.TABLE_VALUE": "58211863590cb3832eae6ee2f851e7e8d4c2ab25df973609ee2ac41b6526fa77",
+    "matrices.TABLE_QTY": "d1bff240ef2f827d9288a32d9920358874ece5870e553c8f66b83f4b8f7e5b19",
+    "matrices.TABLE_PROBLEMS": "525f6ecf1a1fb21c8e6fafd8a2537f56563f342667fc93caf3bc9020e21c5d75",
+    "matrices.TABLE_OSA": "92594d2790a25a92d4fe6c4332a8393a5b489449d1d48ae7d72f117adba5bf6f"
+  },
+  "specs": [
+    [
+      "value_month",
+      1,
+      "Visão geral — Valor mensal",
+      {
+        "datasource": "1__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(sellout_value)",
+            "label": "Sell Out Venda",
+            "optionName": "metric_ff77b2af9d2c"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_value)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(loss_value_percent)",
+            "label": "% Perda",
+            "optionName": "metric_1a00c4a698e0"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(osa_percent)",
+            "label": "%OSA",
+            "optionName": "metric_6946995848a9"
+          }
+        ],
+        "row_limit": 1000,
+        "card_title": "Visão geral — Valor mensal",
+        "card_variant": "panorama",
+        "help_text": "Visão geral — Valor mensal",
+        "metric_labels": "Sell Out Venda|Perda R$ OSA|% Perda|%OSA",
+        "metric_formats": "currency|currency|percent|percent",
+        "metric_directions": "higher",
+        "chart_styles": "bar|hidden|line|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [],
+        "summary_count": "4",
+        "summary_labels": "U3M|U3M|U3M|U3M",
+        "timeline_limit": "0"
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "value_week",
+      2,
+      "Visão geral — Valor semanal",
+      {
+        "datasource": "2__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1D",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(sellout_value)",
+            "label": "Sell Out Venda",
+            "optionName": "metric_ff77b2af9d2c"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_value)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(loss_value_percent)",
+            "label": "% Perda",
+            "optionName": "metric_1a00c4a698e0"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(osa_percent)",
+            "label": "%OSA",
+            "optionName": "metric_6946995848a9"
+          }
+        ],
+        "row_limit": 1000,
+        "card_title": "Visão geral — Valor semanal",
+        "card_variant": "panorama",
+        "help_text": "Visão geral — Valor semanal",
+        "metric_labels": "Sell Out Venda|Perda R$ OSA|% Perda|%OSA",
+        "metric_formats": "currency|currency|percent|percent",
+        "metric_directions": "higher",
+        "chart_styles": "bar|hidden|line|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [],
+        "summary_count": "4",
+        "summary_labels": "U3M|U3M|U3M|U3M",
+        "timeline_limit": "13"
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "qty_month",
+      1,
+      "Visão geral — Quantidade mensal",
+      {
+        "datasource": "1__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(sales_qty)",
+            "label": "Venda qtd",
+            "optionName": "metric_206acbc0f8db"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_qty)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(loss_qty_percent)",
+            "label": "% Perda",
+            "optionName": "metric_1a00c4a698e0"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(osa_percent)",
+            "label": "%OSA",
+            "optionName": "metric_6946995848a9"
+          }
+        ],
+        "row_limit": 1000,
+        "card_title": "Visão geral — Quantidade mensal",
+        "card_variant": "panorama",
+        "help_text": "Visão geral — Quantidade mensal",
+        "metric_labels": "Venda qtd|Perda OSA qtd|% Perda|%OSA",
+        "metric_formats": "quantity|quantity|percent|percent",
+        "metric_directions": "higher",
+        "chart_styles": "bar|hidden|line|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [],
+        "summary_count": "4",
+        "summary_labels": "U3M|U3M|U3M|U3M",
+        "timeline_limit": "0"
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "qty_week",
+      2,
+      "Visão geral — Quantidade semanal",
+      {
+        "datasource": "2__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1D",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(sales_qty)",
+            "label": "Venda qtd",
+            "optionName": "metric_206acbc0f8db"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_qty)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(loss_qty_percent)",
+            "label": "% Perda",
+            "optionName": "metric_1a00c4a698e0"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "AVG(osa_percent)",
+            "label": "%OSA",
+            "optionName": "metric_6946995848a9"
+          }
+        ],
+        "row_limit": 1000,
+        "card_title": "Visão geral — Quantidade semanal",
+        "card_variant": "panorama",
+        "help_text": "Visão geral — Quantidade semanal",
+        "metric_labels": "Venda qtd|Perda OSA qtd|% Perda|%OSA",
+        "metric_formats": "quantity|quantity|percent|percent",
+        "metric_directions": "higher",
+        "chart_styles": "bar|hidden|line|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [],
+        "summary_count": "4",
+        "summary_labels": "U3M|U3M|U3M|U3M",
+        "timeline_limit": "13"
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "value_motive",
+      3,
+      "Perda OSA por motivo — Valor",
+      {
+        "datasource": "3__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(vl_perda_osa)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23"
+          }
+        ],
+        "row_limit": 20,
+        "card_title": "Perda OSA por motivo — Valor",
+        "card_variant": "verticalbars",
+        "help_text": "Perda OSA por motivo — Valor",
+        "metric_labels": "Perda R$ OSA",
+        "metric_formats": "currency",
+        "metric_directions": "higher",
+        "chart_styles": "bar|bar|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [
+          "motivo_osa"
+        ]
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "value_cause",
+      3,
+      "Perda OSA por causa — Valor",
+      {
+        "datasource": "3__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(vl_perda_osa)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23"
+          }
+        ],
+        "row_limit": 20,
+        "card_title": "Perda OSA por causa — Valor",
+        "card_variant": "verticalbars",
+        "help_text": "Perda OSA por causa — Valor",
+        "metric_labels": "Perda R$ OSA",
+        "metric_formats": "currency",
+        "metric_directions": "higher",
+        "chart_styles": "bar|bar|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [
+          "causa_osa"
+        ]
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "qty_motive",
+      3,
+      "Perda OSA por motivo — Quantidade",
+      {
+        "datasource": "3__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(qtd_perda_osa) * MAX(conversion_rate)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382"
+          }
+        ],
+        "row_limit": 20,
+        "card_title": "Perda OSA por motivo — Quantidade",
+        "card_variant": "verticalbars",
+        "help_text": "Perda OSA por motivo — Quantidade",
+        "metric_labels": "Perda OSA qtd",
+        "metric_formats": "quantity",
+        "metric_directions": "higher",
+        "chart_styles": "bar|bar|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [
+          "motivo_osa"
+        ]
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "qty_cause",
+      3,
+      "Perda OSA por causa — Quantidade",
+      {
+        "datasource": "3__table",
+        "viz_type": "neoretail-kpi-card",
+        "x_axis": "data",
+        "time_grain_sqla": "P1M",
+        "time_range": "No filter",
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(qtd_perda_osa) * MAX(conversion_rate)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382"
+          }
+        ],
+        "row_limit": 20,
+        "card_title": "Perda OSA por causa — Quantidade",
+        "card_variant": "verticalbars",
+        "help_text": "Perda OSA por causa — Quantidade",
+        "metric_labels": "Perda OSA qtd",
+        "metric_formats": "quantity",
+        "metric_directions": "higher",
+        "chart_styles": "bar|bar|line",
+        "accent_color": "#7C4AD9",
+        "show_tasks": false,
+        "adhoc_filters": [],
+        "groupby": [
+          "causa_osa"
+        ]
+      },
+      "neoretail-kpi-card"
+    ],
+    [
+      "value_matrix_region",
+      10,
+      "Região — Valor",
+      {
+        "datasource": "10__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": [
+          "regiao"
+        ],
+        "groupbyColumns": [],
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_value)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23",
+            "d3Format": "$,.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(problem_qty)",
+            "label": "Qtd Problema OSA",
+            "optionName": "metric_007de2647216",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)",
+            "label": "% OSA",
+            "optionName": "metric_26a055c30578",
+            "d3Format": ".2%"
+          }
+        ],
+        "adhoc_filters": [],
+        "time_range": "No filter",
+        "row_limit": 10000,
+        "order_desc": true,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": false,
+        "combineMetric": false,
+        "showRowTotals": true,
+        "showColTotals": false,
+        "expandRows": false,
+        "columnFormats": {
+          "Perda R$ OSA": "$,.2f",
+          "Qtd Problema OSA": ",.2f",
+          "% OSA": ".2%"
+        },
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y"
+      },
+      "pivot_table_v2"
+    ],
+    [
+      "value_matrix_retail",
+      11,
+      "Varejo — Valor",
+      {
+        "datasource": "11__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": [
+          "rede"
+        ],
+        "groupbyColumns": [],
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_value)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23",
+            "d3Format": "$,.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(problem_qty)",
+            "label": "Qtd Problema OSA",
+            "optionName": "metric_007de2647216",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)",
+            "label": "% OSA",
+            "optionName": "metric_26a055c30578",
+            "d3Format": ".2%"
+          }
+        ],
+        "adhoc_filters": [],
+        "time_range": "No filter",
+        "row_limit": 10000,
+        "order_desc": true,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": false,
+        "combineMetric": false,
+        "showRowTotals": true,
+        "showColTotals": false,
+        "expandRows": false,
+        "columnFormats": {
+          "Perda R$ OSA": "$,.2f",
+          "Qtd Problema OSA": ",.2f",
+          "% OSA": ".2%"
+        },
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y"
+      },
+      "pivot_table_v2"
+    ],
+    [
+      "value_matrix_item",
+      12,
+      "Hierarquia de item — Valor",
+      {
+        "datasource": "12__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": [
+          "hierarquia_1"
+        ],
+        "groupbyColumns": [],
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_value)",
+            "label": "Perda R$ OSA",
+            "optionName": "metric_561f3fa18f23",
+            "d3Format": "$,.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(problem_qty)",
+            "label": "Qtd Problema OSA",
+            "optionName": "metric_007de2647216",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)",
+            "label": "% OSA",
+            "optionName": "metric_26a055c30578",
+            "d3Format": ".2%"
+          }
+        ],
+        "adhoc_filters": [],
+        "time_range": "No filter",
+        "row_limit": 10000,
+        "order_desc": true,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": false,
+        "combineMetric": false,
+        "showRowTotals": true,
+        "showColTotals": false,
+        "expandRows": false,
+        "columnFormats": {
+          "Perda R$ OSA": "$,.2f",
+          "Qtd Problema OSA": ",.2f",
+          "% OSA": ".2%"
+        },
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y"
+      },
+      "pivot_table_v2"
+    ],
+    [
+      "qty_matrix_region",
+      10,
+      "Região — Quantidade",
+      {
+        "datasource": "10__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": [
+          "regiao"
+        ],
+        "groupbyColumns": [],
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_qty)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(problem_qty)",
+            "label": "Qtd Problema OSA",
+            "optionName": "metric_007de2647216",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)",
+            "label": "% OSA",
+            "optionName": "metric_26a055c30578",
+            "d3Format": ".2%"
+          }
+        ],
+        "adhoc_filters": [],
+        "time_range": "No filter",
+        "row_limit": 10000,
+        "order_desc": true,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": false,
+        "combineMetric": false,
+        "showRowTotals": true,
+        "showColTotals": false,
+        "expandRows": false,
+        "columnFormats": {
+          "Perda OSA qtd": ",.2f",
+          "Qtd Problema OSA": ",.2f",
+          "% OSA": ".2%"
+        },
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y"
+      },
+      "pivot_table_v2"
+    ],
+    [
+      "qty_matrix_retail",
+      11,
+      "Varejo — Quantidade",
+      {
+        "datasource": "11__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": [
+          "rede"
+        ],
+        "groupbyColumns": [],
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_qty)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(problem_qty)",
+            "label": "Qtd Problema OSA",
+            "optionName": "metric_007de2647216",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)",
+            "label": "% OSA",
+            "optionName": "metric_26a055c30578",
+            "d3Format": ".2%"
+          }
+        ],
+        "adhoc_filters": [],
+        "time_range": "No filter",
+        "row_limit": 10000,
+        "order_desc": true,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": false,
+        "combineMetric": false,
+        "showRowTotals": true,
+        "showColTotals": false,
+        "expandRows": false,
+        "columnFormats": {
+          "Perda OSA qtd": ",.2f",
+          "Qtd Problema OSA": ",.2f",
+          "% OSA": ".2%"
+        },
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y"
+      },
+      "pivot_table_v2"
+    ],
+    [
+      "qty_matrix_item",
+      12,
+      "Hierarquia de item — Quantidade",
+      {
+        "datasource": "12__table",
+        "viz_type": "pivot_table_v2",
+        "groupbyRows": [
+          "hierarquia_1"
+        ],
+        "groupbyColumns": [],
+        "metrics": [
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(loss_qty)",
+            "label": "Perda OSA qtd",
+            "optionName": "metric_cf0436bdc382",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(problem_qty)",
+            "label": "Qtd Problema OSA",
+            "optionName": "metric_007de2647216",
+            "d3Format": ",.2f"
+          },
+          {
+            "expressionType": "SQL",
+            "sqlExpression": "1 - SUM(problem_base)/NULLIF(SUM(active_base),0)",
+            "label": "% OSA",
+            "optionName": "metric_26a055c30578",
+            "d3Format": ".2%"
+          }
+        ],
+        "adhoc_filters": [],
+        "time_range": "No filter",
+        "row_limit": 10000,
+        "order_desc": true,
+        "aggregateFunction": "Sum",
+        "rowOrder": "value_z_to_a",
+        "colOrder": "key_a_to_z",
+        "transposePivot": false,
+        "combineMetric": false,
+        "showRowTotals": true,
+        "showColTotals": false,
+        "expandRows": false,
+        "columnFormats": {
+          "Perda OSA qtd": ",.2f",
+          "Qtd Problema OSA": ",.2f",
+          "% OSA": ".2%"
+        },
+        "valueFormat": "SMART_NUMBER",
+        "date_format": "%m/%Y"
+      },
+      "pivot_table_v2"
+    ]
+  ],
+  "layout": {
+    "ROOT_ID": {
+      "id": "ROOT_ID",
+      "type": "ROOT",
+      "children": [
+        "GRID_ID"
+      ]
+    },
+    "GRID_ID": {
+      "id": "GRID_ID",
+      "type": "GRID",
+      "parents": [
+        "ROOT_ID"
+      ],
+      "children": [
+        "TABS-1"
+      ]
+    },
+    "TABS-1": {
+      "id": "TABS-1",
+      "type": "TABS",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID"
+      ],
+      "children": [
+        "TAB-2",
+        "TAB-11"
+      ],
+      "meta": {
+        "defaultText": "Visão OSA"
+      }
+    },
+    "TAB-2": {
+      "id": "TAB-2",
+      "type": "TAB",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1"
+      ],
+      "children": [
+        "TABS-3",
+        "ROW-8",
+        "ROW-9",
+        "ROW-10"
+      ],
+      "meta": {
+        "text": "Valor"
+      }
+    },
+    "TABS-3": {
+      "id": "TABS-3",
+      "type": "TABS",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2"
+      ],
+      "children": [
+        "TAB-4",
+        "TAB-6"
+      ],
+      "meta": {
+        "defaultText": "Período de Valor"
+      }
+    },
+    "TAB-4": {
+      "id": "TAB-4",
+      "type": "TAB",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "TABS-3"
+      ],
+      "children": [
+        "ROW-5"
+      ],
+      "meta": {
+        "text": "Mensal"
+      }
+    },
+    "ROW-5": {
+      "id": "ROW-5",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "TABS-3",
+        "TAB-4"
+      ],
+      "children": [
+        "CHART-100"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-100": {
+      "id": "CHART-100",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "TABS-3",
+        "TAB-4",
+        "ROW-5"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 100,
+        "height": 58,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Visão geral — Valor mensal",
+        "uuid": "chart-0"
+      }
+    },
+    "TAB-6": {
+      "id": "TAB-6",
+      "type": "TAB",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "TABS-3"
+      ],
+      "children": [
+        "ROW-7"
+      ],
+      "meta": {
+        "text": "Semanal"
+      }
+    },
+    "ROW-7": {
+      "id": "ROW-7",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "TABS-3",
+        "TAB-6"
+      ],
+      "children": [
+        "CHART-101"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-101": {
+      "id": "CHART-101",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "TABS-3",
+        "TAB-6",
+        "ROW-7"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 101,
+        "height": 58,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Visão geral — Valor semanal",
+        "uuid": "chart-1"
+      }
+    },
+    "ROW-8": {
+      "id": "ROW-8",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2"
+      ],
+      "children": [
+        "CHART-104"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-104": {
+      "id": "CHART-104",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "ROW-8"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 104,
+        "height": 44,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Perda OSA por motivo — Valor",
+        "uuid": "chart-4"
+      }
+    },
+    "ROW-9": {
+      "id": "ROW-9",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2"
+      ],
+      "children": [
+        "CHART-105"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-105": {
+      "id": "CHART-105",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "ROW-9"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 105,
+        "height": 48,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Perda OSA por causa — Valor",
+        "uuid": "chart-5"
+      }
+    },
+    "ROW-10": {
+      "id": "ROW-10",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2"
+      ],
+      "children": [
+        "CHART-108",
+        "CHART-109",
+        "CHART-110"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-108": {
+      "id": "CHART-108",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "ROW-10"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 108,
+        "height": 52,
+        "width": 4,
+        "sliceName": "[OSA Certificada] Região — Valor",
+        "uuid": "chart-8"
+      }
+    },
+    "CHART-109": {
+      "id": "CHART-109",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "ROW-10"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 109,
+        "height": 52,
+        "width": 4,
+        "sliceName": "[OSA Certificada] Varejo — Valor",
+        "uuid": "chart-9"
+      }
+    },
+    "CHART-110": {
+      "id": "CHART-110",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-2",
+        "ROW-10"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 110,
+        "height": 52,
+        "width": 4,
+        "sliceName": "[OSA Certificada] Hierarquia de item — Valor",
+        "uuid": "chart-10"
+      }
+    },
+    "TAB-11": {
+      "id": "TAB-11",
+      "type": "TAB",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1"
+      ],
+      "children": [
+        "TABS-12",
+        "ROW-17",
+        "ROW-18",
+        "ROW-19"
+      ],
+      "meta": {
+        "text": "Quantidade"
+      }
+    },
+    "TABS-12": {
+      "id": "TABS-12",
+      "type": "TABS",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11"
+      ],
+      "children": [
+        "TAB-13",
+        "TAB-15"
+      ],
+      "meta": {
+        "defaultText": "Período de Quantidade"
+      }
+    },
+    "TAB-13": {
+      "id": "TAB-13",
+      "type": "TAB",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "TABS-12"
+      ],
+      "children": [
+        "ROW-14"
+      ],
+      "meta": {
+        "text": "Mensal"
+      }
+    },
+    "ROW-14": {
+      "id": "ROW-14",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "TABS-12",
+        "TAB-13"
+      ],
+      "children": [
+        "CHART-102"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-102": {
+      "id": "CHART-102",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "TABS-12",
+        "TAB-13",
+        "ROW-14"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 102,
+        "height": 58,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Visão geral — Quantidade mensal",
+        "uuid": "chart-2"
+      }
+    },
+    "TAB-15": {
+      "id": "TAB-15",
+      "type": "TAB",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "TABS-12"
+      ],
+      "children": [
+        "ROW-16"
+      ],
+      "meta": {
+        "text": "Semanal"
+      }
+    },
+    "ROW-16": {
+      "id": "ROW-16",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "TABS-12",
+        "TAB-15"
+      ],
+      "children": [
+        "CHART-103"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-103": {
+      "id": "CHART-103",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "TABS-12",
+        "TAB-15",
+        "ROW-16"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 103,
+        "height": 58,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Visão geral — Quantidade semanal",
+        "uuid": "chart-3"
+      }
+    },
+    "ROW-17": {
+      "id": "ROW-17",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11"
+      ],
+      "children": [
+        "CHART-106"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-106": {
+      "id": "CHART-106",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "ROW-17"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 106,
+        "height": 44,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Perda OSA por motivo — Quantidade",
+        "uuid": "chart-6"
+      }
+    },
+    "ROW-18": {
+      "id": "ROW-18",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11"
+      ],
+      "children": [
+        "CHART-107"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-107": {
+      "id": "CHART-107",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "ROW-18"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 107,
+        "height": 48,
+        "width": 12,
+        "sliceName": "[OSA Certificada] Perda OSA por causa — Quantidade",
+        "uuid": "chart-7"
+      }
+    },
+    "ROW-19": {
+      "id": "ROW-19",
+      "type": "ROW",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11"
+      ],
+      "children": [
+        "CHART-111",
+        "CHART-112",
+        "CHART-113"
+      ],
+      "meta": {
+        "background": "BACKGROUND_TRANSPARENT"
+      }
+    },
+    "CHART-111": {
+      "id": "CHART-111",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "ROW-19"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 111,
+        "height": 52,
+        "width": 4,
+        "sliceName": "[OSA Certificada] Região — Quantidade",
+        "uuid": "chart-11"
+      }
+    },
+    "CHART-112": {
+      "id": "CHART-112",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "ROW-19"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 112,
+        "height": 52,
+        "width": 4,
+        "sliceName": "[OSA Certificada] Varejo — Quantidade",
+        "uuid": "chart-12"
+      }
+    },
+    "CHART-113": {
+      "id": "CHART-113",
+      "type": "CHART",
+      "parents": [
+        "ROOT_ID",
+        "GRID_ID",
+        "TABS-1",
+        "TAB-11",
+        "ROW-19"
+      ],
+      "children": [],
+      "meta": {
+        "chartId": 113,
+        "height": 52,
+        "width": 4,
+        "sliceName": "[OSA Certificada] Hierarquia de item — Quantidade",
+        "uuid": "chart-13"
+      }
+    }
+  },
+  "filters": [
+    {
+      "id": "NATIVE_FILTER-neoretail-nm_measure",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": false,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Medida",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "nm_measure"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {
+          "filters": [
+            {
+              "col": "nm_measure",
+              "op": "IN",
+              "val": [
+                "unidade"
+              ]
+            }
+          ]
+        },
+        "filterState": {
+          "label": "unidade",
+          "value": [
+            "unidade"
+          ]
+        },
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-rede",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Rede",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "rede"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-bandeira",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Bandeira",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "bandeira"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-rede"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-uf",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "UF",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "uf"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-cidade",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Cidade",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "cidade"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-uf"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-tipo_local",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Tipo de local",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "tipo_local"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-loja",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Loja",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "loja"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-tipo_local"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-tp_activity_level",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Nível de atividade",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "tp_activity_level"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-descricao_marca",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Marca",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "descricao_marca"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-hierarquia_1",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Hierarquia 1",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "hierarquia_1"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-descricao_marca"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-hierarquia_2",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Hierarquia 2",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "hierarquia_2"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-hierarquia_1"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-hierarquia_3",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Hierarquia 3",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "hierarquia_3"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-hierarquia_2"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-neoretail-item",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": true,
+        "searchAllOptions": true,
+        "inverseSelection": false
+      },
+      "name": "Item",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 4,
+          "column": {
+            "name": "item"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {},
+        "filterState": {},
+        "ownState": {}
+      },
+      "cascadeParentIds": [
+        "NATIVE_FILTER-neoretail-hierarquia_3"
+      ],
+      "scope": {
+        "excluded": [],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": ""
+    },
+    {
+      "id": "NATIVE_FILTER-osa-certified-period",
+      "controlValues": {
+        "enableEmptyFilter": false,
+        "defaultToFirstItem": false,
+        "creatable": false,
+        "multiSelect": false,
+        "searchAllOptions": false,
+        "inverseSelection": false,
+        "sortAscending": true
+      },
+      "name": "Período",
+      "filterType": "filter_select",
+      "targets": [
+        {
+          "datasetId": 5,
+          "column": {
+            "name": "osa_period"
+          }
+        }
+      ],
+      "defaultDataMask": {
+        "extraFormData": {
+          "filters": [
+            {
+              "col": "osa_period",
+              "op": "IN",
+              "val": [
+                "Mês Anterior"
+              ]
+            }
+          ]
+        },
+        "filterState": {
+          "label": "Mês Anterior",
+          "value": [
+            "Mês Anterior"
+          ]
+        },
+        "ownState": {}
+      },
+      "cascadeParentIds": [],
+      "scope": {
+        "excluded": [
+          100,
+          101,
+          102,
+          103
+        ],
+        "rootPath": [
+          "ROOT_ID"
+        ]
+      },
+      "type": "NATIVE_FILTER",
+      "description": "MTD, Mês Anterior, U3M ou YTD. O padrão reproduz o estado observado no Power BI."
+    }
+  ],
+  "css": ".dashboard-content { background:#e7f0f5 !important; } .dashboard-component-chart-holder { border-radius:8px; background:#fff; } .dashboard-component-chart-holder > .header { display:none !important; }"
+}

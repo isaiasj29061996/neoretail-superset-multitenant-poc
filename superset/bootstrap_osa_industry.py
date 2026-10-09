@@ -9,8 +9,14 @@ import json
 
 from superset.app import create_app
 
-from bootstrap_overview import HISTORY_SQL, M, OVERVIEW_M, metric, native_filters, upsert_dataset
-from bootstrap_panorama import Layout, custom_params, table_params, upsert_chart
+from neoretail_bootstrap.overview.semantics import HISTORY_SQL, M, OVERVIEW_M
+from neoretail_bootstrap.overview.filters import native_filters
+
+
+from neoretail_bootstrap.core.chart_params import custom_params, table_params
+from neoretail_bootstrap.core.layout import Layout
+from neoretail_bootstrap.core.metadata import upsert_dataset, upsert_chart
+from neoretail_bootstrap.core.metrics import metric
 
 
 DASHBOARD_TITLE = "NeoRetail V9 — OSA Indústria"
@@ -45,6 +51,9 @@ JOIN (
   GROUP BY id_customer
 ) d ON d.id_customer = h.id_customer AND d.max_data = h.data
 """.strip()
+
+LEGACY_SELLOUT = metric("Venda sell out", "CASE WHEN SUM(faturamento_sum) > 0 THEN SUM(faturamento_sum) ELSE SUM(fallback_sellout_sum) END")
+LEGACY_OSA_LOSS = metric("Perda OSA", "SUM(osa_loss_qty_sum) * (SUM(avg_sales_price_sum) / NULLIF(SUM(avg_sales_price_count), 0))")
 
 LOSS_VALUE = metric("Perda R$ OSA", "SUM(loss_value_sum)")
 LOSS_PERCENT = metric("% Perda", "100.0 * SUM(qtd_perda_osa) * AVG(avg_sales_price) / NULLIF(CASE WHEN SUM(faturamento) > 0 THEN SUM(faturamento) ELSE SUM(volume_unidades * avg_sales_price) END, 0)")
@@ -138,8 +147,8 @@ def main():
 
         top_metrics = [
             OVERVIEW_M["osa"],
-            OVERVIEW_M["sellout"],
-            OVERVIEW_M["osa_loss"],
+            LEGACY_SELLOUT,
+            LEGACY_OSA_LOSS,
             LOSS_PERCENT_SUMMARY,
         ]
         top = custom_params(

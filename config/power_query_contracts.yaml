@@ -55,10 +55,10 @@ fact_families:
   mensal_causa_osa:
     target_table: fato_mensal_causa_osa
     power_query: FATOS_MENSAL_CAUSA_OSA
-    columns: [vl_month, vl_year, id_item, id_location, qtd_perda_osa, qtd_problemas_osa, qtd_itens_ativos, volume_unidades, faturamento, preco_medio, causa_osa, motivo_osa]
+    columns: [vl_month, vl_year, id_item, id_location, qtd_perda_osa, vl_perda_osa, qtd_problemas_osa, qtd_itens_ativos, volume_unidades, faturamento, preco_medio, causa_osa, motivo_osa]
     derived_date: {target: data, year: vl_year, month: vl_month, day: 1}
     drop_after_derive: [vl_month, vl_year]
-    types: {data: date, id_item: text, id_location: text, qtd_perda_osa: double, qtd_problemas_osa: long, qtd_itens_ativos: long, volume_unidades: double, faturamento: double, preco_medio: double, causa_osa: text, motivo_osa: text}
+    types: {data: date, id_item: text, id_location: text, qtd_perda_osa: double, vl_perda_osa: double, qtd_problemas_osa: long, qtd_itens_ativos: long, volume_unidades: double, faturamento: double, preco_medio: double, causa_osa: text, motivo_osa: text}
 
   fato_nivel_atividade:
     target_table: fato_nivel_atividade

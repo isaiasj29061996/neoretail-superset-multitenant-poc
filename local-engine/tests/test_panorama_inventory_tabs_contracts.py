@@ -1,6 +1,9 @@
 import ast
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
+import pytest
 from jinja2 import Environment
 
 
@@ -8,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def read(path):
+    if path == "superset/bootstrap_panorama.py":
+        return read_panorama('inventory', 'osa', 'gaps', 'filters', 'layout')
     return (ROOT / path).read_text(encoding="utf-8")
 
 
@@ -127,12 +132,12 @@ def test_monthly_osa_status_denominator_comes_from_fato_historico():
     assert "SUM(COALESCE(status_item_geral,0))::float8 AS status_sum" in bootstrap
 
 
-def test_filtered_weekly_inventory_summary_uses_governed_detail_and_valid_aliases():
+def weekly_inventory_template():
     # Execute the SQL generator without importing the Superset application.
     namespace = {}
     for path, names in (
-        ("superset/bootstrap_overview.py", {"_jinja_filter_predicates"}),
-        ("superset/bootstrap_panorama.py", {"weekly_inventory_card_semantic_sql"}),
+        ("superset/neoretail_bootstrap/core/filters.py", {"_jinja_filter_predicates"}),
+        ("superset/neoretail_bootstrap/panorama/inventory.py", {"weekly_inventory_card_semantic_sql"}),
     ):
         tree = ast.parse(read(path))
         nodes = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
@@ -141,7 +146,11 @@ def test_filtered_weekly_inventory_summary_uses_governed_detail_and_valid_aliase
                "item", "descricao_marca", "hierarquia_1", "hierarquia_2", "hierarquia_3",
                "tp_activity_level")
     namespace["WEEKLY_FILTER_COLUMNS"] = columns
-    sql = namespace["weekly_inventory_card_semantic_sql"]()
+    return namespace["weekly_inventory_card_semantic_sql"](), columns
+
+
+def test_filtered_weekly_inventory_summary_uses_governed_detail_and_valid_aliases():
+    sql, columns = weekly_inventory_template()
     environment = Environment()
     environment.filters["where_in"] = lambda values: "('selected')"
     for column in columns:
@@ -152,7 +161,39 @@ def test_filtered_weekly_inventory_summary_uses_governed_detail_and_valid_aliase
                 ),
             )
             monthly = rendered.split("monthly_filtered AS (", 1)[1].split("), monthly AS (", 1)[0]
+            weekly = rendered.split("weekly_filtered AS (", 1)[1].split("), ranked_weeks AS (", 1)[0]
+            assert "FROM gold.nr_panorama_inventory_weekly_detail w" in weekly
+            assert f"AND w.{column} {operator} ('selected')" in weekly
+            for invalid_alias in ("l", "i", "h", "f"):
+                assert f"{invalid_alias}.{column}" not in weekly
             assert "FROM gold.nr_panorama_comparison_history_detail f" in monthly
             assert f"AND f.{column} {operator} ('selected')" in monthly
             assert "l." not in monthly and "i." not in monthly and "h." not in monthly
             assert "nr_overview_history" not in monthly
+
+
+@pytest.mark.parametrize("column,operator,value", [
+    ("uf", "IN", "RJ"),
+    ("uf", "NOT IN", "RJ"),
+    ("item", "IN", "item-test"),
+    ("item", "NOT IN", "item-test"),
+])
+def test_weekly_inventory_filter_has_no_missing_dimension_alias(column, operator, value):
+    sql, _ = weekly_inventory_template()
+    environment = Environment()
+    environment.filters["where_in"] = lambda values: "(" + ", ".join(
+        "'" + item.replace("'", "''") + "'" for item in values
+    ) + ")"
+    rendered = environment.from_string(sql).render(
+        get_filters=lambda name, **kwargs: (
+            [{"op": operator, "val": [value]}] if name == column else []
+        ),
+    )
+    weekly = rendered.split("weekly_filtered AS (", 1)[1].split("), ranked_weeks AS (", 1)[0]
+    monthly = rendered.split("monthly_filtered AS (", 1)[1].split("), monthly AS (", 1)[0]
+    assert "FROM gold.nr_panorama_inventory_weekly_detail w" in weekly
+    assert f"AND w.{column} {operator} ('{value}')" in weekly
+    assert "FROM gold.nr_panorama_comparison_history_detail f" in monthly
+    assert f"AND f.{column} {operator} ('{value}')" in monthly
+    for invalid_alias in ("l", "i", "h"):
+        assert f"{invalid_alias}.{column}" not in rendered

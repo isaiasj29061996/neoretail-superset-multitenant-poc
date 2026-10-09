@@ -1,21 +1,23 @@
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_weekly_sales_contract_uses_real_fact_and_top_13_cd_week():
-    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    bootstrap = read_panorama('sales', 'filters', 'layout')
     assert "FROM gold.fato_semanal w" in bootstrap
     assert "ORDER BY cd_week DESC" in bootstrap
     assert "week_rank<=13" in bootstrap or "week_rank <= 13" in bootstrap
     assert "get_filters" in bootstrap and "remove_filter=True" in (
-        ROOT / "superset" / "bootstrap_overview.py"
+        ROOT / "superset" / "neoretail_bootstrap" / "core" / "filters.py"
     ).read_text(encoding="utf-8")
 
 
 def test_sales_tabs_and_per_metric_semantics_are_declared():
-    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    bootstrap = read_panorama('sales', 'filters', 'layout')
     assert 'charts[f"sales_value_{period}"]' in bootstrap
     assert 'charts[f"sales_quantity_{period}"]' in bootstrap
     assert 'sales_value_summary_' not in bootstrap
@@ -26,7 +28,7 @@ def test_sales_tabs_and_per_metric_semantics_are_declared():
 
 
 def test_quantity_reuses_certified_overview_contract():
-    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    bootstrap = read_panorama('sales', 'filters', 'layout')
     assert "from bootstrap_overview_quantity import Q, quantity_semantic_sql" in bootstrap
     assert 'filter_targets["nm_measure"] = conversion_options.id' in bootstrap
 
@@ -57,7 +59,7 @@ def test_runtime_controls_register_persisted_panorama_parameters():
 
 
 def test_sellout_fallback_matches_literal_dax_aggregation():
-    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    bootstrap = read_panorama('sales', 'filters', 'layout')
     mart = (ROOT / "analytics-db" / "marts" / "41_panorama_sales_semantic.sql").read_text(encoding="utf-8")
     for source in (bootstrap, mart):
         compact = "".join(source.split())
@@ -78,14 +80,14 @@ def test_sellout_fallback_matches_literal_dax_aggregation():
 
 
 def test_monthly_value_uses_dedicated_certified_dataset():
-    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    bootstrap = read_panorama('sales', 'filters', 'layout')
     assert '"nr_panorama_sales_monthly_interactive"' in bootstrap
     assert 'monthly_sales, "Evolutivo de vendas", value_measures, grain="P1M"' in bootstrap
     assert 'add("sales_value_mensal", monthly_sales' in bootstrap
 
 
 def test_sales_uses_true_single_slice_with_embedded_summary():
-    bootstrap = (ROOT / "superset" / "bootstrap_panorama.py").read_text(encoding="utf-8")
+    bootstrap = read_panorama('sales', 'filters', 'layout')
     build_query = (
         ROOT
         / "superset"

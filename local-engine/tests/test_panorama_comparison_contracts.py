@@ -1,10 +1,14 @@
 from pathlib import Path
 
+from panorama_contract_sources import read_panorama
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def read(path):
+    if path == "superset/bootstrap_panorama.py":
+        return read_panorama('comparisons', 'details', 'filters', 'layout')
     return (ROOT / path).read_text(encoding="utf-8")
 
 
@@ -15,15 +19,16 @@ def test_pbip_comparison_hierarchies_and_tabs_are_preserved():
     assert '"hierarchy": ("hierarquia_1", "hierarquia_2", "item")' in bootstrap
     for tab in ("Valor", "Quantidade", "R$ Estoque", "OSA", "Falta x Excesso"):
         assert f'("{tab}",' in bootstrap
-    assert '"viz_type": "pivot_table_v2"' in bootstrap
-    assert '"rowOrder": "value_z_to_a"' in bootstrap
-    assert '"order_desc": True' in bootstrap
+    shared_params = read("superset/neoretail_bootstrap/core/chart_params.py")
+    assert '"viz_type": "pivot_table_v2"' in shared_params
+    assert '"rowOrder": "value_z_to_a"' in shared_params
+    assert '"order_desc": True' in shared_params
 
 
 def test_comparisons_are_not_the_old_top_ten_rankbars():
     bootstrap = read("superset/bootstrap_panorama.py")
     assert 'f"Comparativo — {dimension_label}"' in bootstrap
-    assert '"row_limit": 10000' in bootstrap
+    assert '"row_limit": 10000' in read("superset/neoretail_bootstrap/core/chart_params.py")
     assert 'row_limit=10))' not in bootstrap
     assert 'variant="rankbars"' not in bootstrap
 
@@ -87,8 +92,9 @@ def test_comparison_pivots_keep_individual_metric_formats():
     # A single SMART_NUMBER formatter was flattening ratios such as Markup
     # into 1.17 instead of the Power BI-style 117%. Pivot v2 supports
     # per-metric columnFormats, so the semantic value remains a ratio.
-    assert '"columnFormats": {' in bootstrap
-    assert 'item["label"]: item.get("d3Format")' in bootstrap
+    shared_params = read("superset/neoretail_bootstrap/core/chart_params.py")
+    assert '"columnFormats": {' in shared_params
+    assert 'item["label"]: item.get("d3Format")' in shared_params
     assert 'formatted_metric("Markup",' in bootstrap
     assert '".2%"' in bootstrap
 

@@ -1,6 +1,8 @@
 """Reconcile AP_KPI_INDUSTRIA source -> compact mart -> Superset ChartData."""
 from __future__ import annotations
 
+import os
+
 import json
 import math
 from time import perf_counter
@@ -13,7 +15,7 @@ from superset.app import create_app
 from profile_dashboard_performance import build_queries
 
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 YEAR = 2026
 DASHBOARD = "neoretail-v9-panorama-industria"
 MONTH_NAMES = ("janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro")
