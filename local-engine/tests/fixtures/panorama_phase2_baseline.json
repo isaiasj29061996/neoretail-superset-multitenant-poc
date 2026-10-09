@@ -1,0 +1,393 @@
+{
+  "base": "07e09712a67da7327bd15e78f94ce55a1a96b4e0",
+  "symbols": [
+    {
+      "module": "sources",
+      "name": "WEEKLY_SQL",
+      "sha256": "0360fc5eca55b767183337f9ddefaaf9985a22b7b14648ef09e7853e0804bc53"
+    },
+    {
+      "module": "sources",
+      "name": "OPPORTUNITIES_SQL",
+      "sha256": "2eff1352c7fd276c28e73c3dd76b4a22b8da278b27bd7a04fffec87721b7668d"
+    },
+    {
+      "module": "sources",
+      "name": "OPPORTUNITIES_LATEST_SQL",
+      "sha256": "2916a02ff859f2c3be425e3c9a71d53cc9ff320dee71312d73e8c350f16fe510"
+    },
+    {
+      "module": "sources",
+      "name": "_WEEKLY_SELLOUT",
+      "sha256": "18fc2c566002a9e953ca4be781fef80a2b190df472a3067b5abb1b227afee0b4"
+    },
+    {
+      "module": "sources",
+      "name": "WEEKLY_P",
+      "sha256": "866e695503a77779aa3970fe821b491fa8caaf3b7ace8a99d3e0e732b0a2ef3f"
+    },
+    {
+      "module": "sources",
+      "name": "weekly_semantic_sql",
+      "sha256": "4e38e4e7583e0e70ca306ff03337e8f8dbaa93f5aeffb948a0615a5725a406f4"
+    },
+    {
+      "module": "sales",
+      "name": "weekly_sales_semantic_sql",
+      "sha256": "4331bab780dd2ae22162d721535107336514c312f096f5ed07b68a392e31b243"
+    },
+    {
+      "module": "sales",
+      "name": "monthly_sales_semantic_sql",
+      "sha256": "62965ca8ce8806db87a3183e4c3d8d845c4867cea3651c7cf8567ee92c22c4ce"
+    },
+    {
+      "module": "sales",
+      "name": "weekly_sales_card_semantic_sql",
+      "sha256": "fd38ff2410bbb413b2d4bd3f879076d46ca13c38458dbd9ae128423f59f7a2eb"
+    },
+    {
+      "module": "inventory",
+      "name": "monthly_inventory_semantic_sql",
+      "sha256": "3aefee96c2debac683ffe0208b2bbc3222626e98d088408d08e4238228640a52"
+    },
+    {
+      "module": "inventory",
+      "name": "weekly_inventory_card_semantic_sql",
+      "sha256": "0584e2b39bdf5dbece82d176003061f1592befe87c26ff4e3e884db422ffda14"
+    },
+    {
+      "module": "gaps",
+      "name": "GAP_TVD",
+      "sha256": "97d74310be3a4a34c7e2111feee8fa15c997be3f4d1473bad895d116bf309b5f"
+    },
+    {
+      "module": "gaps",
+      "name": "GAP_IVD",
+      "sha256": "5c7bb05c83b1ac1e9c7d7932abb81f09e86c8485b629fe3ed6a785dadf6f64f9"
+    },
+    {
+      "module": "gaps",
+      "name": "monthly_gap_semantic_sql",
+      "sha256": "f784cd9b8d47eecb4e784bd83032e5475f2ccacc0a7e98d74a433739df02464f"
+    },
+    {
+      "module": "gaps",
+      "name": "weekly_gap_card_semantic_sql",
+      "sha256": "a65f29d5a4aaba60f4582c050c5b797f20d78056f2cf443163ad4555057dd4c3"
+    },
+    {
+      "module": "comparisons",
+      "name": "COMPARISON_SCOPES",
+      "sha256": "4fbbf56181cee20dd40267f014a4c0d5004dce76ef498a15227d953216c50154"
+    },
+    {
+      "module": "comparisons",
+      "name": "_COMPARISON_SELLOUT",
+      "sha256": "218f66942cf6ed04c7495fe7d5345288d33010ca044d167f3394fb6a8ce438d4"
+    },
+    {
+      "module": "comparisons",
+      "name": "_COMPARISON_SALES_QTY",
+      "sha256": "fcd0a19aeac3b250bbf8470c1f988317decb7c4c8d41c6424dd278227ddb4cec"
+    },
+    {
+      "module": "comparisons",
+      "name": "_COMPARISON_LOSS_QTY",
+      "sha256": "681cdce3495c4623483774df678e8bc453e58852703a2f097cc046a2ceb1ece4"
+    },
+    {
+      "module": "comparisons",
+      "name": "_COMPARISON_PRICE",
+      "sha256": "df7cbf5a66007edad1d88460d2068d68cb5760c6204fd98e6c0ed8be198dee40"
+    },
+    {
+      "module": "comparisons",
+      "name": "_COMPARISON_STOCK_QTY",
+      "sha256": "7516b49ed4391b807afa93d25cb0d534caeb3b587e9c1993e3ab346c8a60852e"
+    },
+    {
+      "module": "comparisons",
+      "name": "COMPARISON_METRICS",
+      "sha256": "ab04cdb67c98486f3e751b0234a621b0d35a7b5a1219adc44d1314ffceaaffca"
+    },
+    {
+      "module": "comparisons",
+      "name": "COMPARISON_GAP_METRICS",
+      "sha256": "1eacbc99e31ea9398d8eb465ba3d51a86da93602375f51b234b35c8a322fe252"
+    },
+    {
+      "module": "comparisons",
+      "name": "_comparison_dimension_projection",
+      "sha256": "9dc3ead3345035ccf2ce3990dcd2af78cf49a7636f95f4970863fd6da69c1a89"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_history_sql",
+      "sha256": "cb296c136adc329262ea0bb19b847d2426e226efb1efbad437293b06be059275"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_gap_sql",
+      "sha256": "8848ead1f611e95d80d8f7b572d892a8c2e2e0d0cd4b6cb6390e9d3811f0c2f1"
+    },
+    {
+      "module": "kpis",
+      "name": "KPI_DIMENSION_SCOPES",
+      "sha256": "0ddcd2c02a1325f0749a8133edc0c4137fdc4cc260f9e0e3f62341ea803d1ec7"
+    },
+    {
+      "module": "kpis",
+      "name": "KPI_INDUSTRY_OPTIONS",
+      "sha256": "f36f7607fbcedfa7fb32c41403a34e2aca384ed933a62b102e1bf7aa93b85881"
+    },
+    {
+      "module": "kpis",
+      "name": "KPI_DIMENSION_VALUE",
+      "sha256": "840fc00c5f565a92269e729c20b164e23f5064b03d255923bfc9dd4d5eab6779"
+    },
+    {
+      "module": "kpis",
+      "name": "_kpi_dimension_projection",
+      "sha256": "94994979502ffedc18286237dc0ebd2635535475da9dfc0dd3764c0686ea7357"
+    },
+    {
+      "module": "kpis",
+      "name": "_kpi_default_projection",
+      "sha256": "956c1004d472b73a93ca80abf9cadb7bb9fbb22082e4ec7cd5069c837b1f6f62"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_dimension_sql",
+      "sha256": "4434c5531acfe518cb5c72a6af9ff091cb1db5f013d400c0fc1eca0dc13c94dd"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_filter_options_sql",
+      "sha256": "9dc4a9598ba4a8762a08f7664857d9432a948868b40d88d099a037974c1ca3ae"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_dimension_params",
+      "sha256": "db7d1f7303a2f0279fe6e0db4971110993b616e18bd5ef6f1e61d2e22f9f2f6c"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_filter_bar_params",
+      "sha256": "ec7b2dfbafadda6097375bd8b76ab7b218d16c893e44a0005770ca4b96b962bd"
+    },
+    {
+      "module": "filters",
+      "name": "WEEKLY_FILTER_COLUMNS",
+      "sha256": "3a74209fd94b80a17e2ca1b143c7941462a3767d38a77b40277148cf89bc971f"
+    },
+    {
+      "module": "filters",
+      "name": "KPI_ORDER_METRIC_NAME",
+      "sha256": "104d465266d438ef3bb91196eb784bf34a3f15b4781c71ed064c850dbaa8f895"
+    },
+    {
+      "module": "filters",
+      "name": "KPI_MONTH_ORDER_METRIC_NAME",
+      "sha256": "075bd8063202d15f1311cd3967d415de35d0e4e4632d1ae4a08cb9615ccc70f2"
+    },
+    {
+      "module": "filters",
+      "name": "kpi_native_filters",
+      "sha256": "ef10ebe9da9193ac6890a46f9a27708a6b3a91fff75e06525a11ae25eb06c3db"
+    },
+    {
+      "module": "filters",
+      "name": "sql_filter",
+      "sha256": "9d0eec8e1074e7ac9c6061ee7847e3e605010c641154af19e5e3f7aaff5580cf"
+    },
+    {
+      "module": "details",
+      "name": "DETAIL_DIMENSIONS",
+      "sha256": "ac112da80e4d3958bb300f83407793daef43dc2c08bed99d1666b70bca91c3c0"
+    },
+    {
+      "module": "details",
+      "name": "detail_semantic_sql",
+      "sha256": "4805b50cb0cb1b6215fb1a8ddd20aef1e464524f9413175913659541c9eec364"
+    },
+    {
+      "module": "details",
+      "name": "DETAIL_METRICS",
+      "sha256": "67ba8432ee46c1118f06d61a5f2659b6bbdb6763e92246ad4e0148e3b6cad5ad"
+    },
+    {
+      "module": "details",
+      "name": "detail_table_params",
+      "sha256": "d3a2e615b161d9f700b77edcfa2dbf3fad99668fd1a79dd905dfc71e83159530"
+    }
+  ],
+  "sql": [
+    {
+      "module": "sources",
+      "name": "weekly_semantic_sql",
+      "args": [],
+      "sha256": "016ad5e323fe355d2e2d72b3b119b3efa312a9245043f2d5a70826af87d2d2ea"
+    },
+    {
+      "module": "sales",
+      "name": "weekly_sales_semantic_sql",
+      "args": [],
+      "sha256": "998dd89d550fc65cbb6321e5a0ab34a9ebb20b73d6d342b854df7991ae11c1bf"
+    },
+    {
+      "module": "sales",
+      "name": "monthly_sales_semantic_sql",
+      "args": [],
+      "sha256": "747d63605b726edc6e97b4bcd678cfce8fbb864f762b9ef14a650213d141bb25"
+    },
+    {
+      "module": "sales",
+      "name": "weekly_sales_card_semantic_sql",
+      "args": [],
+      "sha256": "5a37fb3a92b0eb4f73e69aa5b809f9ff04ea9bc8b962fbc51c0712b3f1557205"
+    },
+    {
+      "module": "inventory",
+      "name": "monthly_inventory_semantic_sql",
+      "args": [],
+      "sha256": "92c71455e51ae67ba0d7d6e97d01997d976fe362a51ab61b96a48c7311e7f028"
+    },
+    {
+      "module": "inventory",
+      "name": "weekly_inventory_card_semantic_sql",
+      "args": [],
+      "sha256": "3fecf822e52396c4e984f344820033479f0b09eeec6630701cda5f44b7fa75cf"
+    },
+    {
+      "module": "gaps",
+      "name": "monthly_gap_semantic_sql",
+      "args": [],
+      "sha256": "056a8646ef4effc70df5ceeeeb1404ea671f614a1fe2ae4b41db02f96472d569"
+    },
+    {
+      "module": "gaps",
+      "name": "weekly_gap_card_semantic_sql",
+      "args": [],
+      "sha256": "c4f4f24a057530fa6165a39f9f6547cb5fa5c0cfb4d36adcb9287aa62d684e7a"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_history_sql",
+      "args": [
+        "region"
+      ],
+      "sha256": "924909ac42bafe4b126d036a8fe16c4c8245808b415554e07c09b6604d12d879"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_history_sql",
+      "args": [
+        "retail"
+      ],
+      "sha256": "ea6ff7d5c955a7af791dc42e65455717221e06537c41fa438f136d4e6a5145d0"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_history_sql",
+      "args": [
+        "hierarchy"
+      ],
+      "sha256": "f18f42e823f7d6b8f9bf1c86bea8a2238580aeb8bde7c67af3e47d295912f334"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_gap_sql",
+      "args": [
+        "region"
+      ],
+      "sha256": "d75225dbf866945ce79ec88896f731ec315287c1063e6b9e1fbc8e64c8f91539"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_gap_sql",
+      "args": [
+        "retail"
+      ],
+      "sha256": "4baf59ef6a645c42ca7e2f2a06acc7d50cf7ef6d0d9b551403ff7eb444e30943"
+    },
+    {
+      "module": "comparisons",
+      "name": "comparison_gap_sql",
+      "args": [
+        "hierarchy"
+      ],
+      "sha256": "90ad84c4ca103c4ca8ff8eb5ea083d279661b99ef2e9c387c0fa51bbad62dc5d"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_dimension_sql",
+      "args": [
+        "region"
+      ],
+      "sha256": "01120c13b63431b42c63e235f77be2f5b9392bf166807f8a63bd13009c407a3c"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_dimension_sql",
+      "args": [
+        "retail"
+      ],
+      "sha256": "e0a9d86528eed8f4f793df62944c041cc94a0c2a13d725fcaa7b603a7f9950c6"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_dimension_sql",
+      "args": [
+        "hierarchy"
+      ],
+      "sha256": "94aea997d8411998623922a39bb30fe2ee89738ae51c787d5a7191f38f5ffb5d"
+    },
+    {
+      "module": "kpis",
+      "name": "kpi_filter_options_sql",
+      "args": [],
+      "sha256": "60cb9d66f23e285c380098ba93f10abbbcb61b9d802e746cbb4fe2c20d4f55a8"
+    },
+    {
+      "module": "details",
+      "name": "detail_semantic_sql",
+      "args": [
+        "regiao"
+      ],
+      "sha256": "63ad7acd230510fbbfa3163f832f8c63437cfb63c661eba3d680e6e810852a01"
+    },
+    {
+      "module": "details",
+      "name": "detail_semantic_sql",
+      "args": [
+        "rede"
+      ],
+      "sha256": "d0af56f1bd866c82e6fe4ad8a09fb8b3b040101bef216fc884a8d08dc1223184"
+    },
+    {
+      "module": "details",
+      "name": "detail_semantic_sql",
+      "args": [
+        "hierarquia_1"
+      ],
+      "sha256": "435aa613769e1f2b6fc51978a8c4eaa3bc172e1e72c57366cc25079d2dcbc6c5"
+    },
+    {
+      "module": "details",
+      "name": "detail_semantic_sql",
+      "args": [
+        "item"
+      ],
+      "sha256": "676c763a7d49c068939aa64d54a5ba1b2e3df8a9d7e85151771e7973a040dcfd"
+    },
+    {
+      "module": "details",
+      "name": "detail_semantic_sql",
+      "args": [
+        "activity_level"
+      ],
+      "sha256": "c3d9d1fa1f020911ef6e8b069d65530fa2ea7f85432fab683701a40821b822d9"
+    }
+  ]
+}

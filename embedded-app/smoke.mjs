@@ -63,7 +63,7 @@ const login = await request("/api/login", {
 });
 if (!login.response.ok) throw new Error(`Login falhou: ${login.response.status}`);
 
-const expectedCustomers = [142];
+const expectedCustomers = [Number(process.env.NEORETAIL_VALIDATION_CUSTOMER || 142)];
 let issuedTokens = 0;
 let authorizedDashboards = 0;
 for (const idCustomer of expectedCustomers) {

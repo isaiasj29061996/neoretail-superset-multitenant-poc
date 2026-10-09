@@ -175,13 +175,14 @@ def test_handlebars_card_assets_and_sanitization_are_present():
 
 
 def test_v9_customer_registry_and_embedded_rls():
+    """This deployment is explicitly LACTALIS ONLY; metric contracts are unchanged."""
     registry = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
     )
-    assert [row["id_customer"] for row in registry["customers"]] == [142]
-    assert registry["default_customer"] == 142
-    assert registry["customers"][0]["nm_customer"] == "AMBEV"
-    assert registry["customers"][0]["source_prefix"] == "FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV"
+    assert [row["id_customer"] for row in registry["customers"]] == [290]
+    assert registry["default_customer"] == 290
+    assert registry["customers"][0]["nm_customer"] == "LACTALIS"
+    assert registry["customers"][0]["source_prefix"] == "FATO/CUSTOMER/DAILY/NM_CUSTOMER=LACTALIS"
     assert registry["customers"][0]["source_layout"] == "partitioned_customer_daily_v1"
     server = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in server
@@ -193,14 +194,17 @@ def test_v9_customer_registry_and_embedded_rls():
     tenant_config = yaml.safe_load(
         (ROOT / "config/tenants.yaml").read_text(encoding="utf-8")
     )
+    assert tenant_config["default_customer_id"] == 290
+    assert set(tenant_config["customers"]) == {"290"}
+    assert all(user["allowed_customer_ids"] == [290] for user in tenant_config["users"])
     assert set(tenant_config["dashboards"]) == {
         "overview", "overview_quantity", "panorama", "osa", "tasks",
-        "export_daily", "export_monthly",
+        "osa_certified", "export_daily", "export_monthly",
     }
     assert len({
         definition["embedded_id"]
         for definition in tenant_config["dashboards"].values()
-    }) == 7
+    }) == 8
 
     smoke = (ROOT / "embedded-app/smoke.mjs").read_text(encoding="utf-8")
     assert "TENANTS_CONFIG" in smoke

@@ -1,0 +1,104 @@
+{
+  "source": "generated\\pbi_lactalis_reference_20261008\\NeoRetail Pocket RF.SemanticModel\\definition\\tables\\_Metricas.tmdl",
+  "source_sha256": "c51c0fa208f7a022f49e40688672674d318898e31098c9bc067c2a81eb992caa",
+  "roots": [
+    "Venda Custo",
+    "Venda Custo MTD",
+    "Venda Custo Mes Ant",
+    "Venda Custo U3M",
+    "Estoque Custo",
+    "Estoque Custo MTD",
+    "Estoque Custo Mes Ant",
+    "Estoque Custo U3M",
+    "MARKUP MTD",
+    "MARKUP Mes Ant",
+    "MARKUP U3M",
+    "ROI",
+    "ROI MTD",
+    "ROI Mes Ant",
+    "ROI U3M",
+    "ROI Anual"
+  ],
+  "measures": {
+    "Venda Custo": {
+      "dax": "SUMX(\n\t\t\t    FATOS_PARTICULAR_HISTORICO,\n\t\t\t    FATOS_PARTICULAR_HISTORICO[VOLUME_UNIDADES]*\n\t\t\t    FATOS_PARTICULAR_HISTORICO[AVG_PRICE_COST])",
+      "definition": "\tmeasure 'Venda Custo' = ```\n\t\t\t\n\t\t\tSUMX(\n\t\t\t    FATOS_PARTICULAR_HISTORICO,\n\t\t\t    FATOS_PARTICULAR_HISTORICO[VOLUME_UNIDADES]*\n\t\t\t    FATOS_PARTICULAR_HISTORICO[AVG_PRICE_COST])\n\t\t\t\n\t\t\t```\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: 8e051cdb-3844-44aa-b217-ddc488f94b70\n\n\t\tannotation PBI_FormatHint = {\"isGeneralNumber\":true}\n\n"
+    },
+    "Venda Custo MTD": {
+      "dax": "calculate([Venda Custo], all(AP_CONVERSAO[nm_measure]),'0_0_CALENDARIO'[M0] = True)",
+      "definition": "\tmeasure 'Venda Custo MTD' = calculate([Venda Custo], all(AP_CONVERSAO[nm_measure]),'0_0_CALENDARIO'[M0] = True)\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: cf211c07-b7b5-4b7f-a5c6-b47edfc9c75c\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Venda Custo Mes Ant": {
+      "dax": "calculate([Venda Custo], all(AP_CONVERSAO[nm_measure]),'0_0_CALENDARIO'[M-1] = True)",
+      "definition": "\tmeasure 'Venda Custo Mes Ant' = calculate([Venda Custo], all(AP_CONVERSAO[nm_measure]),'0_0_CALENDARIO'[M-1] = True)\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: cbd011e7-027b-45d4-b7c7-b5ec3d51f3c9\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Venda Custo U3M": {
+      "dax": "divide(calculate([Venda Custo], all(AP_CONVERSAO[nm_measure]), '0_0_CALENDARIO'[U3M] = True),3)",
+      "definition": "\tmeasure 'Venda Custo U3M' = divide(calculate([Venda Custo], all(AP_CONVERSAO[nm_measure]), '0_0_CALENDARIO'[U3M] = True),3)\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: f930a9cc-726f-4dff-935f-bb057a54932c\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Estoque Custo": {
+      "dax": "SUMX(\n\t\t\t    FATOS_PARTICULAR_HISTORICO,\n\t\t\t    FATOS_PARTICULAR_HISTORICO[ESTOQUE_MEDIO]*\n\t\t\t    FATOS_PARTICULAR_HISTORICO[AVG_PRICE_COST])",
+      "definition": "\tmeasure 'Estoque Custo' = ```\n\t\t\t\n\t\t\t    SUMX(\n\t\t\t    FATOS_PARTICULAR_HISTORICO,\n\t\t\t    FATOS_PARTICULAR_HISTORICO[ESTOQUE_MEDIO]*\n\t\t\t    FATOS_PARTICULAR_HISTORICO[AVG_PRICE_COST])\n\t\t\t\n\t\t\t\n\t\t\t```\n\t\tdisplayFolder: _Estoque\n\t\tlineageTag: b977b4d0-d873-4855-983d-6a7a9698f04d\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, \"R$ \" & FORMAT(vvalor, \"#,0,,,B\"),\n\t\t\t\t        vvalor >= 1000000,    \"R$ \" & FORMAT(vvalor, \"#,0,,M\"),\n\t\t\t\t        vvalor >= 1000,       \"R$ \" & FORMAT(vvalor, \"#,0,K\"),\n\t\t\t\t                              \"R$ \" & FORMAT(vvalor, \"#,0.00\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Estoque Custo MTD": {
+      "dax": "calculate([Estoque Custo], '0_0_CALENDARIO'[M0] = True)",
+      "definition": "\tmeasure 'Estoque Custo MTD' = calculate([Estoque Custo], '0_0_CALENDARIO'[M0] = True)\n\t\tdisplayFolder: _Estoque\n\t\tlineageTag: df113f16-60c7-4c68-982c-89c4fc99b5ba\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Estoque Custo Mes Ant": {
+      "dax": "calculate([Estoque Custo], '0_0_CALENDARIO'[M-1] = True)",
+      "definition": "\tmeasure 'Estoque Custo Mes Ant' = calculate([Estoque Custo], '0_0_CALENDARIO'[M-1] = True)\n\t\tdisplayFolder: _Estoque\n\t\tlineageTag: 89e94fd7-1490-40e4-ba04-e5ea81686a04\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Estoque Custo U3M": {
+      "dax": "divide(calculate([Estoque Custo], '0_0_CALENDARIO'[U3M] = True),3)",
+      "definition": "\tmeasure 'Estoque Custo U3M' = divide(calculate([Estoque Custo], '0_0_CALENDARIO'[U3M] = True),3)\n\t\tdisplayFolder: _Estoque\n\t\tlineageTag: fd39a27d-811a-45c8-a43f-e70b5f2bc81c\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "MARKUP MTD": {
+      "dax": "VAR vSellOut = [Venda sell out MTD]\n\t\t\tVAR vVendaCusto = [Venda Custo MTD]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut,\n\t\t\t            vVendaCusto\n\t\t\t        )\n\t\t\t    )\n\t\t\t)",
+      "definition": "\tmeasure 'MARKUP MTD' =\n\t\t\t\n\t\t\tVAR vSellOut = [Venda sell out MTD]\n\t\t\tVAR vVendaCusto = [Venda Custo MTD]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut,\n\t\t\t            vVendaCusto\n\t\t\t        )\n\t\t\t    )\n\t\t\t)\n\t\tformatString: 0.00%;-0.00%;0.00%\n\t\tdisplayFolder: _Markup\n\t\tlineageTag: 4518a67b-5602-4532-9886-7cc7cb63a6d2\n\n"
+    },
+    "Venda sell out MTD": {
+      "dax": "calculate([Venda sell out], '0_0_CALENDARIO'[M0] = True)",
+      "definition": "\tmeasure 'Venda sell out MTD' = calculate([Venda sell out], '0_0_CALENDARIO'[M0] = True)\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: b203f8bc-a01d-490b-b23f-19e6a00d5eb9\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "Venda sell out": {
+      "dax": "SUMX(\n\t\t\t\n\t\t\t    VALUES(DIM_LOCAL[Região]), \n\t\t\t    VAR MedidaSelecionada = SELECTEDVALUE(AP_CONVERSAO[nm_measure])\n\t\t\t    VAR Fator =\n\t\t\t        CALCULATE(\n\t\t\t            MAX(DIM_CONVERSAO[conversion_rate]),\n\t\t\t            DIM_CONVERSAO[nm_measure] = MedidaSelecionada\n\t\t\t        )\n\t\t\t    VAR FaturamentoLocal = CALCULATE(SUM(FATOS_PARTICULAR_HISTORICO[FATURAMENTO]))\n\t\t\t    VAR VolumeLocal = CALCULATE(SUM(FATOS_PARTICULAR_HISTORICO[VOLUME_UNIDADES]))\n\t\t\t    VAR PrecoMedioLocal = CALCULATE(AVERAGE(FATOS_PARTICULAR_HISTORICO[AVG_SALES_PRICE]))\n\t\t\t    RETURN\n\t\t\t        IF(\n\t\t\t            FaturamentoLocal > 0,\n\t\t\t            FaturamentoLocal,\n\t\t\t            (VolumeLocal * Fator) * (PrecoMedioLocal * Fator)\n\t\t\t        )\n\t\t\t)",
+      "definition": "\tmeasure 'Venda sell out' = ```\n\t\t\t\n\t\t\tSUMX(\n\t\t\t\n\t\t\t    VALUES(DIM_LOCAL[Região]), \n\t\t\t    VAR MedidaSelecionada = SELECTEDVALUE(AP_CONVERSAO[nm_measure])\n\t\t\t    VAR Fator =\n\t\t\t        CALCULATE(\n\t\t\t            MAX(DIM_CONVERSAO[conversion_rate]),\n\t\t\t            DIM_CONVERSAO[nm_measure] = MedidaSelecionada\n\t\t\t        )\n\t\t\t    VAR FaturamentoLocal = CALCULATE(SUM(FATOS_PARTICULAR_HISTORICO[FATURAMENTO]))\n\t\t\t    VAR VolumeLocal = CALCULATE(SUM(FATOS_PARTICULAR_HISTORICO[VOLUME_UNIDADES]))\n\t\t\t    VAR PrecoMedioLocal = CALCULATE(AVERAGE(FATOS_PARTICULAR_HISTORICO[AVG_SALES_PRICE]))\n\t\t\t    RETURN\n\t\t\t        IF(\n\t\t\t            FaturamentoLocal > 0,\n\t\t\t            FaturamentoLocal,\n\t\t\t            (VolumeLocal * Fator) * (PrecoMedioLocal * Fator)\n\t\t\t        )\n\t\t\t)\n\t\t\t```\n\t\tformatString: \"R$\"\\ #,0.00;-\"R$\"\\ #,0.00;\"R$\"\\ #,0.00\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: b3deb97f-fa5d-4de2-9631-acc27dba3fc3\n\n\t\tannotation PBI_FormatHint = {\"currencyCulture\":\"pt-BR\"}\n\n"
+    },
+    "MARKUP Mes Ant": {
+      "dax": "VAR vSellOut = [Venda sell out Mes Ant]\n\t\t\tVAR vVendaCusto = [Venda Custo Mes Ant]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut,\n\t\t\t            vVendaCusto\n\t\t\t        )\n\t\t\t    )\n\t\t\t)",
+      "definition": "\tmeasure 'MARKUP Mes Ant' =\n\t\t\t\n\t\t\tVAR vSellOut = [Venda sell out Mes Ant]\n\t\t\tVAR vVendaCusto = [Venda Custo Mes Ant]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut,\n\t\t\t            vVendaCusto\n\t\t\t        )\n\t\t\t    )\n\t\t\t)\n\t\tformatString: 0.00%;-0.00%;0.00%\n\t\tdisplayFolder: _Markup\n\t\tlineageTag: c8e185d1-d33c-4cf5-a1c9-e1e23ba24163\n\n"
+    },
+    "Venda sell out Mes Ant": {
+      "dax": "calculate([Venda sell out], '0_0_CALENDARIO'[M-1] = True)",
+      "definition": "\tmeasure 'Venda sell out Mes Ant' = calculate([Venda sell out], '0_0_CALENDARIO'[M-1] = True)\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: 5a1ed61f-a7a8-4527-a45b-19c6d01242db\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "MARKUP U3M": {
+      "dax": "VAR vSellOut = [Venda sell out U3M]\n\t\t\tVAR vVendaCusto = [Venda Custo U3M]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut,\n\t\t\t            vVendaCusto\n\t\t\t        )\n\t\t\t    )\n\t\t\t)",
+      "definition": "\tmeasure 'MARKUP U3M' =\n\t\t\t\n\t\t\tVAR vSellOut = [Venda sell out U3M]\n\t\t\tVAR vVendaCusto = [Venda Custo U3M]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut,\n\t\t\t            vVendaCusto\n\t\t\t        )\n\t\t\t    )\n\t\t\t)\n\t\tformatString: 0.00%;-0.00%;0.00%\n\t\tdisplayFolder: _Markup\n\t\tlineageTag: 7f8ceae4-d50a-49d8-b699-3e420376b071\n\n"
+    },
+    "Venda sell out U3M": {
+      "dax": "DIVIDE(calculate([Venda sell out], '0_0_CALENDARIO'[U3M] = True),3)",
+      "definition": "\tmeasure 'Venda sell out U3M' = DIVIDE(calculate([Venda sell out], '0_0_CALENDARIO'[U3M] = True),3)\n\t\tdisplayFolder: _Vendas\n\t\tlineageTag: 97771e98-8167-43e4-9239-4d86ac847201\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n"
+    },
+    "ROI": {
+      "dax": "VAR vSellOut = [Venda sell out]\n\t\t\tVAR vVendaCusto = [Venda Custo]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut - vVendaCusto,\n\t\t\t            [Estoque Custo]\n\t\t\t        )\n\t\t\t    )\n\t\t\t)",
+      "definition": "\tmeasure ROI =\n\t\t\t\n\t\t\tVAR vSellOut = [Venda sell out]\n\t\t\tVAR vVendaCusto = [Venda Custo]\n\t\t\t\n\t\t\tRETURN\n\t\t\tIF(\n\t\t\t    vSellOut = 0\n\t\t\t        || vVendaCusto = 0,\n\t\t\t    0,\n\t\t\t    CALCULATE(\n\t\t\t        DIVIDE(\n\t\t\t            vSellOut - vVendaCusto,\n\t\t\t            [Estoque Custo]\n\t\t\t        )\n\t\t\t    )\n\t\t\t)\n\t\tformatString: 0.00%;-0.00%;0.00%\n\t\tdisplayFolder: _ROI\n\t\tlineageTag: 13315ace-c74c-42f6-9668-e3bd344f4d88\n\n"
+    },
+    "ROI MTD": {
+      "dax": "calculate([ROI],'0_0_CALENDARIO'[M0] = True)",
+      "definition": "\tmeasure 'ROI MTD' = calculate([ROI],'0_0_CALENDARIO'[M0] = True)\n\t\tformatString: #,0.00%;-#,0.00%;#,0.00%\n\t\tdisplayFolder: _ROI\n\t\tlineageTag: 57b58ac4-17e9-4805-8ae5-35d601e21272\n\n"
+    },
+    "ROI Mes Ant": {
+      "dax": "calculate([ROI],'0_0_CALENDARIO'[M-1] = True)",
+      "definition": "\tmeasure 'ROI Mes Ant' = calculate([ROI],'0_0_CALENDARIO'[M-1] = True)\n\t\tformatString: #,0.00%;-#,0.00%;#,0.00%\n\t\tdisplayFolder: _ROI\n\t\tlineageTag: 8b6424fd-b2d4-4f96-9b3c-90cfa96d10b5\n\n"
+    },
+    "ROI U3M": {
+      "dax": "calculate([ROI],'0_0_CALENDARIO'[U3M] = True)",
+      "definition": "\tmeasure 'ROI U3M' = calculate([ROI],'0_0_CALENDARIO'[U3M] = True)\n\t\tformatString: 0.00%;-0.00%;0.00%\n\t\tdisplayFolder: _ROI\n\t\tlineageTag: ba9b8e28-8ed0-4890-bd2a-846ffd0f51e2\n\n"
+    },
+    "ROI Anual": {
+      "dax": "CALCULATE(\n\t\t\t    SUMX(\n\t\t\t        VALUES('0_0_CALENDARIO'[AnoMes]),\n\t\t\t        [ROI]\n\t\t\t    ),\n\t\t\t    DATESINPERIOD(\n\t\t\t        '0_0_CALENDARIO'[DATA],\n\t\t\t        MAX('0_0_CALENDARIO'[DATA]),\n\t\t\t        -12,\n\t\t\t        MONTH\n\t\t\t    ),\n\t\t\t    REMOVEFILTERS('0_0_DIM_PERIODO')\n\t\t\t)",
+      "definition": "\tmeasure 'ROI Anual' =\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t    SUMX(\n\t\t\t        VALUES('0_0_CALENDARIO'[AnoMes]),\n\t\t\t        [ROI]\n\t\t\t    ),\n\t\t\t    DATESINPERIOD(\n\t\t\t        '0_0_CALENDARIO'[DATA],\n\t\t\t        MAX('0_0_CALENDARIO'[DATA]),\n\t\t\t        -12,\n\t\t\t        MONTH\n\t\t\t    ),\n\t\t\t    REMOVEFILTERS('0_0_DIM_PERIODO')\n\t\t\t)\n\t\tformatString: 0.00%;-0.00%;0.00%\n\t\tdisplayFolder: _ROI\n\t\tlineageTag: 729f7e5e-b96d-4e78-bc61-1470e69e9c8e\n\n"
+    }
+  }
+}

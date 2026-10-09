@@ -1,0 +1,87 @@
+[
+  {
+    "source_branch": "fix/panorama-weekly-filter-contract",
+    "source_head": "41bd81e23da8a77e5cda2ae7ef4200e177ddc367",
+    "backup_branch": "backup/root-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/governed-analytics-assistant-ollama",
+    "source_head": "f7bc712cf8e95f109f1179e8ae41e4884c55f70b",
+    "backup_branch": "backup/governed-assistant-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/governed-analytics-assistant-ollama-ambev",
+    "source_head": "c0d469c9501f37c18c50b6ba6018157e93958f2f",
+    "backup_branch": "backup/governed-assistant-ambev-pre-format-20261009"
+  },
+  {
+    "source_branch": "detached integration-pr3",
+    "source_head": "3fc07c4da375219b928ffdc4ae090dd127a10d13",
+    "backup_branch": "backup/integration-pr3-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/multitenant-fasttrack",
+    "source_head": "6257e491242d265b9c742633580dcf928416f8be",
+    "backup_branch": "backup/multitenant-fasttrack-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/multitenant-tenant-context",
+    "source_head": "6257e491242d265b9c742633580dcf928416f8be",
+    "backup_branch": "backup/multitenant-tenant-context-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/osa-industry-certification",
+    "source_head": "569d2f536b5968ead1bae9af6d2ef7b76f9a45ae",
+    "backup_branch": "backup/osa-industry-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/overview-quantity-certification",
+    "source_head": "8dac7fcfbdb7677a71a8c504bbf7b91bbb03b3c3",
+    "backup_branch": "backup/overview-quantity-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/panorama-sales-evolution-certification",
+    "source_head": "1a47a8ebd5bbe44e71be3ff84ae49f362f384376",
+    "backup_branch": "backup/panorama-sales-evolution-pre-format-20261009"
+  },
+  {
+    "source_branch": "feat/panorama-stock-certification",
+    "source_head": "4bec5ff7e320d8ef1753cfd2d46be53d9dda8053",
+    "backup_branch": "backup/panorama-stock-pre-format-20261009"
+  },
+  {
+    "source_branch": "refactor/superset-bootstrap-core",
+    "source_head": "a5f2a558b88366b58277d282888291a16129e2c0",
+    "backup_branch": "backup/superset-bootstrap-core-pre-format-20261009"
+  },
+  {
+    "source_branch": "refactor/superset-osa-certified-modules",
+    "source_head": "d30af427b9b367b05383138ddc3605e893b3ac2f",
+    "backup_branch": "backup/superset-osa-certified-modules-pre-format-20261009"
+  },
+  {
+    "source_branch": "refactor/superset-overview-modules",
+    "source_head": "a1337e98f4415ad8b4d04bd2135a8fb47bb677b8",
+    "backup_branch": "backup/superset-overview-modules-pre-format-20261009"
+  },
+  {
+    "source_branch": "refactor/superset-panorama-modules",
+    "source_head": "8080801ab0570f9e2b4edf4c638714cf7b449ee5",
+    "backup_branch": "backup/superset-panorama-modules-pre-format-20261009"
+  },
+  {
+    "source_branch": "test/overview-quantity-stacked",
+    "source_head": "faad0dda40673b3f318baa9bae30acef9842bff6",
+    "backup_branch": "backup/test-overview-quantity-stacked-pre-format-20261009"
+  },
+  {
+    "source_branch": "test/remove-overview-quantity",
+    "source_head": "1b415ecbcd3c6b8ffa45aa5b58afb459a5fbcda2",
+    "backup_branch": "backup/test-remove-overview-quantity-pre-format-20261009"
+  },
+  {
+    "source_branch": "wip/lactalis-rebuild-safe-20261007",
+    "source_head": "daec78231cf9caf1c308acb8620d73a40939f16e",
+    "backup_branch": "backup/wip-lactalis-rebuild-safe-20261007-pre-format-20261009"
+  }
+]

@@ -8,7 +8,7 @@ from flask_login import login_user
 from superset.app import create_app
 
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 FILTER_COLUMN = os.getenv('OVERVIEW_FILTER_COLUMN', '').strip()
 FILTER_VALUE = os.getenv('OVERVIEW_FILTER_VALUE', '').strip()
 CONVERSION_MEASURE = os.getenv('OVERVIEW_CONVERSION_MEASURE', 'unidade').strip()
@@ -53,21 +53,36 @@ with app.test_request_context('/'):
             filters.append({'col': 'nm_measure', 'op': 'IN', 'val': [CONVERSION_MEASURE]})
         if FILTER_COLUMN and FILTER_VALUE:
             filters.append({'col': FILTER_COLUMN, 'op': 'IN', 'val': [FILTER_VALUE]})
+        where, having = [], []
+        for adhoc in form.get('adhoc_filters', []):
+            if adhoc.get('expressionType') == 'SQL':
+                (having if adhoc.get('clause') == 'HAVING' else where).append(adhoc['sqlExpression'])
+            else:
+                filters.append({'col': adhoc['subject'], 'op': adhoc['operator'], 'val': adhoc.get('comparator')})
         common = {
             'time_range': 'No filter',
             'filters': filters,
-            'extras': {'time_grain_sqla': grain},
+            'extras': {'time_grain_sqla': grain, 'where': ' AND '.join(where), 'having': ' AND '.join(having)},
             'metrics': metrics,
             'orderby': [[axis, True]],
             'row_limit': 10000,
         }
         queries = [{**common, 'columns': [time_column]}]
         if form.get('card_variant') == 'bars' and form.get('groupby'):
+            grouped_extras = dict(common['extras'])
+            if form.get('pbip_headline_scope'):
+                grouped_extras['where'] = grouped_extras['where'].replace("semantic_scope = 'all'", "semantic_scope = 'activity'")
             queries.append({
                 **common,
+                'extras': grouped_extras,
                 'columns': [time_column, *form['groupby']],
             })
 
+        if form.get('pbip_sellout_u3m'):
+            queries.append({**common, 'columns': [time_column],
+                'filters': [*filters, {'col':'row_scope','op':'IN','val':['pbip_c05_u3m']}],
+                'extras': {**common['extras'], 'time_grain_sqla':'P1M',
+                    'where': common['extras']['where'].replace("row_scope = 'monthly'", "row_scope = 'pbip_c05_u3m'")}})
         started = perf_counter()
         try:
             # Jinja's get_filters() reads the Chart Data API request payload
@@ -85,7 +100,23 @@ with app.test_request_context('/'):
             sources = []
             for item in result.get('queries', []):
                 sql = item.get('query') or item.get('sql') or ''
-                if 'nr_overview_semantic_default' in sql:
+                if 'nr_pbip_overview_semantic_v3' in sql:
+                    sources.append('pbip_overview_semantic_v3')
+                elif 'nr_pbip_osa_semantic_v3' in sql:
+                    sources.append('pbip_osa_semantic_v3')
+                elif 'nr_pbip_giro_v3' in sql:
+                    sources.append('pbip_giro_v3')
+                elif 'nr_pbip_overview_semantic_v2' in sql:
+                    sources.append('pbip_overview_semantic_v2')
+                elif 'nr_pbip_giro_default' in sql:
+                    sources.append('pbip_giro_default')
+                elif 'nr_pbip_daily_headlines' in sql:
+                    sources.append('pbip_daily_headlines')
+                elif 'nr_pbip_overview_semantic_default' in sql:
+                    sources.append('pbip_overview_semantic_default')
+                elif 'nr_pbip_osa_semantic_default' in sql:
+                    sources.append('pbip_osa_semantic_default')
+                elif 'nr_overview_semantic_default' in sql:
                     sources.append('overview_semantic_default')
                 elif 'history_filtered' in sql:
                     sources.append('overview_detail')

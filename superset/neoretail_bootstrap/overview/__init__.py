@@ -1,0 +1,1 @@
+"""NeoRetail Overview domain contracts."""

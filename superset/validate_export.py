@@ -1,6 +1,8 @@
 """Validate the Export dashboards, indicator selector, and virtual SQL path."""
 from __future__ import annotations
 
+import os
+
 import json
 
 from flask import g
@@ -10,7 +12,7 @@ from superset.app import create_app
 from bootstrap_export import EXPORT_VALUE, INDICATORS
 
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 MONTHLY_SLUG = "neoretail-v9-exportacao-historico-mes"
 
 

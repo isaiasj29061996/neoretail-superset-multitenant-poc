@@ -1,6 +1,8 @@
 """Validate fast and filtered TVD/IVD headline paths through Superset."""
 from __future__ import annotations
 
+import os
+
 import json
 
 from flask import g
@@ -11,7 +13,7 @@ from superset.app import create_app
 from profile_dashboard_performance import build_queries
 
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 CASES = (
     {
         "chart": "TVD - Pré-ruptura",
@@ -188,7 +190,7 @@ def main() -> None:
 
                 filtered = run_chart(factory, ChartDataCommand, chart, [
                     *tenant_filter,
-                    {"col": "rede", "op": "IN", "val": ["AKKIATACADO"]},
+                    {"col": "rede", "op": "IN", "val": [os.getenv("NEORETAIL_VALIDATION_REDE", "AKKIATACADO")]},
                 ])
                 filtered_sql = filtered.get("query") or filtered.get("sql") or ""
                 if detail_table not in filtered_sql or summary_table in filtered_sql:

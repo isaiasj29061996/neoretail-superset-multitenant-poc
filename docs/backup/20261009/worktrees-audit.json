@@ -1,0 +1,111 @@
+[
+  {
+    "name": "NeoRetail_V8_1_LOCAL_POSTGRES",
+    "branch": "fix/panorama-weekly-filter-contract",
+    "head": "41bd81e23da8a77e5cda2ae7ef4200e177ddc367",
+    "excluded": [],
+    "candidate_files": 215
+  },
+  {
+    "name": "governed-assistant",
+    "branch": "feat/governed-analytics-assistant-ollama",
+    "head": "f7bc712cf8e95f109f1179e8ae41e4884c55f70b",
+    "excluded": [],
+    "candidate_files": 134
+  },
+  {
+    "name": "governed-assistant-ambev",
+    "branch": "feat/governed-analytics-assistant-ollama-ambev",
+    "head": "c0d469c9501f37c18c50b6ba6018157e93958f2f",
+    "excluded": [],
+    "candidate_files": 177
+  },
+  {
+    "name": "integration-pr3",
+    "branch": "",
+    "head": "3fc07c4da375219b928ffdc4ae090dd127a10d13",
+    "excluded": [],
+    "candidate_files": 150
+  },
+  {
+    "name": "multitenant-fasttrack",
+    "branch": "feat/multitenant-fasttrack",
+    "head": "6257e491242d265b9c742633580dcf928416f8be",
+    "excluded": [],
+    "candidate_files": 278
+  },
+  {
+    "name": "multitenant-tenant-context",
+    "branch": "feat/multitenant-tenant-context",
+    "head": "6257e491242d265b9c742633580dcf928416f8be",
+    "excluded": [],
+    "candidate_files": 253
+  },
+  {
+    "name": "osa-industry",
+    "branch": "feat/osa-industry-certification",
+    "head": "569d2f536b5968ead1bae9af6d2ef7b76f9a45ae",
+    "excluded": [
+      {
+        "path": "local-engine/tests/fixtures/pbip_filters_conversion_real_rows_20261008.json",
+        "reason": "private real-data test fixture; external backup required",
+        "kind": "untracked"
+      },
+      {
+        "path": "local-engine/tests/fixtures/pbip_lactalis_real_contract_rows_20261008.json",
+        "reason": "private real-data test fixture; external backup required",
+        "kind": "untracked"
+      }
+    ],
+    "candidate_files": 317
+  },
+  {
+    "name": "overview-quantity",
+    "branch": "feat/overview-quantity-certification",
+    "head": "8dac7fcfbdb7677a71a8c504bbf7b91bbb03b3c3",
+    "excluded": [],
+    "candidate_files": 156
+  },
+  {
+    "name": "panorama-sales-evolution",
+    "branch": "feat/panorama-sales-evolution-certification",
+    "head": "1a47a8ebd5bbe44e71be3ff84ae49f362f384376",
+    "excluded": [],
+    "candidate_files": 182
+  },
+  {
+    "name": "panorama-stock",
+    "branch": "feat/panorama-stock-certification",
+    "head": "4bec5ff7e320d8ef1753cfd2d46be53d9dda8053",
+    "excluded": [],
+    "candidate_files": 200
+  },
+  {
+    "name": "superset-bootstrap-core",
+    "branch": "refactor/superset-bootstrap-core",
+    "head": "a5f2a558b88366b58277d282888291a16129e2c0",
+    "excluded": [],
+    "candidate_files": 215
+  },
+  {
+    "name": "superset-osa-certified-modules",
+    "branch": "refactor/superset-osa-certified-modules",
+    "head": "d30af427b9b367b05383138ddc3605e893b3ac2f",
+    "excluded": [],
+    "candidate_files": 247
+  },
+  {
+    "name": "superset-overview-modules",
+    "branch": "refactor/superset-overview-modules",
+    "head": "a1337e98f4415ad8b4d04bd2135a8fb47bb677b8",
+    "excluded": [],
+    "candidate_files": 238
+  },
+  {
+    "name": "superset-panorama-modules",
+    "branch": "refactor/superset-panorama-modules",
+    "head": "8080801ab0570f9e2b4edf4c638714cf7b449ee5",
+    "excluded": [],
+    "candidate_files": 230
+  }
+]

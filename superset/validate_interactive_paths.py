@@ -1,6 +1,8 @@
 """Validate compact defaults and detailed fallbacks for interactive marts."""
 from __future__ import annotations
 
+import os
+
 import json
 
 from flask import g
@@ -10,7 +12,7 @@ from superset.app import create_app
 from profile_dashboard_performance import build_queries
 
 
-CUSTOMER_ID = 142
+CUSTOMER_ID = int(os.getenv("NEORETAIL_VALIDATION_CUSTOMER", "142"))
 TEST_FILTER = {"col": "rede", "op": "IN", "val": ["AKKIATACADO"]}
 EXPORT_DETAIL_FILTER = {"col": "bandeira", "op": "IN", "val": ["DELTAMAX"]}
 CASES = (

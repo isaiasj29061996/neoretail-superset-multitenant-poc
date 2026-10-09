@@ -13,21 +13,39 @@ const asDate = value => {
 };
 const monthKey = date => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 const shiftMonth = (date, offset) => monthKey(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1)));
-const splitConfig = (value, fallback = []) => String(value || '').split('|').map(item => item.trim()).filter(Boolean).concat(fallback);
-const semanticValue = (profile, components) => {
+const splitConfig = (value, fallback = []) => {
+  const configured = String(value || '').split('|').map(item => item.trim()).filter(Boolean);
+  return configured.length ? configured : fallback;
+};
+// Ordinary DAX `= 0` in the certified PBIP ROI/Markup guards. This tests
+// a numeric measure BLANK without changing its stored component or DIVIDE.
+const daxEqualsZero = value => value == null || value === 0;
+const semanticValue = (profile, components, pbipDaxZeroGuard = false) => {
   if (!profile || ['direct_average', 'direct_sum', 'stock_bundle'].includes(profile)) return components;
   const numerator = components[0];
   const denominator = components[1];
+  if (pbipDaxZeroGuard && ['roi', 'markup'].includes(profile)
+    && (daxEqualsZero(numerator) || daxEqualsZero(denominator))) return [0];
   if (profile === 'roi') {
     const stockCost = components[2];
+    if (pbipDaxZeroGuard && stockCost == null) return [null];
     if (numerator === 0 || denominator === 0) return [0];
     if (numerator === null || denominator === null || stockCost === null || stockCost === 0) return [null];
     return [100 * (numerator - denominator) / stockCost];
   }
-  if (profile === 'markup') {
+  if (profile === 'markup' || profile === 'markup_blank') {
+    if (profile === 'markup_blank' && (numerator === 0 || denominator === 0)) return [null];
     if (numerator === 0 || denominator === 0) return [0];
     if (numerator === null || denominator === null) return [null];
     return [100 * numerator / denominator];
+  }
+  if (profile === 'pbip_osa_bundle') {
+    const lossPriceCount = components[4];
+    const loss = components[2] == null || components[3] == null
+      || components[5] == null || !lossPriceCount
+      ? null : components[2] * components[5] * components[3] / lossPriceCount;
+    return [numerator == null || denominator == null || denominator === 0
+      ? null : 100 * (1 - numerator / denominator), loss];
   }
   if (profile === 'osa_bundle') {
     const osa = numerator == null || denominator == null || denominator === 0
@@ -43,7 +61,7 @@ const semanticValue = (profile, components) => {
   if (profile === 'distribution_bundle') return components.slice(0, 2);
   return components;
 };
-const semanticAggregate = (profile, rows, index) => {
+const semanticAggregate = (profile, rows, index, pbipDaxZeroGuard = false) => {
   if (!profile) return null;
   if (profile === 'direct_average') {
     const values = rows.map(row => row?.values[index]).filter(value => value != null);
@@ -70,8 +88,53 @@ const semanticAggregate = (profile, rows, index) => {
     if (value != null) components[componentIndex] = (components[componentIndex] ?? 0) + value;
   }));
   if (profile === 'osa_bundle' && index === 1) return components[2] == null ? null : components[2] / 3;
-  return semanticValue(profile, components)[index] ?? null;
+  if (profile === 'pbip_osa_bundle') {
+    // MAX factor is evaluated once in the selected dimension context, not summed.
+    const factors = rows.map(row => row?.components?.[5]).filter(value => value != null);
+    components[5] = factors.length ? Math.max(...factors) : null;
+    const value = semanticValue(profile, components)[index] ?? null;
+    return index === 1 && value != null ? value / 3 : value;
+  }
+  return semanticValue(profile, components, pbipDaxZeroGuard)[index] ?? null;
 };
+
+// SUMX ignores BLANK; no numeric return leaves the final sum BLANK.
+// Member presence and fact-row presence are separate inputs to this iterator.
+const pbipAnnualRoiSum = (rows, members, pbipDaxZeroGuard) => {
+  const byMonth = new Map(rows.map(row => [monthKey(row.date), row]));
+  const values = members.map(member => byMonth.has(member)
+    ? byMonth.get(member).values[0]
+    : semanticValue('roi', [], pbipDaxZeroGuard)[0]);
+  const numericValues = values.filter(value => value != null);
+  return numericValues.length ? numericValues.reduce((sum, value) => sum + value, 0) : null;
+};
+
+const VALID_SEMANTIC_PROFILES = [
+  'direct_average', 'direct_sum', 'stock_bundle', 'weighted_average',
+  'one_minus_ratio', 'ratio_percent', 'ratio', 'distribution_bundle',
+  'osa_bundle', 'pbip_osa_bundle', 'roi', 'markup', 'markup_blank',
+];
+
+// A Panorama combo can mix measures whose U3M semantics differ. Each spec is
+// `profile:componentOffset:componentCount`, for example:
+// direct_average:0:1|direct_sum:1:1|weighted_average:2:2.
+const parseMetricSemantics = value => String(value || '').split('|').map(spec => {
+  const [profile, offset, count] = spec.split(':');
+  return VALID_SEMANTIC_PROFILES.includes(profile)
+    ? { profile, offset: Number(offset), count: Number(count) }
+    : null;
+}).filter(spec => spec && Number.isInteger(spec.offset) && spec.offset >= 0
+  && Number.isInteger(spec.count) && spec.count > 0);
+
+const aggregateMetricSpec = (spec, rows) => semanticAggregate(
+  spec.profile,
+  rows.map(row => ({
+    ...row,
+    components: row?.components?.slice(spec.offset, spec.offset + spec.count) || [],
+    values: row?.components?.slice(spec.offset, spec.offset + spec.count) || [],
+  })),
+  0,
+);
 
 const ALLOWED_ACTIVITY_LEVELS = [
   'Fast Mover', 'Slow Mover', 'Ultra Slow Mover', 'New Mover',
@@ -82,9 +145,16 @@ export default function transformProps(chartProps) {
   const normalizeKeys = source => Object.fromEntries(Object.entries(source || {})
     .filter(([, value]) => value !== undefined && value !== null)
     .map(([key, value]) => [key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`), value]));
-  // Superset supplies persisted values in formData (camelCase) and may also
-  // include incomplete/default values in rawFormData. Persisted values must win.
-  const formData = { ...normalizeKeys(chartProps.rawFormData), ...normalizeKeys(chartProps.formData) };
+  // Superset exposes persisted chart.params as snake_case rawFormData and the
+  // registered controls as camelCase formData. A missing/empty control value
+  // must not erase its persisted counterpart; an explicit transformed value
+  // still wins when both are present.
+  const rawFormData = normalizeKeys(chartProps.rawFormData);
+  const transformedFormData = normalizeKeys(chartProps.formData);
+  const formData = { ...rawFormData, ...transformedFormData };
+  Object.entries(rawFormData).forEach(([key, value]) => {
+    if (transformedFormData[key] === '') formData[key] = value;
+  });
   const variantCandidates = [
     chartProps.formData?.cardVariant,
     chartProps.formData?.card_variant,
@@ -99,14 +169,30 @@ export default function transformProps(chartProps) {
   const metricLabels = metrics.map(metricLabel);
   const dateColumn = columnName(formData.x_axis) || 'data';
   const groupColumn = columnName(asArray(formData.groupby)[0]);
+  const hierarchyColumns = splitConfig(
+    formData.hierarchy_columns,
+    asArray(formData.groupby).map(columnName).filter(column => column && ![
+      'drill_level', 'comparison_kpi', 'kpi_format',
+    ].includes(column)),
+  );
   const labels = splitConfig(formData.metric_labels, metricLabels);
   const formats = splitConfig(formData.metric_formats, [formData.number_format_type || 'currency']);
   const directions = splitConfig(formData.metric_directions, [formData.lower_is_better === false ? 'higher' : 'lower']);
   const criticalLabel = metricLabel(formData.critical_metric);
   const riskLabel = metricLabel(formData.risk_metric);
-  const semanticProfile = ['direct_average', 'direct_sum', 'stock_bundle', 'weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'distribution_bundle', 'osa_bundle', 'roi', 'markup'].includes(formData.semantic_profile)
+  const semanticProfile = formData.pbip_loss_components ? 'pbip_osa_bundle' : VALID_SEMANTIC_PROFILES.includes(formData.semantic_profile)
     ? formData.semantic_profile
     : null;
+  const pbipDaxZeroGuard = formData.pbip_dax_zero_guard === true
+    && ['roi', 'markup'].includes(semanticProfile);
+  const metricSemantics = parseMetricSemantics(formData.metric_semantics);
+  const summaryLabels = splitConfig(formData.summary_labels, []);
+  const metricSummaryModes = splitConfig(formData.metric_summary_modes, []);
+  const timelineZeroBlankIndices = new Set(
+    splitConfig(formData.timeline_zero_blank_indices, [])
+      .map(value => Number(value))
+      .filter(value => Number.isInteger(value) && value >= 0),
+  );
   const normalize = (rows, grouped = false) => rows.map(row => ({
     date: asDate(row.__timestamp ?? row[dateColumn]),
     category: grouped ? String(row[groupColumn] ?? 'Outros') : null,
@@ -114,12 +200,22 @@ export default function transformProps(chartProps) {
     critical: numeric(row[criticalLabel]),
     risk: numeric(row[riskLabel]),
   })).filter(row => row.date).sort((left, right) => left.date - right.date);
-  const applySemanticProfile = row => ({
-    ...row,
-    components: row.values,
-    values: semanticValue(semanticProfile, row.values),
-  });
+  const applySemanticProfile = row => {
+    const components = row.values;
+    const values = metricSemantics.length
+      ? metricSemantics.map(spec => semanticValue(
+        spec.profile,
+        components.slice(spec.offset, spec.offset + spec.count),
+      )[0] ?? null)
+      : semanticValue(semanticProfile, components, pbipDaxZeroGuard);
+    return { ...row, components, values };
+  };
   const timeline = normalize(queriesData[0]?.data || []).map(applySemanticProfile);
+  const hasSummaryQuery = Boolean(String(formData.summary_query_scope || '').trim());
+  const summaryTimeline = hasSummaryQuery
+    ? normalize(queriesData[1]?.data || []).map(applySemanticProfile)
+    : [];
+  const groupedQueryIndex = hasSummaryQuery ? 2 : 1;
   const rankItems = (queriesData[0]?.data || []).map(row => ({
     category: String(row[groupColumn] ?? 'Outros'),
     value: numeric(row[metricLabels[0]]),
@@ -129,22 +225,95 @@ export default function transformProps(chartProps) {
     values: metricLabels.map(label => numeric(row[label])),
   })).sort((left, right) => right.values.reduce((sum, value) => sum + Math.abs(value), 0)
     - left.values.reduce((sum, value) => sum + Math.abs(value), 0));
-  const grouped = normalize(queriesData[1]?.data || [], true).map(applySemanticProfile);
+  const hierarchyRows = (queriesData[0]?.data || []).map(row => ({
+    level: numeric(row.drill_level),
+    path: hierarchyColumns.map(column => row[column] == null ? null : String(row[column])),
+    value: numeric(row[metricLabels[0]]),
+    kpi: row.comparison_kpi == null ? null : String(row.comparison_kpi),
+    format: row.kpi_format == null ? null : String(row.kpi_format),
+  })).filter(row => row.level !== null && row.value !== null);
+  const grouped = normalize(queriesData[groupedQueryIndex]?.data || [], true).map(applySemanticProfile);
   const monthlyLastNonBlank = formData.semantic_period === 'month_last_nonblank';
-  // The query deliberately stays daily. Native filters are evaluated by
-  // Superset first; only then can we reproduce DAX LASTNONBLANK for each month
-  // without summing every daily snapshot in that month.
-  const semanticTimeline = monthlyLastNonBlank
-    ? [...timeline.reduce((months, row) => months.set(monthKey(row.date), row), new Map()).values()]
-    : timeline;
-  const latest = semanticTimeline[semanticTimeline.length - 1] || null;
-  const currentMonth = latest ? monthKey(latest.date) : null;
+  const collapseMonthly = rows => [...rows.reduce(
+    (months, row) => months.set(monthKey(row.date), row),
+    new Map(),
+  ).values()];
+  // The primary query owns the plotted timeline. A weekly Panorama sales card
+  // may provide a second, monthly query from the same datasource so MTD/U3M
+  // stay on the certified monthly DAX contract inside one Superset slice.
+  const semanticTimeline = monthlyLastNonBlank ? collapseMonthly(timeline) : timeline;
+  const semanticSummaryTimeline = summaryTimeline.length
+    ? collapseMonthly(summaryTimeline)
+    : semanticTimeline;
+  const semanticAnchorDate = asDate(formData.semantic_anchor_date);
+  const anchoredTimeline = semanticAnchorDate
+    ? semanticSummaryTimeline.filter(row => row.date <= semanticAnchorDate)
+    : semanticSummaryTimeline;
+  const availableLatest = anchoredTimeline[anchoredTimeline.length - 1] || null;
+  // PBIP M0 is a calendar flag, even when that month has no fact rows.
+  const latest = semanticAnchorDate
+    ? anchoredTimeline.filter(row => monthKey(row.date) === monthKey(semanticAnchorDate)).at(-1)
+      || { date: semanticAnchorDate, values: [], components: [] }
+    : availableLatest;
+  const timelineLatest = semanticAnchorDate ? latest : semanticTimeline[semanticTimeline.length - 1] || null;
+  const boundaryAnchor = semanticAnchorDate || latest?.date;
+  const annualBoundary = boundaryAnchor ? new Date(Date.UTC(
+    boundaryAnchor.getUTCFullYear() - 1, boundaryAnchor.getUTCMonth(), boundaryAnchor.getUTCDate(),
+  )) : null;
+  const annualCalendarRows = semanticAnchorDate
+    ? anchoredTimeline.filter(row => row.date > annualBoundary && row.date <= semanticAnchorDate)
+    : semanticSummaryTimeline.slice(-12);
+  // Consume the already frozen annual window. An explicit iterator context
+  // can retain fewer calendar members without equating absent facts to BLANK.
+  const annualFirstDay = annualBoundary ? new Date(annualBoundary.getTime() + 86400000) : null;
+  const windowMemberMonths = annualFirstDay && boundaryAnchor
+    ? Array.from({ length: 13 }, (_, offset) => shiftMonth(boundaryAnchor, offset - 12))
+      .filter(member => member >= monthKey(annualFirstDay)) : [];
+  const annualMemberMonths = Array.isArray(formData.pbip_roi_annual_members)
+    ? [...new Set(formData.pbip_roi_annual_members)].filter(member => windowMemberMonths.includes(member))
+    : windowMemberMonths;
+  const pbipAnnualBlank = formData.pbip_roi_annual_blank === true
+    && semanticProfile === 'roi' && pbipDaxZeroGuard;
+  const currentMonth = timelineLatest ? monthKey(timelineLatest.date) : null;
   const lastByMonth = new Map();
-  semanticTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
-  const outputCount = ['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
-    : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup'].includes(semanticProfile) ? 1
-      : metricLabels.length;
+  semanticSummaryTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
+  const outputCount = metricSemantics.length || (['osa_bundle', 'pbip_osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
+    : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup', 'markup_blank'].includes(semanticProfile) ? 1
+      : metricLabels.length);
   const displayMetricLabels = labels.slice(0, outputCount);
+  const metricSpecValue = (spec, row) => {
+    if (!row) return null;
+    if (spec) {
+      return semanticValue(
+        spec.profile,
+        row.components.slice(spec.offset, spec.offset + spec.count),
+      )[0] ?? null;
+    }
+    return row.values[0] ?? null;
+  };
+  const c05QueryIndex = (hasSummaryQuery ? 2 : 1) + (variant === 'bars' && groupColumn ? 1 : 0);
+  const c05FullRow = formData.pbip_sellout_u3m
+    ? normalize(queriesData[c05QueryIndex]?.data || []).map(applySemanticProfile).at(-1)
+    : null;
+  const summaryValue = (index, prior) => {
+    if (formData.pbip_sellout_u3m) {
+      if (semanticProfile === 'roi' || semanticProfile === 'markup' || semanticProfile === 'markup_blank') {
+        return c05FullRow?.values[index] ?? null;
+      }
+      if (index === 0) return c05FullRow?.values[0] == null ? null : c05FullRow.values[0] / 3;
+    }
+    const mode = metricSummaryModes[index] || 'u3m';
+    if (mode === 'annual12') {
+      const rows = semanticSummaryTimeline.slice(-12);
+      const values = rows.map(row => metricSemantics[index]
+        ? metricSpecValue(metricSemantics[index], row)
+        : row.values[index]).filter(value => value != null);
+      return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+    }
+    return metricSemantics[index]
+      ? aggregateMetricSpec(metricSemantics[index], prior)
+      : semanticAggregate(semanticProfile, prior, index, pbipDaxZeroGuard);
+  };
   const indicators = displayMetricLabels.map((label, index) => {
     const previous = latest ? lastByMonth.get(shiftMonth(latest.date, -1)) : null;
     const prior = latest ? [-1, -2, -3].map(offset => lastByMonth.get(shiftMonth(latest.date, offset))) : [];
@@ -156,18 +325,26 @@ export default function transformProps(chartProps) {
       label: labels[index] || label,
       format: formats[index] || formats[0] || 'number',
       lowerIsBetter: (directions[index] || directions[0]) !== 'higher',
-      current: latest?.values[index] ?? null,
-      previous: previous?.values[index] ?? null,
+      // A missing monthly fact row leaves components absent. Only the PBIP
+      // scalar guard evaluates that BLANK context; no timeline row is inserted.
+      current: latest?.values[index] ?? (pbipDaxZeroGuard && latest
+        ? semanticValue(semanticProfile, latest.components, true)[index] : null),
+      previous: previous?.values[index] ?? (pbipDaxZeroGuard && latest && !previous
+        ? semanticValue(semanticProfile, [], true)[index] : null),
       // DAX contract: DIVIDE(M1 + M2 + M3, 3). Missing months do not
       // change the denominator and BLANK participates as zero in the sum.
-      average: latest ? semanticAggregate(semanticProfile, prior, index) : null,
+      average: latest ? summaryValue(index, prior) : null,
       lastYear: disableLy ? { current: null, previous: null, average: null } : {
         current: priorYearCurrent?.values[index] ?? null,
         previous: priorYearPrevious?.values[index] ?? null,
-        average: latest ? semanticAggregate(semanticProfile, priorYear, index) : null,
+        average: latest ? (metricSemantics[index]
+          ? aggregateMetricSpec(metricSemantics[index], priorYear)
+          : semanticAggregate(semanticProfile, priorYear, index, pbipDaxZeroGuard)) : null,
       },
       annual: semanticProfile === 'roi' && latest
-        ? semanticTimeline.slice(-12).reduce((sum, row) => sum + (row.values[0] ?? 0), 0)
+        ? (pbipAnnualBlank
+          ? pbipAnnualRoiSum(annualCalendarRows, annualMemberMonths, pbipDaxZeroGuard)
+          : annualCalendarRows.reduce((sum, row) => sum + (row.values[0] ?? 0), 0))
         : null,
     };
   });
@@ -175,9 +352,17 @@ export default function transformProps(chartProps) {
   grouped.filter(row => ALLOWED_ACTIVITY_LEVELS.includes(row.category)).forEach(row => {
     const entry = categories.get(row.category) || {};
     if (monthKey(row.date) === currentMonth) entry.current = row.values[0];
-    if (latest && monthKey(row.date) === shiftMonth(latest.date, -1)) entry.previous = row.values[0];
+    if (timelineLatest && monthKey(row.date) === shiftMonth(timelineLatest.date, -1)) entry.previous = row.values[0];
     categories.set(row.category, entry);
   });
+  const parsedTimelineLimit = Number(formData.timeline_limit);
+  const parsedSummaryCount = Number(formData.summary_count);
+  const displayTimeline = semanticTimeline.map(row => ({
+    ...row,
+    values: row.values.map((value, index) => (
+      timelineZeroBlankIndices.has(index) && value === 0 ? null : value
+    )),
+  }));
   return {
     width, height, semanticProfile,
     title: formData.card_title || 'NeoRetail',
@@ -188,9 +373,14 @@ export default function transformProps(chartProps) {
     showTasks: formData.show_tasks !== false,
     showAnnual: formData.show_annual === true,
     taskLabels: splitConfig(formData.task_labels, ['itens críticos', 'itens com risco']),
+    summaryLabels,
     chartStyles: splitConfig(formData.chart_styles, ['bar', 'bar', 'line']),
     timeGrain: monthlyLastNonBlank ? 'P1M' : (formData.time_grain_sqla || 'P1M'),
-    summaryCount: Math.max(0, Number(formData.summary_count) || indicators.length),
+    timelineLimit: Number.isFinite(parsedTimelineLimit) && parsedTimelineLimit > 0
+      ? Math.floor(parsedTimelineLimit) : 12,
+    summaryCount: formData.summary_count !== undefined && formData.summary_count !== ''
+      && Number.isFinite(parsedSummaryCount)
+      ? Math.max(0, Math.floor(parsedSummaryCount)) : indicators.length,
     indicators,
     critical: latest?.critical || 0,
     risk: latest?.risk || 0,
@@ -198,7 +388,7 @@ export default function transformProps(chartProps) {
       ? semanticTimeline
       : timeline.filter(row => monthKey(row.date) === currentMonth))
       .map(row => ({ date: row.date, value: row.values[0] })),
-    timeline: semanticTimeline.map(row => ({ date: row.date, values: row.values, components: row.components })),
+    timeline: displayTimeline.map(row => ({ date: row.date, values: row.values, components: row.components })),
     bars: ALLOWED_ACTIVITY_LEVELS
       .filter(category => categories.has(category))
       .map(category => {
@@ -207,6 +397,24 @@ export default function transformProps(chartProps) {
       }),
     rankItems,
     rankSeries,
-    hasData: ['rankbars', 'verticalbars', 'stackedrank'].includes(variant) ? rankItems.length > 0 : timeline.length > 0,
+    hierarchyRows,
+    hierarchyColumns,
+    // Each distinct row is tenant-scoped by the dataset's id_customer RLS.
+    // Redundancy across KPI and month is intentional in the SQL: deduplicate
+    // in the small toolbar component for independent year/month/KPI controls.
+    filterOptions: variant === 'kpifilters'
+      ? (queriesData[0]?.data || []).map(row => ({
+        year: Number(row.comparison_year),
+        month: Number(row.comparison_month),
+        monthKey: String(row.comparison_year_month || ''),
+        kpi: String(row.comparison_kpi || ''),
+        kpiOrder: Number(row['AP KPI ordem'] ?? row.kpi_order),
+      })).filter(row => Number.isFinite(row.year)
+        && Number.isFinite(row.month) && row.monthKey && row.kpi)
+      : [],
+    hierarchyFormat: hierarchyRows[0]?.format || formats[0] || 'number',
+    hierarchyKpi: hierarchyRows[0]?.kpi || labels[0] || '',
+    hasData: variant === 'hierarchyrank' ? hierarchyRows.length > 0
+      : ['rankbars', 'verticalbars', 'stackedrank'].includes(variant) ? rankItems.length > 0 : timeline.length > 0,
   };
 }

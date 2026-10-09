@@ -66,7 +66,10 @@ export default {
                 ['multi', t('Indicadores múltiplos')],
                 ['osa', t('OSA com tarefas')],
                 ['panorama', t('Evolutivo panorama')],
+                ['panoramasummary', t('Resumo do evolutivo panorama')],
                 ['rankbars', t('Ranking em barras')],
+                ['hierarchyrank', t('Barras hierárquicas')],
+                ['kpifilters', t('Barra de filtros dos KPIs')],
                 ['stacked', t('Colunas empilhadas')],
                 ['verticalbars', t('Barras verticais')],
                 ['headlinearea', t('Indicador com área')],
@@ -86,6 +89,69 @@ export default {
           {
             name: 'summary_count',
             config: { type: 'TextControl', label: t('Quantidade de resumos'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'summary_labels',
+            config: { type: 'TextControl', label: t('Rótulos secundários do resumo'), description: t('Separe por |; padrão U3M.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'metric_summary_modes',
+            config: { type: 'TextControl', label: t('Modos do resumo'), description: t('u3m ou annual12; separe por |.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'timeline_zero_blank_indices',
+            config: { type: 'TextControl', label: t('Zeros como BLANK na timeline'), description: t('Índices de saída separados por |, começando em 0.'), default: '', renderTrigger: true },
+          },
+        ],
+        [
+          {
+            name: 'metric_semantics',
+            config: {
+              type: 'TextControl',
+              label: t('Semantica das metricas'),
+              description: t('Perfil:inicio:quantidade; separe as saidas por |.'),
+              default: '',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'timeline_limit',
+            config: {
+              type: 'TextControl',
+              label: t('Limite de periodos'),
+              default: '12',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'timeline_query_scope',
+            config: {
+              type: 'TextControl',
+              label: t('Escopo da timeline'),
+              default: '',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'summary_query_scope',
+            config: {
+              type: 'TextControl',
+              label: t('Escopo do resumo'),
+              default: '',
+              renderTrigger: true,
+            },
           },
         ],
         [
