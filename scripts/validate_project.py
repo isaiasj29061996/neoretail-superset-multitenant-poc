@@ -223,9 +223,11 @@ def main() -> None:
     customers = yaml.safe_load(
         (ROOT / "config/customers.yaml").read_text(encoding="utf-8")
     )["customers"]
-    assert [row["id_customer"] for row in customers] == [142]
+    assert [row["id_customer"] for row in customers] == [142, 17066, 290, 16868]
     assert customers[0]["nm_customer"] == "AMBEV"
-    assert len({row["source_prefix"] for row in customers}) == 1
+    assert customers[0]["source_prefix"] == "FATO/CUSTOMER/DAILY/NM_CUSTOMER=AMBEV"
+    assert all(row["source_prefix"] is None and row["source_layout"] is None for row in customers[1:])
+    assert [row["execution_active"] for row in customers] == [False, True, False, False]
 
     embedded = (ROOT / "embedded-app/server.js").read_text(encoding="utf-8")
     assert "id_customer = ${idCustomer}" in embedded

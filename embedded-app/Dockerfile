@@ -9,7 +9,7 @@ RUN npm run build && npm prune --omit=dev
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json server.js smoke.mjs ./
+COPY package.json server.js smoke.mjs tenant-registry.js ./
 COPY assistant ./assistant
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/public ./public

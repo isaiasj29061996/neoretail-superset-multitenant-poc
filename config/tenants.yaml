@@ -81,9 +81,8 @@ navigation:
     label: Exportação
 
 # POC local. Em produção, usuários e permissões virão do backend NeoRetail.
-customers:
-  "142":
-    name: AMBEV
+customer_access:
+  ambev:
     modules: [visao_industria, tarefas, exportacao_diaria, exportacao_mensal]
 
 users:

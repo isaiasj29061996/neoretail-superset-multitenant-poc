@@ -1,10 +1,19 @@
 param(
-    [int[]]$CustomerIds = @(142)
+    [int[]]$CustomerIds = @()
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 Set-Location $PSScriptRoot
+
+# No implicit baseline refresh. Preflight resolves only automatic tenants and
+# rejects pending source metadata before any data pipeline step is started.
+if ($CustomerIds.Count -eq 0) {
+    $contextsJson = docker compose exec -T local-engine python -m neoretail_local.customers --active --require-source
+    if ($LASTEXITCODE -ne 0) { throw "Automatic tenant resolution failed; no refresh started." }
+    $CustomerIds = @($contextsJson | ConvertFrom-Json | ForEach-Object { $_.id_customer })
+    if ($CustomerIds.Count -eq 0) { throw "No automatic tenants configured; no refresh started." }
+}
 
 foreach ($customerId in $CustomerIds) {
     Write-Host "Atualizando ID_CUSTOMER=$customerId" -ForegroundColor Cyan

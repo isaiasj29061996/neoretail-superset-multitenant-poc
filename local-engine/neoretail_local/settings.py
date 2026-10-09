@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from .customers import Customer, resolve_customer
+from .customers import Customer, customer_modules, resolve_customer
 
 
 def required(name: str) -> str:
@@ -52,9 +52,6 @@ class Settings:
         require_blob: bool = True,
         customer_selector: str | int | None = None,
     ) -> "Settings":
-        connection_string = required("AZURE_STORAGE_CONNECTION_STRING") if require_blob else os.getenv(
-            "AZURE_STORAGE_CONNECTION_STRING", ""
-        ).strip()
         lake_format = os.getenv("LOCAL_LAKE_FORMAT", "parquet").strip().lower()
         if lake_format not in {"parquet", "delta"}:
             raise RuntimeError("LOCAL_LAKE_FORMAT deve ser parquet ou delta")
@@ -64,7 +61,11 @@ class Settings:
         customer = resolve_customer(
             customers_config_path,
             customer_selector or os.getenv("NEORETAIL_CUSTOMER"),
+            require_source=True,
         )
+        connection_string = required("AZURE_STORAGE_CONNECTION_STRING") if require_blob else os.getenv(
+            "AZURE_STORAGE_CONNECTION_STRING", ""
+        ).strip()
         return cls(
             connection_string=connection_string,
             container=os.getenv("AZURE_STORAGE_CONTAINER", "neoretail").strip() or "neoretail",
@@ -100,6 +101,17 @@ class Settings:
     @property
     def nm_customer(self) -> str:
         return self.customer.nm_customer
+
+    @property
+    def tenant_context(self) -> Customer:
+        return self.customer
+
+    @property
+    def customer_modules(self) -> tuple[str, ...]:
+        return customer_modules(
+            Path(os.getenv("TENANTS_CONFIG", str(self.customers_config_path.with_name("tenants.yaml")))),
+            self.customer,
+        )
 
     @property
     def customer_source_prefix(self) -> str:

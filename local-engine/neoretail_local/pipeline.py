@@ -719,7 +719,7 @@ def step_08_quality_gate(settings: Settings, spark) -> dict[str, Any]:
         tenant_ready = "id_customer" in frame.columns
         allow_empty = (
             table == "dim_catalogo_produtos"
-            and "mercado" not in settings.customer.modules
+            and "mercado" not in settings.customer_modules
         )
         checks.append(
             Row(
@@ -818,8 +818,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Pipeline NeoRetail V9 multitenant")
     parser.add_argument("--step", choices=["all", *STEPS], default="all")
     parser.add_argument(
-        "--customer",
-        help="ID_CUSTOMER ou NM_CUSTOMER registrado em config/customers.yaml",
+        "--customer", "--tenant",
+        help="Tenant key, ID_CUSTOMER ou NM_CUSTOMER registrado em config/customers.yaml",
     )
     args = parser.parse_args()
     if args.step == "all":
