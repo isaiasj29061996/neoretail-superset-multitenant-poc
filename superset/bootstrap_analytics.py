@@ -7,6 +7,7 @@ from urllib.parse import quote_plus
 
 from sqlalchemy import text
 from superset.app import create_app
+from neoretail_bootstrap.core.analytics_performance import analytics_engine_extra
 
 
 def required(name: str) -> str:
@@ -64,6 +65,7 @@ def main() -> None:
         # Superset. O flush mantem a instancia ligada a sessao para que a URI
         # possa ser descriptografada durante get_sqla_engine().
         database.set_sqlalchemy_uri(uri)
+        database.extra = analytics_engine_extra(database.extra)
         database.expose_in_sqllab = True
         database.allow_ctas = False
         database.allow_cvas = False

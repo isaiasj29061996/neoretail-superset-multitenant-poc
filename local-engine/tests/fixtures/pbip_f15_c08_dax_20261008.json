@@ -1,0 +1,100 @@
+{
+  "source": "generated\\pbi_lactalis_reference_20261008\\NeoRetail Pocket RF.SemanticModel\\definition\\tables\\_Metricas.tmdl",
+  "source_kind": "Exact PBIP TMDL, independently rechecked",
+  "measures": {
+    "IVD MTD": {
+      "name": "IVD MTD",
+      "table": "_Metricas",
+      "dax": "CALCULATE(\n\t\t\t   [IVD],\n\t\t\t    '0_0_CALENDARIO'[M0] = TRUE())",
+      "definition": "measure 'IVD MTD' =\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t   [IVD],\n\t\t\t    '0_0_CALENDARIO'[M0] = TRUE())\n\t\tdisplayFolder: _IVD\n\t\tlineageTag: c55bd88d-fa91-473a-b6cb-10b2f2f617e1\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n",
+      "format_string": null
+    },
+    "IVD": {
+      "name": "IVD",
+      "table": "_Metricas",
+      "dax": "CALCULATE(\n\t\t\t    SUM(FATOS_PARTICULAR_TVD_IVD[IVD_SIMPLIFICADO]),\n\t\t\t\n\t\t\t    LASTNONBLANK(\n\t\t\t        '0_0_CALENDARIO'[Data],\n\t\t\t        CALCULATE(\n\t\t\t            SUM(FATOS_PARTICULAR_TVD_IVD[IVD_SIMPLIFICADO])\n\t\t\t        )\n\t\t\t    ),\n\t\t\t\n\t\t\t    ALL(AP_CONVERSAO),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_LOCAL,\n\t\t\t        NOT DIM_LOCAL[TIPO_LOCAL]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    ),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_CATALOGO_LOCAL,\n\t\t\t        NOT DIM_CATALOGO_LOCAL[Tipo local]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    )\n\t\t\t)",
+      "definition": "measure IVD =\n\t\t\t\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t    SUM(FATOS_PARTICULAR_TVD_IVD[IVD_SIMPLIFICADO]),\n\t\t\t\n\t\t\t    LASTNONBLANK(\n\t\t\t        '0_0_CALENDARIO'[Data],\n\t\t\t        CALCULATE(\n\t\t\t            SUM(FATOS_PARTICULAR_TVD_IVD[IVD_SIMPLIFICADO])\n\t\t\t        )\n\t\t\t    ),\n\t\t\t\n\t\t\t    ALL(AP_CONVERSAO),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_LOCAL,\n\t\t\t        NOT DIM_LOCAL[TIPO_LOCAL]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    ),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_CATALOGO_LOCAL,\n\t\t\t        NOT DIM_CATALOGO_LOCAL[Tipo local]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    )\n\t\t\t)\n\t\tdisplayFolder: _IVD\n\t\tlineageTag: 17c35dc9-8b1f-4fe4-9e04-935ff6b0d498\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vValor = SELECTEDMEASURE()\n\t\t\t\tvar Unidade = SELECTEDVALUE(AP_CONVERSAO[nm_measure])\n\t\t\t\t\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        ABS(vValor) >= 1000000000,\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0,,,.00B\"),\n\t\t\t\t\n\t\t\t\t        ABS(vValor) >= 1000000,\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0,,.00M\"),\n\t\t\t\t\n\t\t\t\t        ABS(vValor) >= 1000,\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0,.00K\"),\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0.00; -#,0.00; 0.00\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\t\n\t\t\t\treturn\n\t\t\t\t    vAjuste\n\n",
+      "format_string": null
+    },
+    "IVD Mes Ant": {
+      "name": "IVD Mes Ant",
+      "table": "_Metricas",
+      "dax": "CALCULATE(\n\t\t\t   [IVD],\n\t\t\t    '0_0_CALENDARIO'[M-1] = TRUE())",
+      "definition": "measure 'IVD Mes Ant' =\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t   [IVD],\n\t\t\t    '0_0_CALENDARIO'[M-1] = TRUE())\n\t\tdisplayFolder: _IVD\n\t\tlineageTag: 0275e9c1-268d-47e5-b9c1-7bafec117ba8\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n",
+      "format_string": null
+    },
+    "IVD U3M": {
+      "name": "IVD U3M",
+      "table": "_Metricas",
+      "dax": "VAR M1 =\n\t\t\t    CALCULATE(\n\t\t\t        [IVD],\n\t\t\t        '0_0_CALENDARIO'[M-1] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M2 =\n\t\t\t    CALCULATE(\n\t\t\t        [IVD],\n\t\t\t        '0_0_CALENDARIO'[M-2] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M3 =\n\t\t\t    CALCULATE(\n\t\t\t        [IVD],\n\t\t\t        '0_0_CALENDARIO'[M-3] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tRETURN\n\t\t\tDIVIDE(M1 + M2 + M3, 3)",
+      "definition": "measure 'IVD U3M' =\n\t\t\t\n\t\t\tVAR M1 =\n\t\t\t    CALCULATE(\n\t\t\t        [IVD],\n\t\t\t        '0_0_CALENDARIO'[M-1] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M2 =\n\t\t\t    CALCULATE(\n\t\t\t        [IVD],\n\t\t\t        '0_0_CALENDARIO'[M-2] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M3 =\n\t\t\t    CALCULATE(\n\t\t\t        [IVD],\n\t\t\t        '0_0_CALENDARIO'[M-3] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tRETURN\n\t\t\tDIVIDE(M1 + M2 + M3, 3)\n\t\tdisplayFolder: _IVD\n\t\tlineageTag: a92035e3-bdec-403e-9e37-fddd6b0eab4e\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n",
+      "format_string": null
+    },
+    "TVD MTD": {
+      "name": "TVD MTD",
+      "table": "_Metricas",
+      "dax": "CALCULATE(\n\t\t\t   [TVD],\n\t\t\t    '0_0_CALENDARIO'[M0] = TRUE())",
+      "definition": "measure 'TVD MTD' =\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t   [TVD],\n\t\t\t    '0_0_CALENDARIO'[M0] = TRUE())\n\t\tdisplayFolder: _TVD\n\t\tlineageTag: defa65b6-bffa-4649-9d03-9e24d39ef2e1\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n",
+      "format_string": null
+    },
+    "TVD": {
+      "name": "TVD",
+      "table": "_Metricas",
+      "dax": "CALCULATE(\n\t\t\t    SUM(FATOS_PARTICULAR_TVD_IVD[TVD_SIMPLIFICADO]),\n\t\t\t\n\t\t\t    LASTNONBLANK(\n\t\t\t        '0_0_CALENDARIO'[Data],\n\t\t\t        CALCULATE(\n\t\t\t            SUM(FATOS_PARTICULAR_TVD_IVD[TVD_SIMPLIFICADO])\n\t\t\t        )\n\t\t\t    ),\n\t\t\t\n\t\t\t    ALL(AP_CONVERSAO),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_LOCAL,\n\t\t\t        NOT DIM_LOCAL[TIPO_LOCAL]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    ),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_CATALOGO_LOCAL,\n\t\t\t        NOT DIM_CATALOGO_LOCAL[Tipo local]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    )\n\t\t\t)",
+      "definition": "measure TVD =\n\t\t\t\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t    SUM(FATOS_PARTICULAR_TVD_IVD[TVD_SIMPLIFICADO]),\n\t\t\t\n\t\t\t    LASTNONBLANK(\n\t\t\t        '0_0_CALENDARIO'[Data],\n\t\t\t        CALCULATE(\n\t\t\t            SUM(FATOS_PARTICULAR_TVD_IVD[TVD_SIMPLIFICADO])\n\t\t\t        )\n\t\t\t    ),\n\t\t\t\n\t\t\t    ALL(AP_CONVERSAO),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_LOCAL,\n\t\t\t        NOT DIM_LOCAL[TIPO_LOCAL]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    ),\n\t\t\t\n\t\t\t    FILTER(\n\t\t\t        DIM_CATALOGO_LOCAL,\n\t\t\t        NOT DIM_CATALOGO_LOCAL[Tipo local]\n\t\t\t            IN {\"DEPÓSITO\", \"CD\", \"LOJA VIRTUAL\"}\n\t\t\t    )\n\t\t\t)\n\t\tdisplayFolder: _TVD\n\t\tlineageTag: 5c553fe7-d56c-4278-b46d-1152ccc1e58b\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vValor = SELECTEDMEASURE()\n\t\t\t\tvar Unidade = SELECTEDVALUE(AP_CONVERSAO[nm_measure])\n\t\t\t\t\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        ABS(vValor) >= 1000000000,\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0,,,.00B\"),\n\t\t\t\t\n\t\t\t\t        ABS(vValor) >= 1000000,\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0,,.00M\"),\n\t\t\t\t\n\t\t\t\t        ABS(vValor) >= 1000,\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0,.00K\"),\n\t\t\t\t            \"R$ \" & FORMAT(vValor, \"#,0.00; -#,0.00; 0.00\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\t\n\t\t\t\treturn\n\t\t\t\t    vAjuste\n\n",
+      "format_string": null
+    },
+    "TVD Mes Ant": {
+      "name": "TVD Mes Ant",
+      "table": "_Metricas",
+      "dax": "CALCULATE(\n\t\t\t   [TVD],\n\t\t\t    '0_0_CALENDARIO'[M-1] = TRUE())",
+      "definition": "measure 'TVD Mes Ant' =\n\t\t\t\n\t\t\tCALCULATE(\n\t\t\t   [TVD],\n\t\t\t    '0_0_CALENDARIO'[M-1] = TRUE())\n\t\tdisplayFolder: _TVD\n\t\tlineageTag: d74deafa-fffb-4e59-aea1-817c6870afa8\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n",
+      "format_string": null
+    },
+    "TVD U3M": {
+      "name": "TVD U3M",
+      "table": "_Metricas",
+      "dax": "VAR M1 =\n\t\t\t    CALCULATE(\n\t\t\t        [TVD],\n\t\t\t        '0_0_CALENDARIO'[M-1] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M2 =\n\t\t\t    CALCULATE(\n\t\t\t        [TVD],\n\t\t\t        '0_0_CALENDARIO'[M-2] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M3 =\n\t\t\t    CALCULATE(\n\t\t\t        [TVD],\n\t\t\t        '0_0_CALENDARIO'[M-3] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tRETURN\n\t\t\tDIVIDE(M1 + M2 + M3, 3)",
+      "definition": "measure 'TVD U3M' =\n\t\t\t\n\t\t\tVAR M1 =\n\t\t\t    CALCULATE(\n\t\t\t        [TVD],\n\t\t\t        '0_0_CALENDARIO'[M-1] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M2 =\n\t\t\t    CALCULATE(\n\t\t\t        [TVD],\n\t\t\t        '0_0_CALENDARIO'[M-2] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tVAR M3 =\n\t\t\t    CALCULATE(\n\t\t\t        [TVD],\n\t\t\t        '0_0_CALENDARIO'[M-3] = TRUE()\n\t\t\t    )\n\t\t\t\n\t\t\tRETURN\n\t\t\tDIVIDE(M1 + M2 + M3, 3)\n\t\tdisplayFolder: _TVD\n\t\tlineageTag: aa7e575a-2fc7-4013-b3e3-c4ca3c4f3dc2\n\n\t\tformatStringDefinition =\n\t\t\t\tvar vvalor = SELECTEDMEASURE()\n\t\t\t\tvar vAjuste =\n\t\t\t\t    \"\"\"\" &\n\t\t\t\t    SWITCH(\n\t\t\t\t        TRUE(),\n\t\t\t\t        vvalor >= 1000000000, FORMAT(divide(vvalor,1000000000), \"R$ #.##,B\"),\n\t\t\t\t        vvalor >= 1000000,    FORMAT(divide(vvalor,1000000), \"R$ #.##M\"),\n\t\t\t\t        vvalor >= 1000,       FORMAT(divide(vvalor,1000), \"R$ #.##K\"),\n\t\t\t\t                              FORMAT(vvalor, \"R$ #,0\")\n\t\t\t\t    )\n\t\t\t\t    & \"\"\"\"\n\t\t\t\treturn\n\t\t\t\tvAjuste\n\n",
+      "format_string": null
+    }
+  },
+  "visuals": [
+    {
+      "kpi": "IVD - Excesso",
+      "period": "MTD",
+      "pbi_measure": "IVD MTD",
+      "pbi_visual": "5b0148a6b8d797c7d048"
+    },
+    {
+      "kpi": "IVD - Excesso",
+      "period": "Mês anterior",
+      "pbi_measure": "IVD Mes Ant",
+      "pbi_visual": "5b0148a6b8d797c7d048"
+    },
+    {
+      "kpi": "IVD - Excesso",
+      "period": "Média U3M",
+      "pbi_measure": "IVD U3M",
+      "pbi_visual": "5b0148a6b8d797c7d048"
+    },
+    {
+      "kpi": "TVD - Pré-ruptura",
+      "period": "MTD",
+      "pbi_measure": "TVD MTD",
+      "pbi_visual": "dac3d05b03bc50d95a97"
+    },
+    {
+      "kpi": "TVD - Pré-ruptura",
+      "period": "Mês anterior",
+      "pbi_measure": "TVD Mes Ant",
+      "pbi_visual": "dac3d05b03bc50d95a97"
+    },
+    {
+      "kpi": "TVD - Pré-ruptura",
+      "period": "Média U3M",
+      "pbi_measure": "TVD U3M",
+      "pbi_visual": "dac3d05b03bc50d95a97"
+    }
+  ]
+}

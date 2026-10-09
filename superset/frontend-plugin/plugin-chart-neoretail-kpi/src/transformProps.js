@@ -17,12 +17,18 @@ const splitConfig = (value, fallback = []) => {
   const configured = String(value || '').split('|').map(item => item.trim()).filter(Boolean);
   return configured.length ? configured : fallback;
 };
-const semanticValue = (profile, components) => {
+// Ordinary DAX `= 0` in the certified PBIP ROI/Markup guards. This tests
+// a numeric measure BLANK without changing its stored component or DIVIDE.
+const daxEqualsZero = value => value == null || value === 0;
+const semanticValue = (profile, components, pbipDaxZeroGuard = false) => {
   if (!profile || ['direct_average', 'direct_sum', 'stock_bundle'].includes(profile)) return components;
   const numerator = components[0];
   const denominator = components[1];
+  if (pbipDaxZeroGuard && ['roi', 'markup'].includes(profile)
+    && (daxEqualsZero(numerator) || daxEqualsZero(denominator))) return [0];
   if (profile === 'roi') {
     const stockCost = components[2];
+    if (pbipDaxZeroGuard && stockCost == null) return [null];
     if (numerator === 0 || denominator === 0) return [0];
     if (numerator === null || denominator === null || stockCost === null || stockCost === 0) return [null];
     return [100 * (numerator - denominator) / stockCost];
@@ -32,6 +38,14 @@ const semanticValue = (profile, components) => {
     if (numerator === 0 || denominator === 0) return [0];
     if (numerator === null || denominator === null) return [null];
     return [100 * numerator / denominator];
+  }
+  if (profile === 'pbip_osa_bundle') {
+    const lossPriceCount = components[4];
+    const loss = components[2] == null || components[3] == null
+      || components[5] == null || !lossPriceCount
+      ? null : components[2] * components[5] * components[3] / lossPriceCount;
+    return [numerator == null || denominator == null || denominator === 0
+      ? null : 100 * (1 - numerator / denominator), loss];
   }
   if (profile === 'osa_bundle') {
     const osa = numerator == null || denominator == null || denominator === 0
@@ -47,7 +61,7 @@ const semanticValue = (profile, components) => {
   if (profile === 'distribution_bundle') return components.slice(0, 2);
   return components;
 };
-const semanticAggregate = (profile, rows, index) => {
+const semanticAggregate = (profile, rows, index, pbipDaxZeroGuard = false) => {
   if (!profile) return null;
   if (profile === 'direct_average') {
     const values = rows.map(row => row?.values[index]).filter(value => value != null);
@@ -74,13 +88,31 @@ const semanticAggregate = (profile, rows, index) => {
     if (value != null) components[componentIndex] = (components[componentIndex] ?? 0) + value;
   }));
   if (profile === 'osa_bundle' && index === 1) return components[2] == null ? null : components[2] / 3;
-  return semanticValue(profile, components)[index] ?? null;
+  if (profile === 'pbip_osa_bundle') {
+    // MAX factor is evaluated once in the selected dimension context, not summed.
+    const factors = rows.map(row => row?.components?.[5]).filter(value => value != null);
+    components[5] = factors.length ? Math.max(...factors) : null;
+    const value = semanticValue(profile, components)[index] ?? null;
+    return index === 1 && value != null ? value / 3 : value;
+  }
+  return semanticValue(profile, components, pbipDaxZeroGuard)[index] ?? null;
+};
+
+// SUMX ignores BLANK; no numeric return leaves the final sum BLANK.
+// Member presence and fact-row presence are separate inputs to this iterator.
+const pbipAnnualRoiSum = (rows, members, pbipDaxZeroGuard) => {
+  const byMonth = new Map(rows.map(row => [monthKey(row.date), row]));
+  const values = members.map(member => byMonth.has(member)
+    ? byMonth.get(member).values[0]
+    : semanticValue('roi', [], pbipDaxZeroGuard)[0]);
+  const numericValues = values.filter(value => value != null);
+  return numericValues.length ? numericValues.reduce((sum, value) => sum + value, 0) : null;
 };
 
 const VALID_SEMANTIC_PROFILES = [
   'direct_average', 'direct_sum', 'stock_bundle', 'weighted_average',
   'one_minus_ratio', 'ratio_percent', 'ratio', 'distribution_bundle',
-  'osa_bundle', 'roi', 'markup', 'markup_blank',
+  'osa_bundle', 'pbip_osa_bundle', 'roi', 'markup', 'markup_blank',
 ];
 
 // A Panorama combo can mix measures whose U3M semantics differ. Each spec is
@@ -148,9 +180,11 @@ export default function transformProps(chartProps) {
   const directions = splitConfig(formData.metric_directions, [formData.lower_is_better === false ? 'higher' : 'lower']);
   const criticalLabel = metricLabel(formData.critical_metric);
   const riskLabel = metricLabel(formData.risk_metric);
-  const semanticProfile = VALID_SEMANTIC_PROFILES.includes(formData.semantic_profile)
+  const semanticProfile = formData.pbip_loss_components ? 'pbip_osa_bundle' : VALID_SEMANTIC_PROFILES.includes(formData.semantic_profile)
     ? formData.semantic_profile
     : null;
+  const pbipDaxZeroGuard = formData.pbip_dax_zero_guard === true
+    && ['roi', 'markup'].includes(semanticProfile);
   const metricSemantics = parseMetricSemantics(formData.metric_semantics);
   const summaryLabels = splitConfig(formData.summary_labels, []);
   const metricSummaryModes = splitConfig(formData.metric_summary_modes, []);
@@ -173,7 +207,7 @@ export default function transformProps(chartProps) {
         spec.profile,
         components.slice(spec.offset, spec.offset + spec.count),
       )[0] ?? null)
-      : semanticValue(semanticProfile, components);
+      : semanticValue(semanticProfile, components, pbipDaxZeroGuard);
     return { ...row, components, values };
   };
   const timeline = normalize(queriesData[0]?.data || []).map(applySemanticProfile);
@@ -211,12 +245,39 @@ export default function transformProps(chartProps) {
   const semanticSummaryTimeline = summaryTimeline.length
     ? collapseMonthly(summaryTimeline)
     : semanticTimeline;
-  const timelineLatest = semanticTimeline[semanticTimeline.length - 1] || null;
-  const latest = semanticSummaryTimeline[semanticSummaryTimeline.length - 1] || null;
+  const semanticAnchorDate = asDate(formData.semantic_anchor_date);
+  const anchoredTimeline = semanticAnchorDate
+    ? semanticSummaryTimeline.filter(row => row.date <= semanticAnchorDate)
+    : semanticSummaryTimeline;
+  const availableLatest = anchoredTimeline[anchoredTimeline.length - 1] || null;
+  // PBIP M0 is a calendar flag, even when that month has no fact rows.
+  const latest = semanticAnchorDate
+    ? anchoredTimeline.filter(row => monthKey(row.date) === monthKey(semanticAnchorDate)).at(-1)
+      || { date: semanticAnchorDate, values: [], components: [] }
+    : availableLatest;
+  const timelineLatest = semanticAnchorDate ? latest : semanticTimeline[semanticTimeline.length - 1] || null;
+  const boundaryAnchor = semanticAnchorDate || latest?.date;
+  const annualBoundary = boundaryAnchor ? new Date(Date.UTC(
+    boundaryAnchor.getUTCFullYear() - 1, boundaryAnchor.getUTCMonth(), boundaryAnchor.getUTCDate(),
+  )) : null;
+  const annualCalendarRows = semanticAnchorDate
+    ? anchoredTimeline.filter(row => row.date > annualBoundary && row.date <= semanticAnchorDate)
+    : semanticSummaryTimeline.slice(-12);
+  // Consume the already frozen annual window. An explicit iterator context
+  // can retain fewer calendar members without equating absent facts to BLANK.
+  const annualFirstDay = annualBoundary ? new Date(annualBoundary.getTime() + 86400000) : null;
+  const windowMemberMonths = annualFirstDay && boundaryAnchor
+    ? Array.from({ length: 13 }, (_, offset) => shiftMonth(boundaryAnchor, offset - 12))
+      .filter(member => member >= monthKey(annualFirstDay)) : [];
+  const annualMemberMonths = Array.isArray(formData.pbip_roi_annual_members)
+    ? [...new Set(formData.pbip_roi_annual_members)].filter(member => windowMemberMonths.includes(member))
+    : windowMemberMonths;
+  const pbipAnnualBlank = formData.pbip_roi_annual_blank === true
+    && semanticProfile === 'roi' && pbipDaxZeroGuard;
   const currentMonth = timelineLatest ? monthKey(timelineLatest.date) : null;
   const lastByMonth = new Map();
   semanticSummaryTimeline.forEach(row => lastByMonth.set(monthKey(row.date), row));
-  const outputCount = metricSemantics.length || (['osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
+  const outputCount = metricSemantics.length || (['osa_bundle', 'pbip_osa_bundle', 'distribution_bundle'].includes(semanticProfile) ? 2
     : ['weighted_average', 'one_minus_ratio', 'ratio_percent', 'ratio', 'roi', 'markup', 'markup_blank'].includes(semanticProfile) ? 1
       : metricLabels.length);
   const displayMetricLabels = labels.slice(0, outputCount);
@@ -230,7 +291,17 @@ export default function transformProps(chartProps) {
     }
     return row.values[0] ?? null;
   };
+  const c05QueryIndex = (hasSummaryQuery ? 2 : 1) + (variant === 'bars' && groupColumn ? 1 : 0);
+  const c05FullRow = formData.pbip_sellout_u3m
+    ? normalize(queriesData[c05QueryIndex]?.data || []).map(applySemanticProfile).at(-1)
+    : null;
   const summaryValue = (index, prior) => {
+    if (formData.pbip_sellout_u3m) {
+      if (semanticProfile === 'roi' || semanticProfile === 'markup' || semanticProfile === 'markup_blank') {
+        return c05FullRow?.values[index] ?? null;
+      }
+      if (index === 0) return c05FullRow?.values[0] == null ? null : c05FullRow.values[0] / 3;
+    }
     const mode = metricSummaryModes[index] || 'u3m';
     if (mode === 'annual12') {
       const rows = semanticSummaryTimeline.slice(-12);
@@ -241,7 +312,7 @@ export default function transformProps(chartProps) {
     }
     return metricSemantics[index]
       ? aggregateMetricSpec(metricSemantics[index], prior)
-      : semanticAggregate(semanticProfile, prior, index);
+      : semanticAggregate(semanticProfile, prior, index, pbipDaxZeroGuard);
   };
   const indicators = displayMetricLabels.map((label, index) => {
     const previous = latest ? lastByMonth.get(shiftMonth(latest.date, -1)) : null;
@@ -254,8 +325,12 @@ export default function transformProps(chartProps) {
       label: labels[index] || label,
       format: formats[index] || formats[0] || 'number',
       lowerIsBetter: (directions[index] || directions[0]) !== 'higher',
-      current: latest?.values[index] ?? null,
-      previous: previous?.values[index] ?? null,
+      // A missing monthly fact row leaves components absent. Only the PBIP
+      // scalar guard evaluates that BLANK context; no timeline row is inserted.
+      current: latest?.values[index] ?? (pbipDaxZeroGuard && latest
+        ? semanticValue(semanticProfile, latest.components, true)[index] : null),
+      previous: previous?.values[index] ?? (pbipDaxZeroGuard && latest && !previous
+        ? semanticValue(semanticProfile, [], true)[index] : null),
       // DAX contract: DIVIDE(M1 + M2 + M3, 3). Missing months do not
       // change the denominator and BLANK participates as zero in the sum.
       average: latest ? summaryValue(index, prior) : null,
@@ -264,10 +339,12 @@ export default function transformProps(chartProps) {
         previous: priorYearPrevious?.values[index] ?? null,
         average: latest ? (metricSemantics[index]
           ? aggregateMetricSpec(metricSemantics[index], priorYear)
-          : semanticAggregate(semanticProfile, priorYear, index)) : null,
+          : semanticAggregate(semanticProfile, priorYear, index, pbipDaxZeroGuard)) : null,
       },
       annual: semanticProfile === 'roi' && latest
-        ? semanticSummaryTimeline.slice(-12).reduce((sum, row) => sum + (row.values[0] ?? 0), 0)
+        ? (pbipAnnualBlank
+          ? pbipAnnualRoiSum(annualCalendarRows, annualMemberMonths, pbipDaxZeroGuard)
+          : annualCalendarRows.reduce((sum, row) => sum + (row.values[0] ?? 0), 0))
         : null,
     };
   });

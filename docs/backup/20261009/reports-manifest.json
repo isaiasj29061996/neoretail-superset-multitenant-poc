@@ -1,0 +1,142 @@
+[
+  {
+    "worktree": "NeoRetail_V8_1_LOCAL_POSTGRES",
+    "original": "generated/lactalis_only_rebuild_audit_2026-10-07.md",
+    "sha256_original": "9a734950daefb4a7c0b074ee754b5050e6f2644d1836073bcd8ec8fdf645fd9b",
+    "versioned": "reports/NeoRetail_V8_1_LOCAL_POSTGRES__lactalis_only_rebuild_audit_2026-10-07.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/lactalis_push_audit_blocked.md",
+    "sha256_original": "4ef85aa1be44e9d9b864d83548382a921190b0505640929464ee0b2f73d177eb",
+    "versioned": "reports/osa-industry__lactalis_push_audit_blocked.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/lactalis_rebuild_report.md",
+    "sha256_original": "f18d4537bc0338bcb0a8a54076b55ac4c5ee421a5f189f7033b89dc636253638",
+    "versioned": "reports/osa-industry__lactalis_rebuild_report.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/lactalis_reconcile_final.md",
+    "sha256_original": "9595aa426db161da84409eb515bd59f24bb9651d4fbce3126df4085ea1c2d4b1",
+    "versioned": "reports/osa-industry__lactalis_reconcile_final.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbi_superset_semantic_equivalence_20261008.md",
+    "sha256_original": "ff7906bf7315858452450bd9623ae8f9cd28891ae17651d16ef13cabc83b0ff2",
+    "versioned": "reports/osa-industry__pbi_superset_semantic_equivalence_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbi_vs_superset_kpis_20261008.md",
+    "sha256_original": "60b201900268f70a90ba23ea4ea2913b8fb3ced52d712c3208f21b6ebfd9c5aa",
+    "versioned": "reports/osa-industry__pbi_vs_superset_kpis_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_c05_sellout_u3m_before_after_20261008.md",
+    "sha256_original": "d02d2fce3052a8035fcb6e1068af5120c79eb37bb5940579a66334eff8baf79d",
+    "versioned": "reports/osa-industry__pbip_c05_sellout_u3m_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_c14_cost_blank_before_after_20261008.md",
+    "sha256_original": "6dc5de69c82e925ff27915e168d1510ba478a91bb8c901defa5683da70c5a7f0",
+    "versioned": "reports/osa-industry__pbip_c14_cost_blank_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_c16_roi_markup_before_after_20261008.md",
+    "sha256_original": "6170bfc87eb1c5279a369a59995987f1d5f6355fafff15619f997181e8c355e3",
+    "versioned": "reports/osa-industry__pbip_c16_roi_markup_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_f13_final_20261008.md",
+    "sha256_original": "9fdd6ed4e388c987645bf4b200a2eab563e75578b3858c670612f0ddfa0f582a",
+    "versioned": "reports/osa-industry__pbip_f13_final_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_f13_selectors_before_after_20261008.md",
+    "sha256_original": "7d504aa86ae9cbfe1772df9496c03d9111af426520789abbb1dd45c244efa865",
+    "versioned": "reports/osa-industry__pbip_f13_selectors_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_f15_c08_tvd_ivd_before_after_20261008.md",
+    "sha256_original": "267f94259f34fd6f411e3e3d6b7d1bd9697c0b78f21a71e98a867324b02e41fc",
+    "versioned": "reports/osa-industry__pbip_f15_c08_tvd_ivd_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_filters_conversion_before_after_20261008.md",
+    "sha256_original": "ddbfa3472bfdb90d4b8eb1a8e6b0034fabf7c62280eea9953225a046d43c4988",
+    "versioned": "reports/osa-industry__pbip_filters_conversion_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_lactalis_corrections_before_after_20261008.md",
+    "sha256_original": "275729041d1aa45f8f61d77e2197ec4ee98b278eced5c9bfff5bc54e44c9ed28",
+    "versioned": "reports/osa-industry__pbip_lactalis_corrections_before_after_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_performance_optimization_20261008.md",
+    "sha256_original": "6b3282657833ed14cba5b7107e954c3e96403ed452cebb1c13aefe739eba2ca7",
+    "versioned": "reports/osa-industry__pbip_performance_optimization_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_performance_wave2_20261008.md",
+    "sha256_original": "45798b14597f360c569ace8369dbdc0e2289aea639324787b20270cee6d7b4ca",
+    "versioned": "reports/osa-industry__pbip_performance_wave2_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/pbip_roi_annual_blank_final_20261008.md",
+    "sha256_original": "0a78ec61d6e2e90331038886798f85bb4d2d0b33ff0d62082f43d9f212af83a9",
+    "versioned": "reports/osa-industry__pbip_roi_annual_blank_final_20261008.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/refresh_20261008_report.md",
+    "sha256_original": "6a1d73ea340509da115c73febb99d6e667471c7db4bd6e85e88d2e97e6fa975f",
+    "versioned": "reports/osa-industry__refresh_20261008_report.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/tvd_giro_rootcause_20261009_084854/report.md",
+    "sha256_original": "bd572b9db299661548b6511d57ba9733ca9fa4191481d725dc8bd427ad8d6201",
+    "versioned": "reports/osa-industry__tvd_giro_rootcause_20261009_084854__report.md",
+    "redacted": true
+  },
+  {
+    "worktree": "osa-industry",
+    "original": "generated/tvd_ivd_refresh_20261009_070824/report.md",
+    "sha256_original": "2aee57587173c10f55b86ef4ed6ed5d3e329ea714e4b89eb303b71e2eb9228f4",
+    "versioned": "reports/osa-industry__tvd_ivd_refresh_20261009_070824__report.md",
+    "redacted": true
+  }
+]
