@@ -52,7 +52,19 @@ export default function buildQuery(formData, options) {
       });
       const queries = [withScope(common, timelineScope)];
       if (summaryScope) queries.push(withScope(common, summaryScope, 'P1M'));
-      if (formData.card_variant === 'bars' && groupby.length) queries.push({ ...common, columns: [xAxis, ...groupby] });
+      if (formData.card_variant === 'bars' && groupby.length) queries.push({
+        ...common,
+        columns: [xAxis, ...groupby],
+        // The graph's activity categories must not narrow the headline DAX universe.
+        extras: formData.pbip_headline_scope ? {
+          ...common.extras,
+          where: String(common.extras.where || '').replace("semantic_scope = 'all'", "semantic_scope = 'activity'"),
+        } : common.extras,
+      });
+      if (formData.pbip_sellout_u3m ?? formData.pbipSelloutU3m) queries.push(withScope({
+        ...common,
+        extras: { ...common.extras, where: String(common.extras.where || '').replace("row_scope = 'monthly'", "row_scope = 'pbip_c05_u3m'") },
+      }, 'pbip_c05_u3m', 'P1M'));
       return queries;
     },
   });
